@@ -1,6 +1,8 @@
 package com.contactme.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,6 +10,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -25,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.contactme.app.ui.theme.ContactMeSpacing
 
 @Composable
 fun ProfileSetupScreen(onProfileReady: () -> Unit) {
@@ -34,7 +39,13 @@ fun ProfileSetupScreen(onProfileReady: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState())
+            .imePadding()
+            .navigationBarsPadding()
+            .padding(
+                horizontal = ContactMeSpacing.screenHorizontal,
+                vertical = ContactMeSpacing.screenVertical
+            ),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -52,7 +63,7 @@ fun ProfileSetupScreen(onProfileReady: () -> Unit) {
                 fontWeight = FontWeight.SemiBold
             )
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
         Text(
             text = "Set up your profile",
             style = MaterialTheme.typography.headlineMedium,
@@ -64,7 +75,7 @@ fun ProfileSetupScreen(onProfileReady: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = displayName,
@@ -72,7 +83,7 @@ fun ProfileSetupScreen(onProfileReady: () -> Unit) {
             singleLine = true,
             label = { Text(text = "Display name") }
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = username,
@@ -80,12 +91,13 @@ fun ProfileSetupScreen(onProfileReady: () -> Unit) {
             singleLine = true,
             label = { Text(text = "Username") }
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
         Button(
             modifier = Modifier.fillMaxWidth(),
             onClick = onProfileReady
         ) {
             Text(text = "Continue")
         }
+        Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
     }
 }

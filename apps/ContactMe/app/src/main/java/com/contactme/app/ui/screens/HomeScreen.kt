@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.contactme.app.navigation.HomeTab
+import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,8 +60,8 @@ fun HomeScreen() {
                     NavigationBarItem(
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
-                        icon = { Text(text = tab.label.first().toString()) },
-                        label = { Text(text = tab.label) }
+                        icon = { Text(text = tab.shortLabel.first().toString()) },
+                        label = { Text(text = tab.shortLabel) }
                     )
                 }
             }
@@ -70,7 +71,10 @@ fun HomeScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(20.dp)
+                .padding(
+                    horizontal = ContactMeSpacing.screenHorizontal,
+                    vertical = ContactMeSpacing.contentGap
+                )
         ) {
             when (selectedTab) {
                 HomeTab.Chats -> ChatsTab()
