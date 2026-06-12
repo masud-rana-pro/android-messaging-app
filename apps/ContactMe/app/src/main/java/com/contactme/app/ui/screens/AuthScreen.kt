@@ -1,5 +1,7 @@
 package com.contactme.app.ui.screens
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.contactme.app.navigation.AuthMode
+import com.contactme.app.ui.theme.ContactMeSpacing
 
 @Composable
 fun AuthScreen(onAuthSuccess: () -> Unit) {
@@ -33,7 +38,13 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState())
+            .imePadding()
+            .navigationBarsPadding()
+            .padding(
+                horizontal = ContactMeSpacing.screenHorizontal,
+                vertical = ContactMeSpacing.screenVertical
+            ),
         verticalArrangement = Arrangement.Center
     ) {
         Text(
@@ -48,7 +59,7 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
         )
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(ContactMeSpacing.sectionGap))
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = emailOrPhone,
@@ -56,7 +67,7 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
             singleLine = true,
             label = { Text(text = "Email or phone") }
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = password,
@@ -65,14 +76,14 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
             label = { Text(text = "Password") },
             visualTransformation = PasswordVisualTransformation()
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
         Button(
             modifier = Modifier.fillMaxWidth(),
             onClick = onAuthSuccess
         ) {
             Text(text = authMode.actionLabel)
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -90,5 +101,6 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                 Text(text = "Register")
             }
         }
+        Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
     }
 }
