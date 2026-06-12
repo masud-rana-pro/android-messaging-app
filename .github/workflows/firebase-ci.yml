@@ -1,0 +1,14 @@
+name: Firebase CI
+
+on:
+  pull_request:
+    paths:
+      - "firebase/**"
+      - "backend/firebase-functions/**"
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "TODO: Add Firebase checks."

@@ -1,0 +1,13 @@
+name: Android CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "TODO: Add Android CI after app scaffold is ready."
