@@ -1,19 +1,56 @@
-# Android / Gradle
-.gradle/
-build/
-local.properties
-*.apk
-*.aab
+# -----------------------------
+# ContactMe Git Ignore Rules
+# -----------------------------
+# Keep source code, docs, learning notes, Firebase rules, scripts, and Gradle wrapper files in Git.
+# Ignore only generated files, local machine settings, build outputs, and secrets.
 
-# IDE
+# Android / Gradle generated files
+.gradle/
+.kotlin/
+build/
+**/build/
+
+# Local Android Studio / SDK machine settings
+local.properties
+**/local.properties
+
+# IDE user-specific files
 .idea/
+**/.idea/
 *.iml
 
-# OS
+# Build artifacts
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# Kotlin / Java / Gradle logs
+*.log
+hs_err_pid*
+replay_pid*
+
+# OS generated files
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# Secrets
+# Secrets and signing files
+.env
+.env.*
 *.keystore
 *.jks
-.env
+*.p12
+*.pem
+
+# Firebase / Google service config
+# Keep these out until you intentionally decide how to manage environment-specific config.
+google-services.json
+GoogleService-Info.plist
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo

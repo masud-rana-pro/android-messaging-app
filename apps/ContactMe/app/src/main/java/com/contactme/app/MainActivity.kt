@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,10 +15,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.contactme.app.ui.theme.ContactMeTheme
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,44 +50,169 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class AppScreen {
+    Splash,
+    Home
+}
+
+private enum class HomeTab(val label: String) {
+    Chats("Chats"),
+    Status("Status"),
+    Calls("Calls"),
+    Communities("Communities"),
+    Channels("Channels")
+}
+
 @Composable
 fun ContactMeApp() {
+    var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            AppHeader()
-            ChatPreviewList()
+        when (currentScreen) {
+            AppScreen.Splash -> SplashScreen(
+                onSplashFinished = { currentScreen = AppScreen.Home }
+            )
+
+            AppScreen.Home -> HomeScreen()
         }
     }
 }
 
 @Composable
-private fun AppHeader() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "ContactMe",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "Messenger core UI demo",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
-        )
+private fun SplashScreen(onSplashFinished: () -> Unit) {
+    LaunchedEffect(Unit) {
+        delay(900)
+        onSplashFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(76.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "CM",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Text(
+                text = "ContactMe",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Connect faster. Chat cleaner.",
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeScreen() {
+    var selectedTab by remember { mutableStateOf(HomeTab.Chats) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "ContactMe",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    titleContentColor = MaterialTheme.colorScheme.primary
+                )
+            )
+        },
+        bottomBar = {
+            NavigationBar {
+                HomeTab.entries.forEach { tab ->
+                    NavigationBarItem(
+                        selected = selectedTab == tab,
+                        onClick = { selectedTab = tab },
+                        icon = { Text(text = tab.label.first().toString()) },
+                        label = { Text(text = tab.label) }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(20.dp)
+        ) {
+            when (selectedTab) {
+                HomeTab.Chats -> ChatsTab()
+                HomeTab.Status -> PlaceholderTab(
+                    title = "Status",
+                    subtitle = "24-hour updates will appear here."
+                )
+
+                HomeTab.Calls -> PlaceholderTab(
+                    title = "Calls",
+                    subtitle = "Voice and video call history will appear here."
+                )
+
+                HomeTab.Communities -> PlaceholderTab(
+                    title = "Communities",
+                    subtitle = "Linked groups and announcements will appear here."
+                )
+
+                HomeTab.Channels -> PlaceholderTab(
+                    title = "Channels",
+                    subtitle = "Broadcast channels and posts will appear here."
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatsTab() {
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "Chats",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Messenger core UI demo",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
+            )
+        }
+        ChatPreviewList()
     }
 }
 
 @Composable
 private fun ChatPreviewList() {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         ChatPreviewItem(
             name = "Ayesha Rahman",
             message = "Project scaffold ready?",
@@ -82,7 +220,7 @@ private fun ChatPreviewList() {
         )
         ChatPreviewItem(
             name = "Team ContactMe",
-            message = "Next: auth and navigation",
+            message = "Next: auth and real navigation",
             time = "08:45"
         )
         ChatPreviewItem(
@@ -131,10 +269,29 @@ private fun ChatPreviewItem(
     }
 }
 
+@Composable
+private fun PlaceholderTab(
+    title: String,
+    subtitle: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun ContactMeAppPreview() {
     ContactMeTheme {
-        ContactMeApp()
+        HomeScreen()
     }
 }
