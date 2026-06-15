@@ -1,7 +1,7 @@
 package com.contactme.app.di
 
 import com.contactme.app.auth.AuthRepository
-import com.contactme.app.auth.FakeAuthRepository
+import com.contactme.app.auth.FirebaseAuthRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -14,6 +14,6 @@ abstract class AuthModule {
     @Binds
     @Singleton
     abstract fun bindAuthRepository(
-        fakeAuthRepository: FakeAuthRepository
+        firebaseAuthRepository: FirebaseAuthRepository
     ): AuthRepository
 }
