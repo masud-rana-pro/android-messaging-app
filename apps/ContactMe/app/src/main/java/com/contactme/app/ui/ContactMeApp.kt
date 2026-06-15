@@ -33,7 +33,9 @@ fun ContactMeApp(
         when (currentScreen) {
             AppScreen.Splash -> SplashScreen(
                 onSplashFinished = {
-                    currentScreen = sessionViewModel.startScreenAfterSplash()
+                    sessionViewModel.resolveStartScreen { startScreen ->
+                        currentScreen = startScreen
+                    }
                 }
             )
 

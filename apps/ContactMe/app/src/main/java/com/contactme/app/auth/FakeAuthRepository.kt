@@ -11,6 +11,14 @@ class FakeAuthRepository @Inject constructor() : AuthRepository {
         return signedIn
     }
 
+    override fun currentUserId(): String? {
+        return if (signedIn) {
+            "fake-user-id"
+        } else {
+            null
+        }
+    }
+
     override suspend fun signIn(
         email: String,
         password: String
