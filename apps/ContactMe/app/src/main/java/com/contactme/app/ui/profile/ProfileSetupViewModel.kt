@@ -21,6 +21,10 @@ class ProfileSetupViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ProfileSetupUiState())
     val uiState: StateFlow<ProfileSetupUiState> = _uiState.asStateFlow()
 
+    init {
+        loadExistingProfile()
+    }
+
     fun onDisplayNameChanged(value: String) {
         _uiState.update {
             it.copy(
@@ -91,6 +95,23 @@ class ProfileSetupViewModel @Inject constructor(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    private fun loadExistingProfile() {
+        val userId = authRepository.currentUserId() ?: return
+
+        viewModelScope.launch {
+            val profile = profileRepository.getProfile(userId) ?: return@launch
+
+            _uiState.update {
+                it.copy(
+                    displayName = profile.displayName,
+                    username = profile.username,
+                    isExistingProfile = true,
+                    errorMessage = null
+                )
             }
         }
     }
