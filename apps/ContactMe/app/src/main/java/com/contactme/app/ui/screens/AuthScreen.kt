@@ -1,5 +1,8 @@
 package com.contactme.app.ui.screens
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -36,14 +40,21 @@ fun AuthScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val activity = LocalContext.current.findActivity()
 
     AuthContent(
         uiState = uiState,
         onPhoneNumberChanged = viewModel::onPhoneNumberChanged,
+        onOtpCodeChanged = viewModel::onOtpCodeChanged,
         onEmailChanged = viewModel::onEmailChanged,
         onPasswordChanged = viewModel::onPasswordChanged,
         onAuthModeChanged = viewModel::onAuthModeChanged,
-        onSubmit = { viewModel.submit(onSuccess = onAuthSuccess) }
+        onSubmit = {
+            viewModel.submit(
+                activity = activity,
+                onSuccess = onAuthSuccess
+            )
+        }
     )
 }
 
@@ -51,6 +62,7 @@ fun AuthScreen(
 private fun AuthContent(
     uiState: AuthUiState,
     onPhoneNumberChanged: (String) -> Unit,
+    onOtpCodeChanged: (String) -> Unit,
     onEmailChanged: (String) -> Unit,
     onPasswordChanged: (String) -> Unit,
     onAuthModeChanged: (AuthMode) -> Unit,
@@ -96,6 +108,18 @@ private fun AuthContent(
                 label = { Text(text = "Mobile number") },
                 placeholder = { Text(text = "+880 1XXXXXXXXX") }
             )
+            if (uiState.isOtpSent) {
+                Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = uiState.otpCode,
+                    onValueChange = onOtpCodeChanged,
+                    enabled = !uiState.isLoading,
+                    singleLine = true,
+                    label = { Text(text = "OTP code") },
+                    placeholder = { Text(text = "6-digit code") }
+                )
+            }
         } else {
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
@@ -117,6 +141,15 @@ private fun AuthContent(
             )
         }
 
+        uiState.statusMessage?.let { message ->
+            Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
         uiState.errorMessage?.let { message ->
             Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
             Text(
@@ -134,6 +167,8 @@ private fun AuthContent(
             Text(
                 text = if (uiState.isLoading) {
                     "Please wait..."
+                } else if (uiState.authMode == AuthMode.Phone && uiState.isOtpSent) {
+                    "Verify OTP"
                 } else {
                     uiState.authMode.actionLabel
                 }
@@ -184,5 +219,13 @@ private fun AuthContent(
             }
         }
         Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
     }
 }
