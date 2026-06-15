@@ -4,60 +4,88 @@ This document tracks Firebase Auth setup for `feature/auth-build`.
 
 ## Current Status
 
-Firebase Auth SDK dependency has been added, and `FirebaseAuthRepository` has been created.
+Firebase config is available locally, the Google Services Gradle plugin is applied, Firebase Auth SDK is included, and Hilt now binds:
 
-The app still uses `FakeAuthRepository` through Hilt binding until Firebase project config is added.
+```text
+AuthRepository -> FirebaseAuthRepository
+```
 
-## Why Fake Binding Remains Active
+## Firebase Config
 
-The app does not currently have:
+Local config file:
 
 ```text
 apps/ContactMe/app/google-services.json
 ```
 
-Without Firebase config, applying the Google Services Gradle plugin can fail the build. So the project keeps the fake repository active until config is available.
+This file is ignored by Git:
 
-## Required Manual Firebase Steps
+```text
+google-services.json
+```
 
-1. Create a Firebase project.
-2. Add an Android app with package:
+## Package Name
+
+Firebase Android app package:
 
 ```text
 com.contactme.app
 ```
 
-3. Download `google-services.json`.
-4. Place it at:
+This matches the app `applicationId`.
 
-```text
-apps/ContactMe/app/google-services.json
+## Gradle Plugin
+
+Project-level Gradle:
+
+```kotlin
+id("com.google.gms.google-services") version "4.4.4" apply false
 ```
 
-5. Decide whether to commit it.
+App-level Gradle:
 
-Current `.gitignore` ignores `google-services.json`, so it will not be committed by default.
+```kotlin
+id("com.google.gms.google-services")
+```
 
-## Next Code Step After Config
+The plugin processes `google-services.json` and generates Firebase resources for the app.
 
-1. Add Google Services Gradle plugin.
-2. Apply plugin in app module.
-3. Switch Hilt binding from `FakeAuthRepository` to `FirebaseAuthRepository`.
-4. Add register flow.
-5. Add session restore.
-
-## Current Firebase Dependency
+## Firebase Dependencies
 
 ```kotlin
 implementation(platform("com.google.firebase:firebase-bom:33.8.0"))
-implementation("com.google.firebase:firebase-auth-ktx")
+implementation("com.google.firebase:firebase-auth")
 ```
 
-## Current Repository Skeleton
+The project currently uses Firebase BoM `33.8.0` because the latest Firebase Auth artifact pulled by BoM `34.14.1` requires newer Kotlin metadata than this project currently uses.
+
+Future cleanup:
+
+- Upgrade Kotlin and Android Gradle Plugin together.
+- Then upgrade Firebase BoM.
+
+## Current Auth Repository
 
 ```text
 auth/FirebaseAuthRepository.kt
-di/FirebaseModule.kt
 ```
 
-`FirebaseAuthRepository` currently supports email/password sign-in only. Registration will be added in a later step.
+Current support:
+
+- Email/password sign-in
+- Basic blank email check
+- Basic password length check
+- Firebase error message fallback
+
+## Not Done Yet
+
+- Email/password registration
+- Session restore
+- Logout
+- Better Firebase error mapping
+- Firestore user profile document save
+- Phone/OTP auth
+
+## Next Step
+
+Add register flow to `AuthRepository`, `FirebaseAuthRepository`, `FakeAuthRepository`, and `AuthViewModel`.

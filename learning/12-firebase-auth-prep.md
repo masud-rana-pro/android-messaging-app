@@ -1,32 +1,63 @@
 # Step 12: Firebase Auth Preparation
 
-এই ধাপে real Firebase Auth শুরু করার প্রস্তুতি নেওয়া হয়েছে, কিন্তু app এখনো fake auth binding ব্যবহার করছে।
+এই ধাপে Firebase Auth config ready হওয়ার পর app-এ Google Services plugin apply করা হয়েছে এবং Auth repository binding fake থেকে real Firebase implementation-এ switch করা হয়েছে।
 
-## কেন fake binding রাখা হয়েছে
+## কী কী করা হয়েছে
 
-Firebase Auth fully চালাতে `google-services.json` দরকার।
+```text
+apps/ContactMe/build.gradle.kts
+apps/ContactMe/app/build.gradle.kts
+apps/ContactMe/app/src/main/java/com/contactme/app/di/AuthModule.kt
+docs/12-firebase-auth-setup.md
+```
 
-এখন project-এ এই file নেই:
+## Firebase config কোথায়
+
+Firebase config file:
 
 ```text
 apps/ContactMe/app/google-services.json
 ```
 
-তাই Google Services plugin apply করলে build fail হতে পারে। এজন্য Firebase SDK dependency এবং repository skeleton যোগ করা হয়েছে, কিন্তু active binding এখনো fake।
+এই file Git-এ commit হচ্ছে না, কারণ `.gitignore`-এ ignore করা আছে।
 
-## কী কী যোগ হয়েছে
+কেন ignore:
+
+- এটা environment-specific config
+- public repo-তে রাখা ভালো practice না
+- future-এ dev/staging/prod config আলাদা হতে পারে
+
+## Package name verify
+
+Firebase config-এর package name:
 
 ```text
-auth/FirebaseAuthRepository.kt
-di/FirebaseModule.kt
-docs/12-firebase-auth-setup.md
+com.contactme.app
 ```
 
-Update হয়েছে:
+App Gradle-এর `applicationId`-ও:
 
-```text
-apps/ContactMe/app/build.gradle.kts
+```kotlin
+applicationId = "com.contactme.app"
 ```
+
+দুইটা match করা জরুরি। না মিললে Firebase config ঠিকমতো কাজ করবে না।
+
+## Google Services plugin
+
+Project-level Gradle:
+
+```kotlin
+id("com.google.gms.google-services") version "4.4.4" apply false
+```
+
+App-level Gradle:
+
+```kotlin
+id("com.google.gms.google-services")
+```
+
+এই plugin `google-services.json` পড়ে Android resource generate করে।
 
 ## Firebase BOM
 
@@ -36,40 +67,56 @@ implementation(platform("com.google.firebase:firebase-bom:33.8.0"))
 
 BOM মানে Bill of Materials।
 
-কেন দরকার:
+কাজ:
 
-- Firebase libraries-এর compatible version manage করে।
-- আলাদা Firebase dependency-তে version লিখতে হয় না।
+- Firebase library versions compatible রাখে
+- প্রতিটা Firebase dependency-তে আলাদা version লিখতে হয় না
 
 ## Firebase Auth dependency
 
 ```kotlin
-implementation("com.google.firebase:firebase-auth-ktx")
+implementation("com.google.firebase:firebase-auth")
 ```
 
 এটা Firebase Authentication SDK যোগ করে।
 
-## `FirebaseModule`
+আগে অনেক project-এ `firebase-auth-ktx` ব্যবহার করা হতো। আমরা এখন `firebase-auth` ব্যবহার করছি, কারণ main module-ই forward-compatible path।
 
-```kotlin
-@Provides
-@Singleton
-fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
+Important compatibility note:
+
+Firebase BoM `34.14.1` try করলে `firebase-auth 24.1.0` আসে, যেটা Kotlin metadata `2.3.0` দিয়ে compiled। আমাদের project এখন Kotlin `2.0.21`, তাই build fail করে। এজন্য আপাতত Firebase BoM `33.8.0` রাখা হয়েছে।
+
+Future-এ Kotlin/AGP upgrade করলে Firebase BoM আবার latest করা যাবে।
+
+## Binding switch
+
+আগে:
+
+```text
+AuthRepository -> FakeAuthRepository
 ```
 
-এটা Hilt-কে বলে কীভাবে `FirebaseAuth` instance তৈরি করতে হবে।
+এখন:
+
+```text
+AuthRepository -> FirebaseAuthRepository
+```
+
+Code:
+
+```kotlin
+@Binds
+@Singleton
+abstract fun bindAuthRepository(
+    firebaseAuthRepository: FirebaseAuthRepository
+): AuthRepository
+```
+
+মানে এখন `AuthViewModel` যখন `AuthRepository` চাইবে, Hilt তাকে Firebase implementation দেবে।
 
 ## `FirebaseAuthRepository`
 
-```kotlin
-class FirebaseAuthRepository @Inject constructor(
-    private val firebaseAuth: FirebaseAuth
-) : AuthRepository
-```
-
-এই repository `AuthRepository` implement করে।
-
-এখন এতে email/password sign-in skeleton আছে:
+Current কাজ:
 
 ```kotlin
 firebaseAuth.signInWithEmailAndPassword(
@@ -78,56 +125,44 @@ firebaseAuth.signInWithEmailAndPassword(
 ).await()
 ```
 
-`await()` coroutine-friendly Firebase call করে।
+এটা Firebase email/password sign-in call করে।
 
-## কেন এখনই binding switch করা হয়নি
+`await()` coroutine-friendly করে Firebase Task result অপেক্ষা করে।
 
-বর্তমানে `AuthModule` এখনো বলে:
+## এখন কীভাবে verify করবে
 
-```text
-AuthRepository -> FakeAuthRepository
+Build:
+
+```powershell
+cd apps\ContactMe
+.\gradlew.bat assembleDebug
 ```
 
-কারণ Firebase config নেই।
-
-Config যোগ করার পর switch হবে:
+Expected:
 
 ```text
-AuthRepository -> FirebaseAuthRepository
+BUILD SUCCESSFUL
 ```
 
-## তোমার manual কাজ
+Manual:
 
-Firebase Console-এ:
+1. Firebase Console-এ Email/Password sign-in enable করতে হবে।
+2. Firebase Console-এ test user create করতে হবে, অথবা register flow add করার পর app থেকে create করতে হবে।
+3. App Auth screen-এ valid email/password দিয়ে login try করতে হবে।
 
-1. New Firebase project create করো।
-2. Android app add করো।
-3. Package name দাও:
+## এখনো কী বাকি
 
-```text
-com.contactme.app
-```
-
-4. `google-services.json` download করো।
-5. রাখো:
-
-```text
-apps/ContactMe/app/google-services.json
-```
+- Register flow
+- Session restore
+- Logout
+- Firebase error mapping
+- Firestore user profile save
+- Phone/OTP auth
 
 ## এই ধাপে কী শেখা হলো
 
-- Firebase SDK dependency add করা আর Firebase config apply করা আলাদা কাজ।
-- `google-services.json` ছাড়া Firebase plugin fully apply করা উচিত না।
-- Repository interface থাকলে fake থেকে Firebase-এ switch করা সহজ।
-- Hilt module দিয়ে Firebase SDK instance provide করা যায়।
-
-## পরের step
-
-Firebase config file ready হলে:
-
-- Google Services plugin add/apply
-- Auth binding switch
-- real login
-- register flow
-- session restore
+- Firebase config ready হলে Google Services plugin apply করা যায়।
+- `google-services.json` app module folder-এ থাকে।
+- Firebase BoM versions manage করে।
+- Repository interface থাকলে fake থেকে Firebase implementation-এ switch করা সহজ।
+- Hilt binding বদলালেই ViewModel-এর code change না করেও implementation বদলানো যায়।
