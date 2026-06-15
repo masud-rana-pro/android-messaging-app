@@ -1,12 +1,19 @@
 package com.contactme.app.navigation
 
-enum class AuthMode(val title: String, val actionLabel: String) {
-    Login(
-        title = "Welcome back",
+enum class AuthMode(
+    val title: String,
+    val actionLabel: String
+) {
+    Phone(
+        title = "Continue with phone",
+        actionLabel = "Send OTP"
+    ),
+    EmailLogin(
+        title = "Log in with email",
         actionLabel = "Log in"
     ),
-    Register(
-        title = "Create account",
+    EmailRegister(
+        title = "Create email account",
         actionLabel = "Register"
     )
 }
