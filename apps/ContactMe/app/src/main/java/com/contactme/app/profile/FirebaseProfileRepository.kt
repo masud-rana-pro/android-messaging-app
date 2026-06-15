@@ -19,6 +19,24 @@ class FirebaseProfileRepository @Inject constructor(
         }.getOrDefault(false)
     }
 
+    override suspend fun getProfile(userId: String): UserProfile? {
+        return runCatching {
+            val document = firestore.collection(USERS_COLLECTION)
+                .document(userId)
+                .get()
+                .await()
+
+            if (!document.exists()) {
+                null
+            } else {
+                UserProfile(
+                    displayName = document.getString("displayName").orEmpty(),
+                    username = document.getString("username").orEmpty()
+                )
+            }
+        }.getOrNull()
+    }
+
     override suspend fun saveProfile(
         userId: String,
         displayName: String,

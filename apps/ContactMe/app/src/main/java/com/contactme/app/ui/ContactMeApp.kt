@@ -64,6 +64,7 @@ fun ContactMeApp(
 
             AppScreen.Settings -> SettingsScreen(
                 onBack = { currentScreen = AppScreen.Home },
+                onEditProfile = { currentScreen = AppScreen.ProfileSetup },
                 onSignOut = {
                     sessionViewModel.signOut {
                         currentScreen = AppScreen.Auth

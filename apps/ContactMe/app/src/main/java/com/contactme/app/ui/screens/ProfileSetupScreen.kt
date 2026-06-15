@@ -85,7 +85,11 @@ private fun ProfileSetupContent(
         }
         Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
         Text(
-            text = "Set up your profile",
+            text = if (uiState.isExistingProfile) {
+                "Edit your profile"
+            } else {
+                "Set up your profile"
+            },
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
@@ -131,6 +135,8 @@ private fun ProfileSetupContent(
             Text(
                 text = if (uiState.isLoading) {
                     "Saving..."
+                } else if (uiState.isExistingProfile) {
+                    "Save changes"
                 } else {
                     "Save and continue"
                 }

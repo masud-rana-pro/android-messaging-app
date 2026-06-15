@@ -19,12 +19,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.contactme.app.ui.settings.SettingsUiState
+import com.contactme.app.ui.settings.SettingsViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
 
@@ -32,6 +37,26 @@ import com.contactme.app.ui.theme.ContactMeTheme
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onEditProfile: () -> Unit,
+    onSignOut: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    SettingsContent(
+        uiState = uiState,
+        onBack = onBack,
+        onEditProfile = onEditProfile,
+        onSignOut = onSignOut
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsContent(
+    uiState: SettingsUiState,
+    onBack: () -> Unit,
+    onEditProfile: () -> Unit,
     onSignOut: () -> Unit
 ) {
     Scaffold(
@@ -77,23 +102,40 @@ fun SettingsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "CM",
+                        text = uiState.displayName.profileInitials(),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Column {
                     Text(
-                        text = "ContactMe User",
+                        text = if (uiState.isLoadingProfile) {
+                            "Loading profile..."
+                        } else {
+                            uiState.displayName
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "@contactme",
+                        text = "@${uiState.username}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
                     )
                 }
+            }
+            uiState.errorMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onEditProfile
+            ) {
+                Text(text = "Edit profile")
             }
             SettingsItem(
                 title = "Privacy",
@@ -150,9 +192,26 @@ private fun SettingsItem(
 @Composable
 private fun SettingsScreenPreview() {
     ContactMeTheme {
-        SettingsScreen(
+        SettingsContent(
+            uiState = SettingsUiState(
+                displayName = "Masud Rana",
+                username = "masud_rana",
+                isLoadingProfile = false
+            ),
             onBack = {},
+            onEditProfile = {},
             onSignOut = {}
         )
     }
+}
+
+private fun String.profileInitials(): String {
+    val initials = trim()
+        .split(" ")
+        .filter(String::isNotBlank)
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+        .joinToString("")
+
+    return initials.ifBlank { "CM" }
 }
