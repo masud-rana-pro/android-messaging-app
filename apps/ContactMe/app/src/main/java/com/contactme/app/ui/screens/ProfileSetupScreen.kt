@@ -21,21 +21,41 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.contactme.app.ui.profile.ProfileSetupUiState
+import com.contactme.app.ui.profile.ProfileSetupViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
 
 @Composable
-fun ProfileSetupScreen(onProfileReady: () -> Unit) {
-    var displayName by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
+fun ProfileSetupScreen(
+    onProfileReady: () -> Unit,
+    viewModel: ProfileSetupViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
 
+    ProfileSetupContent(
+        uiState = uiState,
+        onDisplayNameChanged = viewModel::onDisplayNameChanged,
+        onUsernameChanged = viewModel::onUsernameChanged,
+        onSaveProfile = {
+            viewModel.saveProfile(onProfileReady = onProfileReady)
+        }
+    )
+}
+
+@Composable
+private fun ProfileSetupContent(
+    uiState: ProfileSetupUiState,
+    onDisplayNameChanged: (String) -> Unit,
+    onUsernameChanged: (String) -> Unit,
+    onSaveProfile: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -71,32 +91,50 @@ fun ProfileSetupScreen(onProfileReady: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "This placeholder prepares the auth-to-profile flow.",
+            text = "Add the name people will see in ContactMe.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
         )
         Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
-            value = displayName,
-            onValueChange = { displayName = it },
+            value = uiState.displayName,
+            onValueChange = onDisplayNameChanged,
+            enabled = !uiState.isLoading,
             singleLine = true,
             label = { Text(text = "Display name") }
         )
         Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
-            value = username,
-            onValueChange = { username = it },
+            value = uiState.username,
+            onValueChange = onUsernameChanged,
+            enabled = !uiState.isLoading,
             singleLine = true,
-            label = { Text(text = "Username") }
+            label = { Text(text = "Username") },
+            placeholder = { Text(text = "your_name") }
         )
+        uiState.errorMessage?.let { message ->
+            Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
         Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
         Button(
             modifier = Modifier.fillMaxWidth(),
-            onClick = onProfileReady
+            enabled = !uiState.isLoading,
+            onClick = onSaveProfile
         ) {
-            Text(text = "Continue")
+            Text(
+                text = if (uiState.isLoading) {
+                    "Saving..."
+                } else {
+                    "Save and continue"
+                }
+            )
         }
         Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
     }

@@ -5,6 +5,8 @@ import android.app.Activity
 interface AuthRepository {
     fun hasActiveSession(): Boolean
 
+    fun currentUserId(): String?
+
     suspend fun signIn(
         email: String,
         password: String
