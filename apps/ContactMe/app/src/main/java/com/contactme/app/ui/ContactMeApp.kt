@@ -11,13 +11,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.contactme.app.navigation.AppScreen
 import com.contactme.app.ui.screens.AuthScreen
+import com.contactme.app.ui.screens.ChatDetailScreen
 import com.contactme.app.ui.screens.HomeScreen
 import com.contactme.app.ui.screens.ProfileSetupScreen
+import com.contactme.app.ui.screens.SettingsScreen
 import com.contactme.app.ui.screens.SplashScreen
 
 @Composable
 fun ContactMeApp() {
     var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
+    var selectedChatName by remember { mutableStateOf("Ayesha Rahman") }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -36,7 +39,24 @@ fun ContactMeApp() {
                 onProfileReady = { currentScreen = AppScreen.Home }
             )
 
-            AppScreen.Home -> HomeScreen()
+            AppScreen.Home -> HomeScreen(
+                onChatSelected = { chatName ->
+                    selectedChatName = chatName
+                    currentScreen = AppScreen.ChatDetail
+                },
+                onSettingsSelected = {
+                    currentScreen = AppScreen.Settings
+                }
+            )
+
+            AppScreen.ChatDetail -> ChatDetailScreen(
+                chatName = selectedChatName,
+                onBack = { currentScreen = AppScreen.Home }
+            )
+
+            AppScreen.Settings -> SettingsScreen(
+                onBack = { currentScreen = AppScreen.Home }
+            )
         }
     }
 }

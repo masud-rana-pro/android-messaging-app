@@ -4,5 +4,7 @@ enum class AppScreen {
     Splash,
     Auth,
     ProfileSetup,
-    Home
+    Home,
+    ChatDetail,
+    Settings
 }

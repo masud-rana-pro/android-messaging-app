@@ -1,6 +1,7 @@
 package com.contactme.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -37,7 +39,10 @@ import com.contactme.app.ui.theme.ContactMeTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onChatSelected: (String) -> Unit,
+    onSettingsSelected: () -> Unit
+) {
     var selectedTab by remember { mutableStateOf(HomeTab.Chats) }
 
     Scaffold(
@@ -48,6 +53,11 @@ fun HomeScreen() {
                         text = "ContactMe",
                         fontWeight = FontWeight.Bold
                     )
+                },
+                actions = {
+                    TextButton(onClick = onSettingsSelected) {
+                        Text(text = "Settings")
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     titleContentColor = MaterialTheme.colorScheme.primary
@@ -77,7 +87,7 @@ fun HomeScreen() {
                 )
         ) {
             when (selectedTab) {
-                HomeTab.Chats -> ChatsTab()
+                HomeTab.Chats -> ChatsTab(onChatSelected = onChatSelected)
                 HomeTab.Status -> PlaceholderTab(
                     title = "Status",
                     subtitle = "24-hour updates will appear here."
@@ -103,7 +113,7 @@ fun HomeScreen() {
 }
 
 @Composable
-private fun ChatsTab() {
+private fun ChatsTab(onChatSelected: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
@@ -117,27 +127,30 @@ private fun ChatsTab() {
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
             )
         }
-        ChatPreviewList()
+        ChatPreviewList(onChatSelected = onChatSelected)
     }
 }
 
 @Composable
-private fun ChatPreviewList() {
+private fun ChatPreviewList(onChatSelected: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         ChatPreviewItem(
             name = "Ayesha Rahman",
             message = "Project scaffold ready?",
-            time = "09:10"
+            time = "09:10",
+            onClick = { onChatSelected("Ayesha Rahman") }
         )
         ChatPreviewItem(
             name = "Team ContactMe",
             message = "Next: auth and real navigation",
-            time = "08:45"
+            time = "08:45",
+            onClick = { onChatSelected("Team ContactMe") }
         )
         ChatPreviewItem(
             name = "Design Notes",
             message = "Primary color: #a605e6",
-            time = "Yesterday"
+            time = "Yesterday",
+            onClick = { onChatSelected("Design Notes") }
         )
     }
 }
@@ -146,10 +159,13 @@ private fun ChatPreviewList() {
 private fun ChatPreviewItem(
     name: String,
     message: String,
-    time: String
+    time: String,
+    onClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -203,6 +219,9 @@ private fun PlaceholderTab(
 @Composable
 private fun HomeScreenPreview() {
     ContactMeTheme {
-        HomeScreen()
+        HomeScreen(
+            onChatSelected = {},
+            onSettingsSelected = {}
+        )
     }
 }
