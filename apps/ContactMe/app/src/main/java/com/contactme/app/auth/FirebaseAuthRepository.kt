@@ -15,6 +15,10 @@ import kotlin.coroutines.resume
 class FirebaseAuthRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth
 ) : AuthRepository {
+    override fun hasActiveSession(): Boolean {
+        return firebaseAuth.currentUser != null
+    }
+
     override suspend fun signIn(
         email: String,
         password: String
@@ -189,5 +193,9 @@ class FirebaseAuthRepository @Inject constructor(
             }
             else -> "Phone verification failed. Please try again."
         }
+    }
+
+    override fun signOut() {
+        firebaseAuth.signOut()
     }
 }

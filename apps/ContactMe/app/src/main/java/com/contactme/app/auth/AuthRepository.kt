@@ -3,6 +3,8 @@ package com.contactme.app.auth
 import android.app.Activity
 
 interface AuthRepository {
+    fun hasActiveSession(): Boolean
+
     suspend fun signIn(
         email: String,
         password: String
@@ -22,4 +24,6 @@ interface AuthRepository {
         verificationId: String,
         otpCode: String
     ): AuthResult
+
+    fun signOut()
 }

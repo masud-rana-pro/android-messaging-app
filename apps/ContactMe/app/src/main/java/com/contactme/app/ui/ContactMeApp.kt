@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.contactme.app.navigation.AppScreen
 import com.contactme.app.ui.screens.AuthScreen
 import com.contactme.app.ui.screens.ChatDetailScreen
@@ -16,9 +17,12 @@ import com.contactme.app.ui.screens.HomeScreen
 import com.contactme.app.ui.screens.ProfileSetupScreen
 import com.contactme.app.ui.screens.SettingsScreen
 import com.contactme.app.ui.screens.SplashScreen
+import com.contactme.app.ui.session.SessionViewModel
 
 @Composable
-fun ContactMeApp() {
+fun ContactMeApp(
+    sessionViewModel: SessionViewModel = hiltViewModel()
+) {
     var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
     var selectedChatName by remember { mutableStateOf("Ayesha Rahman") }
 
@@ -28,7 +32,9 @@ fun ContactMeApp() {
     ) {
         when (currentScreen) {
             AppScreen.Splash -> SplashScreen(
-                onSplashFinished = { currentScreen = AppScreen.Auth }
+                onSplashFinished = {
+                    currentScreen = sessionViewModel.startScreenAfterSplash()
+                }
             )
 
             AppScreen.Auth -> AuthScreen(
@@ -55,7 +61,12 @@ fun ContactMeApp() {
             )
 
             AppScreen.Settings -> SettingsScreen(
-                onBack = { currentScreen = AppScreen.Home }
+                onBack = { currentScreen = AppScreen.Home },
+                onSignOut = {
+                    sessionViewModel.signOut {
+                        currentScreen = AppScreen.Auth
+                    }
+                }
             )
         }
     }
