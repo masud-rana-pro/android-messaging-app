@@ -60,12 +60,19 @@ class AuthViewModel @Inject constructor(
                 )
             }
 
-            when (
-                val result = authRepository.submitAuth(
-                    emailOrPhone = state.emailOrPhone,
+            val result = when (state.authMode) {
+                AuthMode.Login -> authRepository.signIn(
+                    email = state.emailOrPhone,
                     password = state.password
                 )
-            ) {
+
+                AuthMode.Register -> authRepository.register(
+                    email = state.emailOrPhone,
+                    password = state.password
+                )
+            }
+
+            when (result) {
                 AuthResult.Success -> {
                     _uiState.update { it.copy(isLoading = false) }
                     onSuccess()

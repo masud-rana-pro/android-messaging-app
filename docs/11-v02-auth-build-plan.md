@@ -18,6 +18,8 @@ Auth foundation has been added:
 - Auth UI state model
 - Auth ViewModel
 - ViewModel-driven Auth screen
+- Firebase sign-in binding
+- Email/password registration support
 
 ## Current Auth Flow
 
@@ -25,7 +27,7 @@ Auth foundation has been added:
 AuthScreen
 -> AuthViewModel
 -> AuthRepository
--> FakeAuthRepository
+-> FirebaseAuthRepository
 -> Success/Error
 ```
 
@@ -42,16 +44,14 @@ The fake repository allows the app to:
 
 ## Next Steps
 
-1. Add Firebase Gradle plugin and dependencies.
-2. Add Firebase project config when available.
-3. Implement FirebaseAuthRepository.
-4. Replace fake binding with Firebase binding.
-5. Add session restore.
-6. Save profile data after auth.
+1. Add session restore.
+2. Add logout.
+3. Save profile data after auth.
+4. Improve Firebase error mapping.
+5. Add email verification if needed.
 
 ## Not Done Yet
 
-- Real Firebase Auth
 - OTP/phone auth
 - Email verification
 - Session restore

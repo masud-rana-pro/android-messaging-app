@@ -74,7 +74,7 @@ private fun AuthContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Use email or phone to continue with ContactMe.",
+            text = "Use email to continue with ContactMe.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
         )
@@ -85,7 +85,7 @@ private fun AuthContent(
             onValueChange = onEmailOrPhoneChanged,
             enabled = !uiState.isLoading,
             singleLine = true,
-            label = { Text(text = "Email or phone") }
+            label = { Text(text = "Email") }
         )
         Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
         OutlinedTextField(

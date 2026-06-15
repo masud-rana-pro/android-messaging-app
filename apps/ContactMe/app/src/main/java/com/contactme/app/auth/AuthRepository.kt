@@ -1,8 +1,13 @@
 package com.contactme.app.auth
 
 interface AuthRepository {
-    suspend fun submitAuth(
-        emailOrPhone: String,
+    suspend fun signIn(
+        email: String,
+        password: String
+    ): AuthResult
+
+    suspend fun register(
+        email: String,
         password: String
     ): AuthResult
 }
