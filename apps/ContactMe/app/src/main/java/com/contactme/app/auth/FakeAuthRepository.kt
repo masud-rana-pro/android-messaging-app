@@ -40,12 +40,11 @@ class FakeAuthRepository @Inject constructor() : AuthRepository {
         activity: Activity
     ): PhoneOtpResult {
         delay(350)
+        val normalizedPhoneNumber = PhoneNumberFormatter.normalizeBangladeshNumber(phoneNumber)
 
         return when {
             phoneNumber.isBlank() -> PhoneOtpResult.Error("Phone number is required.")
-            phoneNumber.filter(Char::isDigit).length < 10 -> {
-                PhoneOtpResult.Error("Enter a valid phone number.")
-            }
+            normalizedPhoneNumber == null -> PhoneOtpResult.Error("Enter a valid Bangladesh phone number.")
             else -> PhoneOtpResult.CodeSent("fake-verification-id")
         }
     }
@@ -57,8 +56,8 @@ class FakeAuthRepository @Inject constructor() : AuthRepository {
         delay(350)
 
         return when {
-            verificationId.isBlank() -> AuthResult.Error("OTP session expired. Send a new code.")
-            otpCode.length != 6 -> AuthResult.Error("Enter the 6-digit OTP code.")
+            verificationId.isBlank() -> AuthResult.Error("Verification session expired. Request a new code.")
+            otpCode.length != 6 -> AuthResult.Error("Enter the 6-digit verification code.")
             else -> AuthResult.Success
         }
     }

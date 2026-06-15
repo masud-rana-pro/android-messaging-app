@@ -89,7 +89,7 @@ private fun AuthContent(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = if (uiState.authMode == AuthMode.Phone) {
-                "Use your mobile number as your primary ContactMe identity."
+                "Enter your mobile number to receive a verification code."
             } else {
                 "Email and password are available as a fallback login method."
             },
@@ -105,8 +105,8 @@ private fun AuthContent(
                 onValueChange = onPhoneNumberChanged,
                 enabled = !uiState.isLoading,
                 singleLine = true,
-                label = { Text(text = "Mobile number") },
-                placeholder = { Text(text = "+880 1XXXXXXXXX") }
+                label = { Text(text = "Phone number") },
+                placeholder = { Text(text = "01XXXXXXXXX") }
             )
             if (uiState.isOtpSent) {
                 Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
@@ -116,7 +116,7 @@ private fun AuthContent(
                     onValueChange = onOtpCodeChanged,
                     enabled = !uiState.isLoading,
                     singleLine = true,
-                    label = { Text(text = "OTP code") },
+                    label = { Text(text = "Verification code") },
                     placeholder = { Text(text = "6-digit code") }
                 )
             }
@@ -168,7 +168,7 @@ private fun AuthContent(
                 text = if (uiState.isLoading) {
                     "Please wait..."
                 } else if (uiState.authMode == AuthMode.Phone && uiState.isOtpSent) {
-                    "Verify OTP"
+                    "Verify code"
                 } else {
                     uiState.authMode.actionLabel
                 }

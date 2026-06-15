@@ -2,6 +2,7 @@ package com.contactme.app.auth
 
 import android.app.Activity
 import com.google.firebase.FirebaseException
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
@@ -73,12 +74,14 @@ class FirebaseAuthRepository @Inject constructor(
         phoneNumber: String,
         activity: Activity
     ): PhoneOtpResult {
+        val normalizedPhoneNumber = PhoneNumberFormatter.normalizeBangladeshNumber(phoneNumber)
+
         if (phoneNumber.isBlank()) {
             return PhoneOtpResult.Error("Phone number is required.")
         }
 
-        if (phoneNumber.filter(Char::isDigit).length < 10) {
-            return PhoneOtpResult.Error("Enter a valid phone number.")
+        if (normalizedPhoneNumber == null) {
+            return PhoneOtpResult.Error("Enter a valid Bangladesh phone number.")
         }
 
         return suspendCancellableCoroutine { continuation ->
@@ -93,7 +96,7 @@ class FirebaseAuthRepository @Inject constructor(
                             } else {
                                 continuation.resume(
                                     PhoneOtpResult.Error(
-                                        task.exception?.message ?: "Phone verification failed."
+                                        "We could not verify this number. Please try again."
                                     )
                                 )
                             }
@@ -105,7 +108,7 @@ class FirebaseAuthRepository @Inject constructor(
 
                     continuation.resume(
                         PhoneOtpResult.Error(
-                            exception.message ?: "Could not send OTP. Please try again."
+                            exception.toPhoneAuthMessage()
                         )
                     )
                 }
@@ -121,7 +124,7 @@ class FirebaseAuthRepository @Inject constructor(
             }
 
             val options = PhoneAuthOptions.newBuilder(firebaseAuth)
-                .setPhoneNumber(phoneNumber.trim())
+                .setPhoneNumber(normalizedPhoneNumber)
                 .setTimeout(60L, TimeUnit.SECONDS)
                 .setActivity(activity)
                 .setCallbacks(callbacks)
@@ -136,11 +139,11 @@ class FirebaseAuthRepository @Inject constructor(
         otpCode: String
     ): AuthResult {
         if (verificationId.isBlank()) {
-            return AuthResult.Error("OTP session expired. Send a new code.")
+            return AuthResult.Error("Verification session expired. Request a new code.")
         }
 
         if (otpCode.length != 6) {
-            return AuthResult.Error("Enter the 6-digit OTP code.")
+            return AuthResult.Error("Enter the 6-digit verification code.")
         }
 
         val credential = PhoneAuthProvider.getCredential(
@@ -154,9 +157,37 @@ class FirebaseAuthRepository @Inject constructor(
             onSuccess = { AuthResult.Success },
             onFailure = { error ->
                 AuthResult.Error(
-                    error.message ?: "OTP verification failed. Please try again."
+                    error.toPhoneVerificationMessage()
                 )
             }
         )
+    }
+
+    private fun FirebaseException.toPhoneAuthMessage(): String {
+        val authErrorCode = (this as? FirebaseAuthException)?.errorCode
+
+        return when (authErrorCode) {
+            "ERROR_OPERATION_NOT_ALLOWED" -> {
+                "We could not send a verification code right now. Please try again later."
+            }
+            "ERROR_INVALID_PHONE_NUMBER" -> "Enter a valid Bangladesh phone number."
+            "ERROR_TOO_MANY_REQUESTS" -> "Too many attempts. Please try again later."
+            "ERROR_QUOTA_EXCEEDED" -> "Verification is temporarily unavailable. Please try again later."
+            else -> toPhoneVerificationMessage()
+        }
+    }
+
+    private fun Throwable.toPhoneVerificationMessage(): String {
+        val rawMessage = message.orEmpty()
+
+        return when {
+            rawMessage.contains("SMS", ignoreCase = true) -> {
+                "We could not send a verification code right now. Please try again later."
+            }
+            rawMessage.contains("network", ignoreCase = true) -> {
+                "Check your internet connection and try again."
+            }
+            else -> "Phone verification failed. Please try again."
+        }
     }
 }
