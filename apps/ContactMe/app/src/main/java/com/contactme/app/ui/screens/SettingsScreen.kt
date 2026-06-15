@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,7 +30,10 @@ import com.contactme.app.ui.theme.ContactMeTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onSignOut: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -107,6 +111,15 @@ fun SettingsScreen(onBack: () -> Unit) {
                 title = "Blocked users",
                 subtitle = "Manage blocked contacts"
             )
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onSignOut
+            ) {
+                Text(
+                    text = "Log out",
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }
@@ -137,6 +150,9 @@ private fun SettingsItem(
 @Composable
 private fun SettingsScreenPreview() {
     ContactMeTheme {
-        SettingsScreen(onBack = {})
+        SettingsScreen(
+            onBack = {},
+            onSignOut = {}
+        )
     }
 }

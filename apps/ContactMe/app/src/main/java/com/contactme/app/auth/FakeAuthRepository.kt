@@ -5,6 +5,12 @@ import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 class FakeAuthRepository @Inject constructor() : AuthRepository {
+    private var signedIn = false
+
+    override fun hasActiveSession(): Boolean {
+        return signedIn
+    }
+
     override suspend fun signIn(
         email: String,
         password: String
@@ -27,12 +33,18 @@ class FakeAuthRepository @Inject constructor() : AuthRepository {
     ): AuthResult {
         delay(350)
 
-        return when {
+        val result = when {
             email.isBlank() -> AuthResult.Error("Email is required.")
             !email.contains("@") -> AuthResult.Error("Enter a valid email address.")
             password.length < 6 -> AuthResult.Error("Password must be at least 6 characters.")
             else -> AuthResult.Success
         }
+
+        if (result == AuthResult.Success) {
+            signedIn = true
+        }
+
+        return result
     }
 
     override suspend fun requestPhoneOtp(
@@ -55,10 +67,20 @@ class FakeAuthRepository @Inject constructor() : AuthRepository {
     ): AuthResult {
         delay(350)
 
-        return when {
+        val result = when {
             verificationId.isBlank() -> AuthResult.Error("Verification session expired. Request a new code.")
             otpCode.length != 6 -> AuthResult.Error("Enter the 6-digit verification code.")
             else -> AuthResult.Success
         }
+
+        if (result == AuthResult.Success) {
+            signedIn = true
+        }
+
+        return result
+    }
+
+    override fun signOut() {
+        signedIn = false
     }
 }
