@@ -18,23 +18,42 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.contactme.app.navigation.AuthMode
+import com.contactme.app.ui.auth.AuthUiState
+import com.contactme.app.ui.auth.AuthViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
 
 @Composable
-fun AuthScreen(onAuthSuccess: () -> Unit) {
-    var authMode by remember { mutableStateOf(AuthMode.Login) }
-    var emailOrPhone by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+fun AuthScreen(
+    onAuthSuccess: () -> Unit,
+    viewModel: AuthViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
 
+    AuthContent(
+        uiState = uiState,
+        onEmailOrPhoneChanged = viewModel::onEmailOrPhoneChanged,
+        onPasswordChanged = viewModel::onPasswordChanged,
+        onAuthModeChanged = viewModel::onAuthModeChanged,
+        onSubmit = { viewModel.submit(onSuccess = onAuthSuccess) }
+    )
+}
+
+@Composable
+private fun AuthContent(
+    uiState: AuthUiState,
+    onEmailOrPhoneChanged: (String) -> Unit,
+    onPasswordChanged: (String) -> Unit,
+    onAuthModeChanged: (AuthMode) -> Unit,
+    onSubmit: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -48,7 +67,7 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = authMode.title,
+            text = uiState.authMode.title,
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
@@ -62,26 +81,43 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
         Spacer(modifier = Modifier.height(ContactMeSpacing.sectionGap))
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
-            value = emailOrPhone,
-            onValueChange = { emailOrPhone = it },
+            value = uiState.emailOrPhone,
+            onValueChange = onEmailOrPhoneChanged,
+            enabled = !uiState.isLoading,
             singleLine = true,
             label = { Text(text = "Email or phone") }
         )
         Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
-            value = password,
-            onValueChange = { password = it },
+            value = uiState.password,
+            onValueChange = onPasswordChanged,
+            enabled = !uiState.isLoading,
             singleLine = true,
             label = { Text(text = "Password") },
             visualTransformation = PasswordVisualTransformation()
         )
+        uiState.errorMessage?.let { message ->
+            Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
         Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
         Button(
             modifier = Modifier.fillMaxWidth(),
-            onClick = onAuthSuccess
+            enabled = !uiState.isLoading,
+            onClick = onSubmit
         ) {
-            Text(text = authMode.actionLabel)
+            Text(
+                text = if (uiState.isLoading) {
+                    "Please wait..."
+                } else {
+                    uiState.authMode.actionLabel
+                }
+            )
         }
         Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
         Row(
@@ -90,13 +126,15 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
         ) {
             OutlinedButton(
                 modifier = Modifier.weight(1f),
-                onClick = { authMode = AuthMode.Login }
+                enabled = !uiState.isLoading,
+                onClick = { onAuthModeChanged(AuthMode.Login) }
             ) {
                 Text(text = "Login")
             }
             OutlinedButton(
                 modifier = Modifier.weight(1f),
-                onClick = { authMode = AuthMode.Register }
+                enabled = !uiState.isLoading,
+                onClick = { onAuthModeChanged(AuthMode.Register) }
             ) {
                 Text(text = "Register")
             }
