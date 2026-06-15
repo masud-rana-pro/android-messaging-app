@@ -118,6 +118,18 @@ Result:
 BUILD SUCCESSFUL
 ```
 
+## Android Gradle Plugin compatibility note
+
+The project currently uses Android Gradle Plugin `8.7.3`.
+
+With `compileSdk = 36`, Gradle may show a warning that AGP `8.7.3` was tested up to API 35. The debug build still succeeds.
+
+Future cleanup:
+
+- Upgrade AGP to a version that officially supports API 36.
+- Re-run the build after the upgrade.
+- Keep the project on the version that builds reliably in the local Android Studio/Gradle environment.
+
 ## মনে রাখার নিয়ম
 
 - `compileSdk`: কোন SDK দিয়ে build হচ্ছে
