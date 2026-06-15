@@ -20,6 +20,24 @@
 - `reports/{reportId}`
 - `blocked_users/{uid}/items/{blockedUid}`
 
+## User Profile Model
+
+```text
+users/{uid}
+  uid
+  phoneNumber
+  email
+  displayName
+  username
+  photoUrl
+  primaryAuthProvider
+  createdAt
+  updatedAt
+  lastSeenAt
+```
+
+`phoneNumber` is the preferred identity field for WhatsApp-like discovery. `email` is optional fallback identity.
+
 ## Realtime Database
 
 - `presence/{uid}`

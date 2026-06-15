@@ -29,10 +29,19 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun onEmailOrPhoneChanged(value: String) {
+    fun onPhoneNumberChanged(value: String) {
         _uiState.update {
             it.copy(
-                emailOrPhone = value,
+                phoneNumber = value,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun onEmailChanged(value: String) {
+        _uiState.update {
+            it.copy(
+                email = value,
                 errorMessage = null
             )
         }
@@ -61,13 +70,15 @@ class AuthViewModel @Inject constructor(
             }
 
             val result = when (state.authMode) {
-                AuthMode.Login -> authRepository.signIn(
-                    email = state.emailOrPhone,
+                AuthMode.Phone -> requestPhoneOtp(state.phoneNumber)
+
+                AuthMode.EmailLogin -> authRepository.signIn(
+                    email = state.email,
                     password = state.password
                 )
 
-                AuthMode.Register -> authRepository.register(
-                    email = state.emailOrPhone,
+                AuthMode.EmailRegister -> authRepository.register(
+                    email = state.email,
                     password = state.password
                 )
             }
@@ -87,6 +98,16 @@ class AuthViewModel @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    private fun requestPhoneOtp(phoneNumber: String): AuthResult {
+        return when {
+            phoneNumber.isBlank() -> AuthResult.Error("Phone number is required.")
+            phoneNumber.filter(Char::isDigit).length < 10 -> {
+                AuthResult.Error("Enter a valid phone number.")
+            }
+            else -> AuthResult.Error("Phone OTP verification will be connected in the next auth step.")
         }
     }
 }

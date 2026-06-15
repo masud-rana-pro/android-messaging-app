@@ -39,7 +39,8 @@ fun AuthScreen(
 
     AuthContent(
         uiState = uiState,
-        onEmailOrPhoneChanged = viewModel::onEmailOrPhoneChanged,
+        onPhoneNumberChanged = viewModel::onPhoneNumberChanged,
+        onEmailChanged = viewModel::onEmailChanged,
         onPasswordChanged = viewModel::onPasswordChanged,
         onAuthModeChanged = viewModel::onAuthModeChanged,
         onSubmit = { viewModel.submit(onSuccess = onAuthSuccess) }
@@ -49,7 +50,8 @@ fun AuthScreen(
 @Composable
 private fun AuthContent(
     uiState: AuthUiState,
-    onEmailOrPhoneChanged: (String) -> Unit,
+    onPhoneNumberChanged: (String) -> Unit,
+    onEmailChanged: (String) -> Unit,
     onPasswordChanged: (String) -> Unit,
     onAuthModeChanged: (AuthMode) -> Unit,
     onSubmit: () -> Unit
@@ -74,29 +76,47 @@ private fun AuthContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Use email to continue with ContactMe.",
+            text = if (uiState.authMode == AuthMode.Phone) {
+                "Use your mobile number as your primary ContactMe identity."
+            } else {
+                "Email and password are available as a fallback login method."
+            },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
         )
         Spacer(modifier = Modifier.height(ContactMeSpacing.sectionGap))
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = uiState.emailOrPhone,
-            onValueChange = onEmailOrPhoneChanged,
-            enabled = !uiState.isLoading,
-            singleLine = true,
-            label = { Text(text = "Email") }
-        )
-        Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = uiState.password,
-            onValueChange = onPasswordChanged,
-            enabled = !uiState.isLoading,
-            singleLine = true,
-            label = { Text(text = "Password") },
-            visualTransformation = PasswordVisualTransformation()
-        )
+
+        if (uiState.authMode == AuthMode.Phone) {
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = uiState.phoneNumber,
+                onValueChange = onPhoneNumberChanged,
+                enabled = !uiState.isLoading,
+                singleLine = true,
+                label = { Text(text = "Mobile number") },
+                placeholder = { Text(text = "+880 1XXXXXXXXX") }
+            )
+        } else {
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = uiState.email,
+                onValueChange = onEmailChanged,
+                enabled = !uiState.isLoading,
+                singleLine = true,
+                label = { Text(text = "Email") }
+            )
+            Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = uiState.password,
+                onValueChange = onPasswordChanged,
+                enabled = !uiState.isLoading,
+                singleLine = true,
+                label = { Text(text = "Password") },
+                visualTransformation = PasswordVisualTransformation()
+            )
+        }
+
         uiState.errorMessage?.let { message ->
             Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
             Text(
@@ -127,16 +147,40 @@ private fun AuthContent(
             OutlinedButton(
                 modifier = Modifier.weight(1f),
                 enabled = !uiState.isLoading,
-                onClick = { onAuthModeChanged(AuthMode.Login) }
+                onClick = { onAuthModeChanged(AuthMode.Phone) }
             ) {
-                Text(text = "Login")
+                Text(text = "Phone")
             }
             OutlinedButton(
                 modifier = Modifier.weight(1f),
                 enabled = !uiState.isLoading,
-                onClick = { onAuthModeChanged(AuthMode.Register) }
+                onClick = { onAuthModeChanged(AuthMode.EmailLogin) }
             ) {
-                Text(text = "Register")
+                Text(text = "Email")
+            }
+        }
+        Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
+        if (uiState.authMode != AuthMode.Phone) {
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !uiState.isLoading,
+                onClick = {
+                    onAuthModeChanged(
+                        if (uiState.authMode == AuthMode.EmailLogin) {
+                            AuthMode.EmailRegister
+                        } else {
+                            AuthMode.EmailLogin
+                        }
+                    )
+                }
+            ) {
+                Text(
+                    text = if (uiState.authMode == AuthMode.EmailLogin) {
+                        "Need an account? Register with email"
+                    } else {
+                        "Already have an account? Log in with email"
+                    }
+                )
             }
         }
         Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))

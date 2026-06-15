@@ -20,6 +20,7 @@ Auth foundation has been added:
 - ViewModel-driven Auth screen
 - Firebase sign-in binding
 - Email/password registration support
+- Phone-first auth UI with email fallback
 
 ## Current Auth Flow
 
@@ -30,6 +31,8 @@ AuthScreen
 -> FirebaseAuthRepository
 -> Success/Error
 ```
+
+Phone mode currently shows the primary phone entry UI and validates the number, but real OTP verification is planned for the next step.
 
 ## Why Fake Repository First
 
@@ -45,10 +48,11 @@ The fake repository allows the app to:
 ## Next Steps
 
 1. Add session restore.
-2. Add logout.
-3. Save profile data after auth.
-4. Improve Firebase error mapping.
-5. Add email verification if needed.
+2. Add Firebase Phone Auth OTP flow.
+3. Add logout.
+4. Save profile data after auth.
+5. Improve Firebase error mapping.
+6. Add email verification if needed.
 
 ## Not Done Yet
 
