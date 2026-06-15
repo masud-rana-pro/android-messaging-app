@@ -6,7 +6,7 @@ enum class AuthMode(
 ) {
     Phone(
         title = "Continue with phone",
-        actionLabel = "Send OTP"
+        actionLabel = "Send code"
     ),
     EmailLogin(
         title = "Log in with email",

@@ -9,7 +9,7 @@ ContactMe WhatsApp-like app। তাই phone number primary identity হওয়
 আগে phone screen ছিল, কিন্তু OTP real ছিল না। এখন:
 
 ```text
-Phone number input -> Send OTP -> OTP input -> Verify OTP
+Phone number input -> Send code -> verification code input -> Verify code
 ```
 
 flow তৈরি হয়েছে।
@@ -149,7 +149,7 @@ if OTP not sent -> requestPhoneOtp
 if OTP sent -> verifyPhoneOtp
 ```
 
-এতে same button first time `Send OTP`, next time `Verify OTP` হিসেবে কাজ করে।
+এতে same button first time `Send code`, next time `Verify code` হিসেবে কাজ করে।
 
 ## `AuthScreen`
 
@@ -157,8 +157,8 @@ if OTP sent -> verifyPhoneOtp
 
 - Phone mode default
 - Mobile number input
-- OTP sent হলে OTP code input দেখা যায়
-- Button text হয় `Verify OTP`
+- code sent হলে verification code input দেখা যায়
+- Button text হয় `Verify code`
 - Status/error message দেখা যায়
 
 Activity পাওয়ার জন্য:
@@ -175,6 +175,18 @@ Real phone auth test করতে:
 2. Authentication > Sign-in method।
 3. Phone provider enable করো।
 4. Development-এর জন্য test phone number add করো।
+
+যদি Phone provider enable না থাকে, Firebase এই ধরনের error দিতে পারে:
+
+```text
+This operation is not allowed. This may be because the given sign-in provider is disabled...
+```
+
+Fix:
+
+```text
+Firebase Console -> Authentication -> Sign-in method -> Phone -> Enable
+```
 
 Test phone number ব্যবহার করা ভালো কারণ:
 
@@ -201,11 +213,35 @@ Manual:
 
 1. Auth screen open করো।
 2. Phone mode-এ Firebase test phone number দাও।
-3. Send OTP চাপো।
+3. Send code চাপো।
 4. OTP input দেখা যাবে।
 5. Firebase test code দাও।
-6. Verify OTP চাপো।
+6. Verify code চাপো।
 7. Success হলে Profile Setup screen-এ যাবে।
+
+## Bangladesh phone number formatting
+
+তুমি যদি local number দাও:
+
+```text
+01575634380
+```
+
+App এটাকে Firebase format-এ convert করবে:
+
+```text
++8801575634380
+```
+
+Firebase Phone Auth E.164 format চায়, তাই `+880` country code দরকার।
+
+Accepted examples:
+
+```text
+01575634380
+8801575634380
++8801575634380
+```
 
 ## এখনো কী বাকি
 
@@ -224,3 +260,51 @@ Splash checks Firebase currentUser
 if user exists -> Home/Profile
 else -> Auth
 ```
+
+## UI copy polish update
+
+এই update-এ auth screen-এর phone verification textগুলো industry app standard অনুযায়ী পরিষ্কার করা হয়েছে।
+
+আগের সমস্যা:
+
+- placeholder-এ real/example full phone number ছিল
+- button/error text-এ `OTP` শব্দ বেশি technical লাগছিল
+- Firebase-এর raw SMS/provider/region error সরাসরি user-কে দেখানোর ঝুঁকি ছিল
+
+এখন screen-এ ব্যবহার করা হচ্ছে:
+
+```text
+Phone number
+01XXXXXXXXX
+Send code
+Verification code
+Verify code
+```
+
+কেন এটা ভালো:
+
+- user বুঝে যায় কী দিতে হবে, কিন্তু কোনো personal-looking number দেখানো হয় না
+- `verification code` সাধারণ user-এর কাছে `OTP`-এর চেয়ে বেশি clear
+- Firebase Console/SMS region/provider-এর technical কথা app UI-তে দেখানো ঠিক না
+
+Repository layer-এ Firebase error message map করা হয়েছে:
+
+```kotlin
+"We could not send a verification code right now. Please try again later."
+```
+
+এর মানে:
+
+- Firebase থেকে raw technical message আসলেও user friendly message দেখবে
+- setup/debug instruction documentation-এ থাকবে
+- app UI clean থাকবে
+
+কীভাবে verify করবে:
+
+1. Phone screen open করো।
+2. phone input placeholder দেখবে `01XXXXXXXXX`।
+3. button text দেখবে `Send code`।
+4. code sent হলে message দেখবে `Code sent. Check your SMS messages.`
+5. OTP field label দেখবে `Verification code`।
+6. verify button দেখবে `Verify code`।
+7. Firebase SMS/provider/region issue হলে raw long Firebase error না দেখিয়ে short retry message দেখাবে।

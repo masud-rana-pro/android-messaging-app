@@ -7,13 +7,29 @@ ContactMe now has the first Firebase Phone Auth implementation path.
 ```text
 Auth screen phone mode
 -> enter mobile number
--> Send OTP
+-> Send code
 -> Firebase sends verification code
--> OTP input appears
--> Verify OTP
+-> verification code input appears
+-> Verify code
 -> Firebase signs in
 -> Profile Setup
 ```
+
+## App Copy Standard
+
+Phone auth UI should use product-friendly language instead of Firebase/internal wording.
+
+Current UI copy:
+
+```text
+Phone number
+01XXXXXXXXX
+Send code
+Verification code
+Verify code
+```
+
+Firebase technical errors are also mapped to general user-facing messages. For example, SMS region/quota/provider errors should not expose console setup details inside the app. The app shows a short retry message, while setup instructions stay in project docs.
 
 ## Required Firebase Console Setup
 
@@ -24,6 +40,8 @@ Before testing real phone OTP:
 3. Open Sign-in method.
 4. Enable Phone provider.
 5. Add test phone numbers for development.
+
+If this is not enabled, Firebase returns an operation-not-allowed error.
 
 ## Recommended Development Testing
 
@@ -37,6 +55,24 @@ Code: 123456
 ```
 
 Use your own test number/code pair from Firebase Console.
+
+## Bangladesh Number Format
+
+The app accepts common Bangladesh number input and normalizes it before sending to Firebase.
+
+Examples:
+
+```text
+01575634380      -> +8801575634380
+8801575634380   -> +8801575634380
++8801575634380  -> +8801575634380
+```
+
+Firebase Phone Auth requires E.164 format:
+
+```text
++8801575634380
+```
 
 ## SHA Setup
 

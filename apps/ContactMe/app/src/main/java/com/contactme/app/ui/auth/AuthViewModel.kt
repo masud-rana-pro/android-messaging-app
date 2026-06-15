@@ -158,7 +158,7 @@ class AuthViewModel @Inject constructor(
                         it.copy(
                             isLoading = false,
                             phoneVerificationId = result.verificationId,
-                            statusMessage = "OTP sent. Enter the code to continue.",
+                            statusMessage = "Code sent. Check your SMS messages.",
                             errorMessage = null
                         )
                     }
