@@ -1,13 +1,92 @@
 package com.contactme.app.presence
 
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FirebaseFirestore
 import javax.inject.Inject
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class FirebasePresenceRepository @Inject constructor(
-    private val database: FirebaseDatabase
+    private val database: FirebaseDatabase,
+    private val firestore: FirebaseFirestore
 ) : PresenceRepository {
+    override fun observeConversationPeerPresence(
+        conversationId: String,
+        currentUserId: String
+    ): Flow<PresenceStatus> = callbackFlow {
+        var presenceReference: DatabaseReference? = null
+        var presenceListener: ValueEventListener? = null
+
+        fun clearPresenceListener() {
+            val reference = presenceReference
+            val listener = presenceListener
+
+            if (reference != null && listener != null) {
+                reference.removeEventListener(listener)
+            }
+
+            presenceReference = null
+            presenceListener = null
+        }
+
+        val conversationRegistration = firestore.collection(CONVERSATIONS_COLLECTION)
+            .document(conversationId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(PresenceStatus())
+                    return@addSnapshotListener
+                }
+
+                val participantIds = snapshot
+                    ?.get("participantIds") as? List<*>
+                val peerUserId = participantIds
+                    .orEmpty()
+                    .filterIsInstance<String>()
+                    .firstOrNull { userId -> userId != currentUserId }
+
+                clearPresenceListener()
+
+                if (peerUserId == null) {
+                    trySend(PresenceStatus())
+                    return@addSnapshotListener
+                }
+
+                val nextReference = database.reference
+                    .child(PRESENCE_PATH)
+                    .child(peerUserId)
+                val nextListener = object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        trySend(
+                            PresenceStatus(
+                                isOnline = snapshot.child("isOnline").getValue(Boolean::class.java) ?: false,
+                                lastSeenAtMillis = snapshot.child("lastSeenAt").getValue(Long::class.java) ?: 0L
+                            )
+                        )
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+                        trySend(PresenceStatus())
+                    }
+                }
+
+                presenceReference = nextReference
+                presenceListener = nextListener
+                nextReference.addValueEventListener(nextListener)
+            }
+
+        awaitClose {
+            conversationRegistration.remove()
+            clearPresenceListener()
+        }
+    }
+
     override suspend fun markOnline(userId: String) {
         val presenceReference = database.reference
             .child(PRESENCE_PATH)
@@ -44,6 +123,7 @@ class FirebasePresenceRepository @Inject constructor(
     }
 
     private companion object {
+        const val CONVERSATIONS_COLLECTION = "conversations"
         const val PRESENCE_PATH = "presence"
     }
 }
