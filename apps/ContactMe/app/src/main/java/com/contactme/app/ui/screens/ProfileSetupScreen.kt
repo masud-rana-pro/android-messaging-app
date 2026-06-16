@@ -1,6 +1,10 @@
 package com.contactme.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -24,10 +28,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.contactme.app.ui.profile.ProfileSetupUiState
 import com.contactme.app.ui.profile.ProfileSetupViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
@@ -43,6 +49,7 @@ fun ProfileSetupScreen(
         uiState = uiState,
         onDisplayNameChanged = viewModel::onDisplayNameChanged,
         onUsernameChanged = viewModel::onUsernameChanged,
+        onPhotoSelected = viewModel::onPhotoSelected,
         onSaveProfile = {
             viewModel.saveProfile(onProfileReady = onProfileReady)
         }
@@ -54,8 +61,15 @@ private fun ProfileSetupContent(
     uiState: ProfileSetupUiState,
     onDisplayNameChanged: (String) -> Unit,
     onUsernameChanged: (String) -> Unit,
+    onPhotoSelected: (android.net.Uri?) -> Unit,
     onSaveProfile: () -> Unit
 ) {
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = onPhotoSelected
+    )
+    val photoModel = uiState.selectedPhotoUri.ifBlank { uiState.photoUrl }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -73,15 +87,29 @@ private fun ProfileSetupContent(
             modifier = Modifier
                 .size(88.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .clickable(enabled = !uiState.isLoading) {
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "Photo",
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
-            )
+            if (photoModel.isNotBlank()) {
+                AsyncImage(
+                    modifier = Modifier.fillMaxSize(),
+                    model = photoModel,
+                    contentDescription = "Profile photo",
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(
+                    text = "Photo",
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
         Spacer(modifier = Modifier.height(ContactMeSpacing.contentGap))
         Text(

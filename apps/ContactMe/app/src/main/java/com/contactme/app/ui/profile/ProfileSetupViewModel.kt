@@ -1,8 +1,11 @@
 package com.contactme.app.ui.profile
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
+import com.contactme.app.profile.ProfilePhotoRepository
+import com.contactme.app.profile.ProfilePhotoResult
 import com.contactme.app.profile.ProfileRepository
 import com.contactme.app.profile.ProfileResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +19,8 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ProfileSetupViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
+    private val profilePhotoRepository: ProfilePhotoRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileSetupUiState())
     val uiState: StateFlow<ProfileSetupUiState> = _uiState.asStateFlow()
@@ -50,6 +54,15 @@ class ProfileSetupViewModel @Inject constructor(
         }
     }
 
+    fun onPhotoSelected(uri: Uri?) {
+        _uiState.update {
+            it.copy(
+                selectedPhotoUri = uri?.toString().orEmpty(),
+                errorMessage = null
+            )
+        }
+    }
+
     fun saveProfile(onProfileReady: () -> Unit) {
         val state = _uiState.value
         val userId = authRepository.currentUserId()
@@ -75,11 +88,17 @@ class ProfileSetupViewModel @Inject constructor(
                 )
             }
 
+            val photoUrl = uploadSelectedPhotoIfNeeded(
+                userId = userId.orEmpty(),
+                state = state
+            ) ?: return@launch
+
             when (
                 val result = profileRepository.saveProfile(
                     userId = userId.orEmpty(),
                     displayName = state.displayName,
-                    username = state.username
+                    username = state.username,
+                    photoUrl = photoUrl
                 )
             ) {
                 ProfileResult.Success -> {
@@ -109,6 +128,8 @@ class ProfileSetupViewModel @Inject constructor(
                 it.copy(
                     displayName = profile.displayName,
                     username = profile.username,
+                    photoUrl = profile.photoUrl,
+                    selectedPhotoUri = "",
                     isExistingProfile = true,
                     errorMessage = null
                 )
@@ -138,5 +159,32 @@ class ProfileSetupViewModel @Inject constructor(
         const val MAX_DISPLAY_NAME_LENGTH = 40
         const val MIN_USERNAME_LENGTH = 3
         const val MAX_USERNAME_LENGTH = 24
+    }
+
+    private suspend fun uploadSelectedPhotoIfNeeded(
+        userId: String,
+        state: ProfileSetupUiState
+    ): String? {
+        if (state.selectedPhotoUri.isBlank()) {
+            return state.photoUrl
+        }
+
+        return when (
+            val result = profilePhotoRepository.uploadProfilePhoto(
+                userId = userId,
+                photoUri = Uri.parse(state.selectedPhotoUri)
+            )
+        ) {
+            is ProfilePhotoResult.Success -> result.photoUrl
+            is ProfilePhotoResult.Error -> {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = result.message
+                    )
+                }
+                null
+            }
+        }
     }
 }
