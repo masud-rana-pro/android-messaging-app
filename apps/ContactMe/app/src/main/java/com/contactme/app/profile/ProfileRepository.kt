@@ -5,6 +5,11 @@ interface ProfileRepository {
 
     suspend fun getProfile(userId: String): UserProfile?
 
+    suspend fun searchProfiles(
+        usernameQuery: String,
+        currentUserId: String
+    ): List<UserProfile>
+
     suspend fun saveProfile(
         userId: String,
         displayName: String,
