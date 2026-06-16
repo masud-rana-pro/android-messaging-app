@@ -3,6 +3,7 @@ package com.contactme.app.ui.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
+import com.contactme.app.conversation.ConversationRepository
 import com.contactme.app.message.MessageRepository
 import com.contactme.app.message.MessageResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ChatDetailViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val conversationRepository: ConversationRepository,
     private val messageRepository: MessageRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
@@ -31,6 +33,7 @@ class ChatDetailViewModel @Inject constructor(
         if (conversationId == null || activeConversationId == conversationId) return
 
         activeConversationId = conversationId
+        markConversationRead(conversationId)
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
             messageRepository.observeMessages(conversationId).collect { messages ->
@@ -39,6 +42,9 @@ class ChatDetailViewModel @Inject constructor(
                         messages = messages,
                         errorMessage = null
                     )
+                }
+                if (messages.isNotEmpty()) {
+                    markConversationRead(conversationId)
                 }
             }
         }
@@ -110,5 +116,16 @@ class ChatDetailViewModel @Inject constructor(
 
     private companion object {
         const val MAX_MESSAGE_LENGTH = 4000
+    }
+
+    private fun markConversationRead(conversationId: String) {
+        val userId = authRepository.currentUserId() ?: return
+
+        viewModelScope.launch {
+            conversationRepository.markConversationRead(
+                conversationId = conversationId,
+                userId = userId
+            )
+        }
     }
 }
