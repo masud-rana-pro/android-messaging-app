@@ -2,6 +2,7 @@ package com.contactme.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -131,12 +133,18 @@ private fun ChatDetailContent(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (messages.isEmpty()) {
+                if (uiState.isLoadingMessages) {
                     item {
-                        Text(
-                            text = "No messages yet.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+                        ChatListStateMessage(
+                            title = "Loading messages",
+                            subtitle = "Syncing this conversation."
+                        )
+                    }
+                } else if (messages.isEmpty()) {
+                    item {
+                        ChatListStateMessage(
+                            title = "No messages yet",
+                            subtitle = "Send the first message to start the conversation."
                         )
                     }
                 }
@@ -156,10 +164,10 @@ private fun ChatDetailContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 uiState.errorMessage?.let { message ->
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
+                    SendErrorMessage(
+                        message = message,
+                        canRetry = uiState.messageText.isNotBlank() && conversationId != null,
+                        onRetry = onSendMessage
                     )
                 }
                 Row(
@@ -194,6 +202,70 @@ private fun ChatDetailContent(
                         Text(text = "Send")
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatListStateMessage(
+    title: String,
+    subtitle: String
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 36.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (title == "Loading messages") {
+                CircularProgressIndicator()
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SendErrorMessage(
+    message: String,
+    canRetry: Boolean,
+    onRetry: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            modifier = Modifier.weight(1f),
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onErrorContainer
+        )
+        if (canRetry) {
+            TextButton(onClick = onRetry) {
+                Text(text = "Retry")
             }
         }
     }
@@ -264,7 +336,7 @@ private fun MessageMetaRow(
 
 private fun MessageStatus.toDisplayMark(): String {
     return when (this) {
-        MessageStatus.Sent -> "✓"
+        MessageStatus.Sent -> "Sent"
     }
 }
 
