@@ -1,5 +1,7 @@
 package com.contactme.app.conversation
 
+import com.contactme.app.profile.PrivacyVisibility
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
@@ -50,7 +52,7 @@ class FirebaseConversationRepository @Inject constructor(
                             title = otherUser.getString("displayName").orEmpty().ifBlank {
                                 otherUser.getString("username").orEmpty().ifBlank { "ContactMe User" }
                             },
-                            photoUrl = otherUser.getString("photoUrl").orEmpty(),
+                            photoUrl = otherUser.visibleProfilePhotoUrl(),
                             subtitle = document.getString("lastMessageText").orEmpty().ifBlank {
                                 "No messages yet."
                             },
@@ -170,6 +172,15 @@ class FirebaseConversationRepository @Inject constructor(
                 .document(conversationId)
                 .update("readAtByUser.$userId", FieldValue.serverTimestamp())
                 .await()
+        }
+    }
+
+    private fun DocumentSnapshot.visibleProfilePhotoUrl(): String {
+        val visibility = PrivacyVisibility.fromFirestore(getString("profilePhotoVisibility"))
+        return if (visibility == PrivacyVisibility.Nobody) {
+            ""
+        } else {
+            getString("photoUrl").orEmpty()
         }
     }
 
