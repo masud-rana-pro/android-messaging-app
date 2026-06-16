@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "TODO: Add Firebase deploy commands."
+firebase deploy --only firestore:rules,firestore:indexes
