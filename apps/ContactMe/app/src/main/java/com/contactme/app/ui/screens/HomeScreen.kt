@@ -2,6 +2,8 @@ package com.contactme.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +48,8 @@ import com.contactme.app.ui.discovery.ContactDiscoveryUiState
 import com.contactme.app.ui.discovery.ContactDiscoveryViewModel
 import com.contactme.app.ui.conversation.ConversationListUiState
 import com.contactme.app.ui.conversation.ConversationListViewModel
+import com.contactme.app.ui.contact.ContactListUiState
+import com.contactme.app.ui.contact.ContactListViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
 import java.text.SimpleDateFormat
@@ -56,7 +60,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onChatSelected: (String) -> Unit,
     onConversationSelected: (String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
     onSettingsSelected: () -> Unit
@@ -106,7 +109,6 @@ fun HomeScreen(
         ) {
             when (selectedTab) {
                 HomeTab.Chats -> ChatsTab(
-                    onChatSelected = onChatSelected,
                     onConversationSelected = onConversationSelected,
                     onDiscoveredUserSelected = onDiscoveredUserSelected
                 )
@@ -136,20 +138,21 @@ fun HomeScreen(
 
 @Composable
 private fun ChatsTab(
-    onChatSelected: (String) -> Unit,
     onConversationSelected: (String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
     discoveryViewModel: ContactDiscoveryViewModel = hiltViewModel(),
+    contactListViewModel: ContactListViewModel = hiltViewModel(),
     conversationListViewModel: ConversationListViewModel = hiltViewModel()
 ) {
     val discoveryState by discoveryViewModel.uiState.collectAsState()
+    val contactListState by contactListViewModel.uiState.collectAsState()
     val conversationListState by conversationListViewModel.uiState.collectAsState()
 
     ChatsContent(
         discoveryState = discoveryState,
+        contactListState = contactListState,
         conversationListState = conversationListState,
         onSearchQueryChanged = discoveryViewModel::onQueryChanged,
-        onChatSelected = onChatSelected,
         onConversationSelected = onConversationSelected,
         onDiscoveredUserSelected = onDiscoveredUserSelected
     )
@@ -158,13 +161,16 @@ private fun ChatsTab(
 @Composable
 private fun ChatsContent(
     discoveryState: ContactDiscoveryUiState,
+    contactListState: ContactListUiState,
     conversationListState: ConversationListUiState,
     onSearchQueryChanged: (String) -> Unit,
-    onChatSelected: (String) -> Unit,
     onConversationSelected: (String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    Column(
+        modifier = Modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 text = "Chats",
@@ -182,12 +188,55 @@ private fun ChatsContent(
             onSearchQueryChanged = onSearchQueryChanged,
             onDiscoveredUserSelected = onDiscoveredUserSelected
         )
+        SavedContactsList(
+            contactListState = contactListState,
+            onContactSelected = onDiscoveredUserSelected
+        )
         ConversationPreviewList(
             conversationListState = conversationListState,
             onConversationSelected = onConversationSelected
         )
-        if (conversationListState.conversations.isEmpty()) {
-            ChatPreviewList(onChatSelected = onChatSelected)
+    }
+}
+
+@Composable
+private fun SavedContactsList(
+    contactListState: ContactListUiState,
+    onContactSelected: (UserProfile) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "Saved contacts",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        if (contactListState.isLoading) {
+            Text(
+                text = "Loading contacts...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
+        contactListState.message?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
+        if (!contactListState.isLoading && contactListState.contacts.isEmpty()) {
+            Text(
+                text = "Search people to save contacts and start chats.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
+        contactListState.contacts.forEach { contact ->
+            ContactSearchResult(
+                profile = contact,
+                actionText = "Chat",
+                onClick = { onContactSelected(contact) }
+            )
         }
     }
 }
@@ -333,6 +382,7 @@ private fun ContactSearch(
         discoveryState.results.forEach { profile ->
             ContactSearchResult(
                 profile = profile,
+                actionText = "Open",
                 onClick = { onDiscoveredUserSelected(profile) }
             )
         }
@@ -342,6 +392,7 @@ private fun ContactSearch(
 @Composable
 private fun ContactSearchResult(
     profile: UserProfile,
+    actionText: String,
     onClick: () -> Unit
 ) {
     Row(
@@ -376,7 +427,7 @@ private fun ContactSearchResult(
             }
         }
         Text(
-            text = "Open",
+            text = actionText,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary
         )
@@ -410,71 +461,6 @@ private fun ContactAvatar(
                 fontWeight = FontWeight.Bold
             )
         }
-    }
-}
-
-@Composable
-private fun ChatPreviewList(onChatSelected: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        ChatPreviewItem(
-            name = "Ayesha Rahman",
-            message = "Project scaffold ready?",
-            time = "09:10",
-            onClick = { onChatSelected("Ayesha Rahman") }
-        )
-        ChatPreviewItem(
-            name = "Team ContactMe",
-            message = "Next: auth and real navigation",
-            time = "08:45",
-            onClick = { onChatSelected("Team ContactMe") }
-        )
-        ChatPreviewItem(
-            name = "Design Notes",
-            message = "Primary color: #a605e6",
-            time = "Yesterday",
-            onClick = { onChatSelected("Design Notes") }
-        )
-    }
-}
-
-@Composable
-private fun ChatPreviewItem(
-    name: String,
-    message: String,
-    time: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Spacer(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
-            )
-        }
-        Text(
-            text = time,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.56f)
-        )
     }
 }
 
@@ -539,7 +525,6 @@ private fun PlaceholderTab(
 private fun HomeScreenPreview() {
     ContactMeTheme {
         HomeScreen(
-            onChatSelected = {},
             onConversationSelected = { _, _ -> },
             onDiscoveredUserSelected = {},
             onSettingsSelected = {}

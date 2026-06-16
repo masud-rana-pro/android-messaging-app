@@ -36,7 +36,7 @@ fun ContactMeApp(
     val lifecycleOwner = LocalLifecycleOwner.current
     var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
     var selectedChatTarget by remember {
-        mutableStateOf(ChatTarget(title = "Ayesha Rahman", conversationId = null))
+        mutableStateOf(ChatTarget(title = "ContactMe User", conversationId = null))
     }
 
     fun openChat(target: ChatTarget) {
@@ -86,14 +86,6 @@ fun ContactMeApp(
             )
 
             AppScreen.Home -> HomeScreen(
-                onChatSelected = { chatName ->
-                    openChat(
-                        ChatTarget(
-                            title = chatName,
-                            conversationId = null
-                        )
-                    )
-                },
                 onConversationSelected = { conversationId, chatName ->
                     openChat(
                         ChatTarget(
