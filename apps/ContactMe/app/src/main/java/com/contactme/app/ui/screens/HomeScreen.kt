@@ -320,7 +320,7 @@ private fun ContactSearch(
             onValueChange = onSearchQueryChanged,
             singleLine = true,
             label = { Text(text = "Find people") },
-            placeholder = { Text(text = "Search username") }
+            placeholder = { Text(text = "Search username or phone") }
         )
         if (discoveryState.isSearching) {
             Text(
@@ -381,6 +381,13 @@ private fun ContactSearchResult(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
             )
+            if (profile.phoneNumber.isNotBlank()) {
+                Text(
+                    text = profile.phoneNumber,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.52f)
+                )
+            }
         }
         Text(
             text = "Open",

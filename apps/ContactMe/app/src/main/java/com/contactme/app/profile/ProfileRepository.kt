@@ -6,7 +6,7 @@ interface ProfileRepository {
     suspend fun getProfile(userId: String): UserProfile?
 
     suspend fun searchProfiles(
-        usernameQuery: String,
+        query: String,
         currentUserId: String
     ): List<UserProfile>
 
