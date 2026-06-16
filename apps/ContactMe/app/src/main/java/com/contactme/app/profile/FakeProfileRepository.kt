@@ -5,6 +5,7 @@ import javax.inject.Inject
 
 class FakeProfileRepository @Inject constructor() : ProfileRepository {
     private val profiles = mutableMapOf<String, UserProfile>()
+    private val privacySettings = mutableMapOf<String, PrivacySettings>()
 
     override suspend fun isProfileComplete(userId: String): Boolean {
         delay(150)
@@ -14,6 +15,11 @@ class FakeProfileRepository @Inject constructor() : ProfileRepository {
     override suspend fun getProfile(userId: String): UserProfile? {
         delay(150)
         return profiles[userId]
+    }
+
+    override suspend fun getPrivacySettings(userId: String): PrivacySettings {
+        delay(150)
+        return privacySettings[userId] ?: PrivacySettings()
     }
 
     override suspend fun searchProfiles(
@@ -66,6 +72,15 @@ class FakeProfileRepository @Inject constructor() : ProfileRepository {
             phoneNumber = "",
             photoUrl = photoUrl
         )
+        return ProfileResult.Success
+    }
+
+    override suspend fun savePrivacySettings(
+        userId: String,
+        privacySettings: PrivacySettings
+    ): ProfileResult {
+        delay(150)
+        this.privacySettings[userId] = privacySettings
         return ProfileResult.Success
     }
 
