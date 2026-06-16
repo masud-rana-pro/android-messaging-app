@@ -32,6 +32,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.contactme.app.message.ChatMessage
+import com.contactme.app.message.MessageStatus
 import com.contactme.app.ui.chat.ChatDetailUiState
 import com.contactme.app.ui.chat.ChatDetailViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
@@ -227,12 +228,43 @@ private fun MessageBubble(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Text(
-                text = message.sentAtMillis.formatChatTime(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f)
+            MessageMetaRow(
+                sentAtMillis = message.sentAtMillis,
+                status = message.status,
+                isMine = isMine
             )
         }
+    }
+}
+
+@Composable
+private fun MessageMetaRow(
+    sentAtMillis: Long,
+    status: MessageStatus,
+    isMine: Boolean
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = sentAtMillis.formatChatTime(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f)
+        )
+        if (isMine) {
+            Text(
+                text = status.toDisplayMark(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+private fun MessageStatus.toDisplayMark(): String {
+    return when (this) {
+        MessageStatus.Sent -> "✓"
     }
 }
 

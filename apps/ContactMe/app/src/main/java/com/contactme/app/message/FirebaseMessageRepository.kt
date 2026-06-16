@@ -28,7 +28,8 @@ class FirebaseMessageRepository @Inject constructor(
                         id = document.id,
                         senderId = document.getString("senderId").orEmpty(),
                         text = document.getString("text").orEmpty(),
-                        sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L
+                        sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
+                        status = MessageStatus.fromFirestore(document.getString("status"))
                     )
                 }
 
@@ -56,6 +57,7 @@ class FirebaseMessageRepository @Inject constructor(
             "senderId" to senderId,
             "text" to trimmedText,
             "type" to "text",
+            "status" to MessageStatus.Sent.firestoreValue,
             "createdAt" to FieldValue.serverTimestamp()
         )
 

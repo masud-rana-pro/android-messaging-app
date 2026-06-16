@@ -29,7 +29,8 @@ class FakeMessageRepository @Inject constructor() : MessageRepository {
             id = "fake-message-${System.currentTimeMillis()}",
             senderId = senderId,
             text = trimmedText,
-            sentAtMillis = System.currentTimeMillis()
+            sentAtMillis = System.currentTimeMillis(),
+            status = MessageStatus.Sent
         )
 
         messagesByConversation.value = messagesByConversation.value.toMutableMap().also {
