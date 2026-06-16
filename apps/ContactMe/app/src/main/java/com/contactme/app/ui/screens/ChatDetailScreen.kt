@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -21,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,6 +36,9 @@ import com.contactme.app.ui.chat.ChatDetailUiState
 import com.contactme.app.ui.chat.ChatDetailViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +74,19 @@ private fun ChatDetailContent(
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit
 ) {
+    val messages = if (conversationId == null) {
+        demoMessages(currentUserId = uiState.currentUserId)
+    } else {
+        uiState.messages
+    }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.lastIndex)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -104,29 +125,35 @@ private fun ChatDetailContent(
                 ),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                val messages = if (conversationId == null) {
-                    demoMessages(currentUserId = uiState.currentUserId)
-                } else {
-                    uiState.messages
-                }
-
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 if (messages.isEmpty()) {
-                    Text(
-                        text = "No messages yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
-                    )
+                    item {
+                        Text(
+                            text = "No messages yet.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+                        )
+                    }
                 }
 
-                messages.forEach { message ->
+                items(
+                    items = messages,
+                    key = { message -> message.id }
+                ) { message ->
                     MessageBubble(
-                        text = message.text,
+                        message = message,
                         isMine = message.senderId == uiState.currentUserId
                     )
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.padding(top = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 uiState.errorMessage?.let { message ->
                     Text(
                         text = message,
@@ -156,7 +183,12 @@ private fun ChatDetailContent(
                     )
                     Button(
                         enabled = conversationId != null && !uiState.isSending,
-                        onClick = onSendMessage
+                        onClick = onSendMessage,
+                        shape = RoundedCornerShape(22.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
                     ) {
                         Text(text = "Send")
                     }
@@ -168,14 +200,14 @@ private fun ChatDetailContent(
 
 @Composable
 private fun MessageBubble(
-    text: String,
+    message: ChatMessage,
     isMine: Boolean
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
     ) {
-        Text(
+        Column(
             modifier = Modifier
                 .fillMaxWidth(0.78f)
                 .background(
@@ -186,12 +218,28 @@ private fun MessageBubble(
                     },
                     shape = RoundedCornerShape(18.dp)
                 )
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
+        ) {
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                text = message.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = message.sentAtMillis.formatChatTime(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f)
+            )
+        }
     }
+}
+
+private fun Long.formatChatTime(): String {
+    if (this <= 0L) return "Now"
+
+    return SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this))
 }
 
 private fun demoMessages(currentUserId: String): List<ChatMessage> {
