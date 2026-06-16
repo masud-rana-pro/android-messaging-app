@@ -40,6 +40,8 @@ service cloud.firestore {
       allow create, update: if isOwner(userId)
         && request.resource.data.username is string
         && request.resource.data.displayName is string
+        && request.resource.data.phoneNumber is string
+        && request.resource.data.email is string
         && request.resource.data.profileComplete == true;
       allow delete: if false;
     }

@@ -25,10 +25,10 @@ class ContactDiscoveryViewModel @Inject constructor(
     private var searchJob: Job? = null
 
     fun onQueryChanged(value: String) {
-        val normalizedQuery = value
+        val normalizedQuery = value.trimStart()
             .lowercase()
             .filter { character ->
-                character.isLetterOrDigit() || character == '_' || character == '.'
+                character.isLetterOrDigit() || character == '_' || character == '.' || character == '+'
             }
             .take(MAX_QUERY_LENGTH)
 
@@ -79,7 +79,7 @@ class ContactDiscoveryViewModel @Inject constructor(
         }
 
         val results = profileRepository.searchProfiles(
-            usernameQuery = query,
+            query = query,
             currentUserId = currentUserId
         )
 
@@ -98,7 +98,7 @@ class ContactDiscoveryViewModel @Inject constructor(
 
     private companion object {
         const val MIN_QUERY_LENGTH = 3
-        const val MAX_QUERY_LENGTH = 24
+        const val MAX_QUERY_LENGTH = 32
         const val SEARCH_DEBOUNCE_MS = 300L
     }
 }
