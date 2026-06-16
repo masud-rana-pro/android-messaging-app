@@ -4,5 +4,6 @@ data class UserProfile(
     val userId: String,
     val displayName: String,
     val username: String,
-    val phoneNumber: String = ""
+    val phoneNumber: String = "",
+    val photoUrl: String = ""
 )

@@ -35,7 +35,8 @@ class FirebaseProfileRepository @Inject constructor(
                     userId = document.id,
                     displayName = document.getString("displayName").orEmpty(),
                     username = document.getString("username").orEmpty(),
-                    phoneNumber = document.getString("phoneNumber").orEmpty()
+                    phoneNumber = document.getString("phoneNumber").orEmpty(),
+                    photoUrl = document.getString("photoUrl").orEmpty()
                 )
             }
         }.getOrNull()
@@ -74,7 +75,8 @@ class FirebaseProfileRepository @Inject constructor(
                         userId = document.id,
                         displayName = document.getString("displayName").orEmpty(),
                         username = document.getString("username").orEmpty(),
-                        phoneNumber = document.getString("phoneNumber").orEmpty()
+                        phoneNumber = document.getString("phoneNumber").orEmpty(),
+                        photoUrl = document.getString("photoUrl").orEmpty()
                     )
                 }
         }.getOrDefault(emptyList())
@@ -83,7 +85,8 @@ class FirebaseProfileRepository @Inject constructor(
     override suspend fun saveProfile(
         userId: String,
         displayName: String,
-        username: String
+        username: String,
+        photoUrl: String
     ): ProfileResult {
         return runCatching {
             val profileDocument = firestore.collection(USERS_COLLECTION).document(userId)
@@ -112,6 +115,7 @@ class FirebaseProfileRepository @Inject constructor(
                     "username" to normalizedUsername,
                     "phoneNumber" to currentUser?.phoneNumber.orEmpty(),
                     "email" to currentUser?.email.orEmpty(),
+                    "photoUrl" to photoUrl,
                     PROFILE_COMPLETE_FIELD to true,
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
@@ -158,7 +162,8 @@ class FirebaseProfileRepository @Inject constructor(
                         userId = document.id,
                         displayName = document.getString("displayName").orEmpty(),
                         username = document.getString("username").orEmpty(),
-                        phoneNumber = document.getString("phoneNumber").orEmpty()
+                        phoneNumber = document.getString("phoneNumber").orEmpty(),
+                        photoUrl = document.getString("photoUrl").orEmpty()
                     )
                 }
         }.getOrDefault(emptyList())

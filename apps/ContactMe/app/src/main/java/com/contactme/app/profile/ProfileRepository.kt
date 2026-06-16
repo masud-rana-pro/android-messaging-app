@@ -13,6 +13,7 @@ interface ProfileRepository {
     suspend fun saveProfile(
         userId: String,
         displayName: String,
-        username: String
+        username: String,
+        photoUrl: String
     ): ProfileResult
 }

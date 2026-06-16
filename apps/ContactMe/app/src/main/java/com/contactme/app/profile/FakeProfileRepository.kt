@@ -46,7 +46,8 @@ class FakeProfileRepository @Inject constructor() : ProfileRepository {
     override suspend fun saveProfile(
         userId: String,
         displayName: String,
-        username: String
+        username: String,
+        photoUrl: String
     ): ProfileResult {
         delay(350)
         val normalizedUsername = username.trim().lowercase()
@@ -62,7 +63,8 @@ class FakeProfileRepository @Inject constructor() : ProfileRepository {
             userId = userId,
             displayName = displayName.trim(),
             username = normalizedUsername,
-            phoneNumber = ""
+            phoneNumber = "",
+            photoUrl = photoUrl
         )
         return ProfileResult.Success
     }

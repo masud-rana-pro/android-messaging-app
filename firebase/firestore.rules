@@ -42,6 +42,7 @@ service cloud.firestore {
         && request.resource.data.displayName is string
         && request.resource.data.phoneNumber is string
         && request.resource.data.email is string
+        && request.resource.data.photoUrl is string
         && request.resource.data.profileComplete == true;
       allow delete: if false;
     }
