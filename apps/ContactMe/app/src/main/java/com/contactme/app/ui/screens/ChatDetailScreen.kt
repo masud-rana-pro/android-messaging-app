@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.contactme.app.message.ChatMessage
 import com.contactme.app.message.MessageStatus
+import com.contactme.app.presence.PresenceStatus
 import com.contactme.app.ui.chat.ChatDetailUiState
 import com.contactme.app.ui.chat.ChatDetailViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
@@ -97,13 +98,11 @@ private fun ChatDetailContent(
                     Column {
                         Text(text = chatName, fontWeight = FontWeight.Bold)
                         Text(
-                            text = if (conversationId == null) {
-                                "online"
-                            } else if (uiState.isOtherUserTyping) {
-                                "typing..."
-                            } else {
-                                "last seen recently"
-                            },
+                            text = chatSubtitle(
+                                conversationId = conversationId,
+                                isOtherUserTyping = uiState.isOtherUserTyping,
+                                peerPresence = uiState.peerPresence
+                            ),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.62f)
                         )
@@ -207,6 +206,24 @@ private fun ChatDetailContent(
             }
         }
     }
+}
+
+private fun chatSubtitle(
+    conversationId: String?,
+    isOtherUserTyping: Boolean,
+    peerPresence: PresenceStatus
+): String {
+    return when {
+        conversationId == null -> "online"
+        isOtherUserTyping -> "typing..."
+        peerPresence.isOnline -> "online"
+        peerPresence.lastSeenAtMillis > 0L -> "last seen ${peerPresence.lastSeenAtMillis.formatPresenceTime()}"
+        else -> "last seen recently"
+    }
+}
+
+private fun Long.formatPresenceTime(): String {
+    return SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this))
 }
 
 @Composable

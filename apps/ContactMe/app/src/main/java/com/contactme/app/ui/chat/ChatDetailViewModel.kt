@@ -6,6 +6,7 @@ import com.contactme.app.auth.AuthRepository
 import com.contactme.app.conversation.ConversationRepository
 import com.contactme.app.message.MessageRepository
 import com.contactme.app.message.MessageResult
+import com.contactme.app.presence.PresenceRepository
 import com.contactme.app.typing.TypingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -21,7 +22,8 @@ class ChatDetailViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val conversationRepository: ConversationRepository,
     private val messageRepository: MessageRepository,
-    private val typingRepository: TypingRepository
+    private val typingRepository: TypingRepository,
+    private val presenceRepository: PresenceRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         ChatDetailUiState(currentUserId = authRepository.currentUserId().orEmpty())
@@ -31,6 +33,7 @@ class ChatDetailViewModel @Inject constructor(
     private var activeConversationId: String? = null
     private var messagesJob: Job? = null
     private var typingJob: Job? = null
+    private var presenceJob: Job? = null
     private var lastTypingValue = false
 
     fun openConversation(conversationId: String?) {
@@ -48,11 +51,13 @@ class ChatDetailViewModel @Inject constructor(
         markConversationRead(conversationId)
         messagesJob?.cancel()
         typingJob?.cancel()
+        presenceJob?.cancel()
         _uiState.update {
             it.copy(
                 messages = emptyList(),
                 isLoadingMessages = true,
                 isOtherUserTyping = false,
+                peerPresence = com.contactme.app.presence.PresenceStatus(),
                 errorMessage = null
             )
         }
@@ -80,6 +85,17 @@ class ChatDetailViewModel @Inject constructor(
                 ).collect { isOtherUserTyping ->
                     _uiState.update {
                         it.copy(isOtherUserTyping = isOtherUserTyping)
+                    }
+                }
+            }
+
+            presenceJob = viewModelScope.launch {
+                presenceRepository.observeConversationPeerPresence(
+                    conversationId = conversationId,
+                    currentUserId = currentUserId
+                ).collect { peerPresence ->
+                    _uiState.update {
+                        it.copy(peerPresence = peerPresence)
                     }
                 }
             }
