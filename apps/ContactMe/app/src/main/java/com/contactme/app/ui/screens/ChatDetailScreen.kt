@@ -217,7 +217,9 @@ private fun chatSubtitle(
         conversationId == null -> "online"
         isOtherUserTyping -> "typing..."
         peerPresence.isOnline -> "online"
-        peerPresence.lastSeenAtMillis > 0L -> "last seen ${peerPresence.lastSeenAtMillis.formatPresenceTime()}"
+        peerPresence.lastSeenAtMillis > 0L && peerPresence.canShowLastSeen -> {
+            "last seen ${peerPresence.lastSeenAtMillis.formatPresenceTime()}"
+        }
         else -> "last seen recently"
     }
 }
