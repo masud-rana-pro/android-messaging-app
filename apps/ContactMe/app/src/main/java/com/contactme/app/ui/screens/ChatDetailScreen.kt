@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.contactme.app.conversation.ReadReceiptState
 import com.contactme.app.message.ChatMessage
 import com.contactme.app.message.MessageStatus
 import com.contactme.app.presence.PresenceStatus
@@ -156,7 +157,8 @@ private fun ChatDetailContent(
                 ) { message ->
                     MessageBubble(
                         message = message,
-                        isMine = message.senderId == uiState.currentUserId
+                        isMine = message.senderId == uiState.currentUserId,
+                        readReceiptState = uiState.readReceiptState
                     )
                 }
             }
@@ -295,7 +297,8 @@ private fun SendErrorMessage(
 @Composable
 private fun MessageBubble(
     message: ChatMessage,
-    isMine: Boolean
+    isMine: Boolean,
+    readReceiptState: ReadReceiptState
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -324,7 +327,8 @@ private fun MessageBubble(
             MessageMetaRow(
                 sentAtMillis = message.sentAtMillis,
                 status = message.status,
-                isMine = isMine
+                isMine = isMine,
+                isSeen = isMine && message.isSeenByPeer(readReceiptState)
             )
         }
     }
@@ -334,7 +338,8 @@ private fun MessageBubble(
 private fun MessageMetaRow(
     sentAtMillis: Long,
     status: MessageStatus,
-    isMine: Boolean
+    isMine: Boolean,
+    isSeen: Boolean
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -347,7 +352,7 @@ private fun MessageMetaRow(
         )
         if (isMine) {
             Text(
-                text = status.toDisplayMark(),
+                text = status.toDisplayMark(isSeen = isSeen),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -355,10 +360,18 @@ private fun MessageMetaRow(
     }
 }
 
-private fun MessageStatus.toDisplayMark(): String {
+private fun MessageStatus.toDisplayMark(isSeen: Boolean): String {
+    if (isSeen) return "Seen"
+
     return when (this) {
         MessageStatus.Sent -> "Sent"
     }
+}
+
+private fun ChatMessage.isSeenByPeer(readReceiptState: ReadReceiptState): Boolean {
+    return readReceiptState.canShowPeerReadReceipt &&
+        sentAtMillis > 0L &&
+        readReceiptState.peerReadAtMillis >= sentAtMillis
 }
 
 private fun Long.formatChatTime(): String {
