@@ -3,6 +3,7 @@ package com.contactme.app.conversation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -16,6 +17,11 @@ class FakeConversationRepository @Inject constructor() : ConversationRepository 
                 .sortedByDescending { preview -> preview.updatedAtMillis }
         }
     }
+
+    override fun observeReadReceiptState(
+        conversationId: String,
+        currentUserId: String
+    ): Flow<ReadReceiptState> = flowOf(ReadReceiptState())
 
     override suspend fun getOrCreateDirectConversation(
         currentUserId: String,

@@ -34,6 +34,7 @@ class ChatDetailViewModel @Inject constructor(
     private var messagesJob: Job? = null
     private var typingJob: Job? = null
     private var presenceJob: Job? = null
+    private var readReceiptJob: Job? = null
     private var lastTypingValue = false
 
     fun openConversation(conversationId: String?) {
@@ -52,12 +53,14 @@ class ChatDetailViewModel @Inject constructor(
         messagesJob?.cancel()
         typingJob?.cancel()
         presenceJob?.cancel()
+        readReceiptJob?.cancel()
         _uiState.update {
             it.copy(
                 messages = emptyList(),
                 isLoadingMessages = true,
                 isOtherUserTyping = false,
                 peerPresence = com.contactme.app.presence.PresenceStatus(),
+                readReceiptState = com.contactme.app.conversation.ReadReceiptState(),
                 errorMessage = null
             )
         }
@@ -96,6 +99,17 @@ class ChatDetailViewModel @Inject constructor(
                 ).collect { peerPresence ->
                     _uiState.update {
                         it.copy(peerPresence = peerPresence)
+                    }
+                }
+            }
+
+            readReceiptJob = viewModelScope.launch {
+                conversationRepository.observeReadReceiptState(
+                    conversationId = conversationId,
+                    currentUserId = currentUserId
+                ).collect { readReceiptState ->
+                    _uiState.update {
+                        it.copy(readReceiptState = readReceiptState)
                     }
                 }
             }

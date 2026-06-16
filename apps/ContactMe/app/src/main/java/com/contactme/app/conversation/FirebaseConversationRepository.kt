@@ -68,6 +68,54 @@ class FirebaseConversationRepository @Inject constructor(
         awaitClose { registration.remove() }
     }
 
+    override fun observeReadReceiptState(
+        conversationId: String,
+        currentUserId: String
+    ): Flow<ReadReceiptState> = callbackFlow {
+        val registration = firestore.collection(CONVERSATIONS_COLLECTION)
+            .document(conversationId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(ReadReceiptState())
+                    return@addSnapshotListener
+                }
+
+                launch {
+                    val participantIds = snapshot
+                        ?.get("participantIds") as? List<*>
+                    val peerUserId = participantIds
+                        .orEmpty()
+                        .filterIsInstance<String>()
+                        .firstOrNull { userId -> userId != currentUserId }
+
+                    if (peerUserId == null) {
+                        trySend(ReadReceiptState())
+                        return@launch
+                    }
+
+                    val peerProfile = firestore.collection(USERS_COLLECTION)
+                        .document(peerUserId)
+                        .get()
+                        .await()
+                    val peerAllowsReadReceipts = peerProfile.getBoolean("readReceiptsEnabled") ?: true
+                    val peerReadAtMillis = snapshot
+                        ?.getTimestamp("readAtByUser.$peerUserId")
+                        ?.toDate()
+                        ?.time
+                        ?: 0L
+
+                    trySend(
+                        ReadReceiptState(
+                            peerReadAtMillis = peerReadAtMillis,
+                            canShowPeerReadReceipt = peerAllowsReadReceipts
+                        )
+                    )
+                }
+            }
+
+        awaitClose { registration.remove() }
+    }
+
     override suspend fun getOrCreateDirectConversation(
         currentUserId: String,
         otherUserId: String
