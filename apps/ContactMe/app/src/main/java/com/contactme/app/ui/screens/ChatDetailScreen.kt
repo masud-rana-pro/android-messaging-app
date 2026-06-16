@@ -99,6 +99,8 @@ private fun ChatDetailContent(
                         Text(
                             text = if (conversationId == null) {
                                 "online"
+                            } else if (uiState.isOtherUserTyping) {
+                                "typing..."
                             } else {
                                 "last seen recently"
                             },
