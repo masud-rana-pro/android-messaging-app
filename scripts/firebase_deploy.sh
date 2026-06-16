@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-firebase deploy --only firestore:rules,firestore:indexes
+firebase deploy --only firestore:rules,firestore:indexes,database
