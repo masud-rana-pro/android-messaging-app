@@ -47,6 +47,7 @@ import com.contactme.app.ui.theme.ContactMeTheme
 @Composable
 fun HomeScreen(
     onChatSelected: (String) -> Unit,
+    onDiscoveredUserSelected: (UserProfile) -> Unit,
     onSettingsSelected: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(HomeTab.Chats) }
@@ -93,7 +94,10 @@ fun HomeScreen(
                 )
         ) {
             when (selectedTab) {
-                HomeTab.Chats -> ChatsTab(onChatSelected = onChatSelected)
+                HomeTab.Chats -> ChatsTab(
+                    onChatSelected = onChatSelected,
+                    onDiscoveredUserSelected = onDiscoveredUserSelected
+                )
                 HomeTab.Status -> PlaceholderTab(
                     title = "Status",
                     subtitle = "24-hour updates will appear here."
@@ -121,6 +125,7 @@ fun HomeScreen(
 @Composable
 private fun ChatsTab(
     onChatSelected: (String) -> Unit,
+    onDiscoveredUserSelected: (UserProfile) -> Unit,
     viewModel: ContactDiscoveryViewModel = hiltViewModel()
 ) {
     val discoveryState by viewModel.uiState.collectAsState()
@@ -128,7 +133,8 @@ private fun ChatsTab(
     ChatsContent(
         discoveryState = discoveryState,
         onSearchQueryChanged = viewModel::onQueryChanged,
-        onChatSelected = onChatSelected
+        onChatSelected = onChatSelected,
+        onDiscoveredUserSelected = onDiscoveredUserSelected
     )
 }
 
@@ -136,7 +142,8 @@ private fun ChatsTab(
 private fun ChatsContent(
     discoveryState: ContactDiscoveryUiState,
     onSearchQueryChanged: (String) -> Unit,
-    onChatSelected: (String) -> Unit
+    onChatSelected: (String) -> Unit,
+    onDiscoveredUserSelected: (UserProfile) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -154,7 +161,7 @@ private fun ChatsContent(
         ContactSearch(
             discoveryState = discoveryState,
             onSearchQueryChanged = onSearchQueryChanged,
-            onChatSelected = onChatSelected
+            onDiscoveredUserSelected = onDiscoveredUserSelected
         )
         ChatPreviewList(onChatSelected = onChatSelected)
     }
@@ -164,7 +171,7 @@ private fun ChatsContent(
 private fun ContactSearch(
     discoveryState: ContactDiscoveryUiState,
     onSearchQueryChanged: (String) -> Unit,
-    onChatSelected: (String) -> Unit
+    onDiscoveredUserSelected: (UserProfile) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         OutlinedTextField(
@@ -192,7 +199,7 @@ private fun ContactSearch(
         discoveryState.results.forEach { profile ->
             ContactSearchResult(
                 profile = profile,
-                onClick = { onChatSelected(profile.displayName) }
+                onClick = { onDiscoveredUserSelected(profile) }
             )
         }
     }
@@ -344,6 +351,7 @@ private fun HomeScreenPreview() {
     ContactMeTheme {
         HomeScreen(
             onChatSelected = {},
+            onDiscoveredUserSelected = {},
             onSettingsSelected = {}
         )
     }
