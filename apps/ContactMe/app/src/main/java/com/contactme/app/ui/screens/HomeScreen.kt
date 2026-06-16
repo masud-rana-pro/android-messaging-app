@@ -253,7 +253,11 @@ private fun ConversationPreviewItem(
             Text(
                 text = conversation.title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = if (conversation.hasUnreadMessages) {
+                    FontWeight.Bold
+                } else {
+                    FontWeight.SemiBold
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -261,16 +265,45 @@ private fun ConversationPreviewItem(
             Text(
                 text = conversation.subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f),
+                color = MaterialTheme.colorScheme.onBackground.copy(
+                    alpha = if (conversation.hasUnreadMessages) 0.86f else 0.68f
+                ),
+                fontWeight = if (conversation.hasUnreadMessages) {
+                    FontWeight.SemiBold
+                } else {
+                    FontWeight.Normal
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Text(
-            text = conversation.updatedAtMillis.formatConversationTime(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.56f)
-        )
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = conversation.updatedAtMillis.formatConversationTime(),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (conversation.hasUnreadMessages) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.56f)
+                },
+                fontWeight = if (conversation.hasUnreadMessages) {
+                    FontWeight.Bold
+                } else {
+                    FontWeight.Normal
+                }
+            )
+            if (conversation.hasUnreadMessages) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+        }
     }
 }
 

@@ -37,6 +37,12 @@ class FirebaseConversationRepository @Inject constructor(
                             .document(otherUserId)
                             .get()
                             .await()
+                        val updatedAtMillis = document.getTimestamp("updatedAt")?.toDate()?.time ?: 0L
+                        val lastMessageSenderId = document.getString("lastMessageSenderId").orEmpty()
+                        val readAtMillis = document.getTimestamp("readAtByUser.$currentUserId")
+                            ?.toDate()
+                            ?.time
+                            ?: 0L
 
                         ConversationPreview(
                             conversationId = document.id,
@@ -47,7 +53,10 @@ class FirebaseConversationRepository @Inject constructor(
                             subtitle = document.getString("lastMessageText").orEmpty().ifBlank {
                                 "No messages yet."
                             },
-                            updatedAtMillis = document.getTimestamp("updatedAt")?.toDate()?.time ?: 0L
+                            updatedAtMillis = updatedAtMillis,
+                            hasUnreadMessages = lastMessageSenderId.isNotBlank() &&
+                                lastMessageSenderId != currentUserId &&
+                                updatedAtMillis > readAtMillis
                         )
                     }
 
@@ -101,6 +110,18 @@ class FirebaseConversationRepository @Inject constructor(
                 ConversationResult.Error("We could not open this chat. Please try again.")
             }
         )
+    }
+
+    override suspend fun markConversationRead(
+        conversationId: String,
+        userId: String
+    ) {
+        runCatching {
+            firestore.collection(CONVERSATIONS_COLLECTION)
+                .document(conversationId)
+                .update("readAtByUser.$userId", FieldValue.serverTimestamp())
+                .await()
+        }
     }
 
     private companion object {

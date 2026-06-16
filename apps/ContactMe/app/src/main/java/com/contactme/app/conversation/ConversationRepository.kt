@@ -9,4 +9,9 @@ interface ConversationRepository {
         currentUserId: String,
         otherUserId: String
     ): ConversationResult
+
+    suspend fun markConversationRead(
+        conversationId: String,
+        userId: String
+    )
 }

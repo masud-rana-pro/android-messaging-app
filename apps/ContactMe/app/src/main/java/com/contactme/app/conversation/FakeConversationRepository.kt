@@ -37,10 +37,22 @@ class FakeConversationRepository @Inject constructor() : ConversationRepository 
                 otherUserId = otherUserId,
                 title = "ContactMe User",
                 subtitle = "No messages yet.",
-                updatedAtMillis = System.currentTimeMillis()
+                updatedAtMillis = System.currentTimeMillis(),
+                hasUnreadMessages = false
             )
         }
 
         return ConversationResult.Success(conversationId)
+    }
+
+    override suspend fun markConversationRead(
+        conversationId: String,
+        userId: String
+    ) {
+        val preview = conversations.value[conversationId] ?: return
+
+        conversations.value = conversations.value.toMutableMap().also {
+            it[conversationId] = preview.copy(hasUnreadMessages = false)
+        }
     }
 }
