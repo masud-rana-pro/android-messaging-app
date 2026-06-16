@@ -7,6 +7,7 @@ This schema separates currently implemented collections from planned WhatsApp-li
 ```text
 users/{uid}
 usernames/{username}
+contacts/{uid}/items/{contactUid}
 conversations/{conversationId}
 conversations/{conversationId}/messages/{messageId}
 ```
@@ -28,6 +29,20 @@ users/{uid}
 ```
 
 Phone number is the primary identity for WhatsApp-like discovery. Email is optional fallback login identity.
+
+## Current Contact Model
+
+```text
+contacts/{uid}/items/{contactUid}
+  userId
+  displayName
+  username
+  phoneNumber
+  photoUrl
+  updatedAt
+```
+
+The contact document owner is the user who saved the contact. Privacy checks treat `contacts` visibility as visible only when the viewer exists in the profile owner's contact list.
 
 ## Current Conversation Model
 
@@ -60,7 +75,6 @@ Only text messages are implemented now. Delivered/read status should not be show
 ```text
 user_private/{uid}
 user_devices/{uid}/devices/{deviceId}
-contacts/{uid}/items/{contactUid}
 blocked_users/{uid}/items/{blockedUid}
 reports/{reportId}
 groups/{groupId}

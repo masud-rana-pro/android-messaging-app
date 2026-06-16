@@ -96,7 +96,7 @@ class FirebaseProfileRepository @Inject constructor(
                         displayName = document.getString("displayName").orEmpty(),
                         username = document.getString("username").orEmpty(),
                         phoneNumber = document.getString("phoneNumber").orEmpty(),
-                        photoUrl = document.visibleProfilePhotoUrl()
+                        photoUrl = document.visibleProfilePhotoUrlFor(currentUserId)
                     )
                 }
         }.getOrDefault(emptyList())
@@ -220,19 +220,35 @@ class FirebaseProfileRepository @Inject constructor(
                         displayName = document.getString("displayName").orEmpty(),
                         username = document.getString("username").orEmpty(),
                         phoneNumber = document.getString("phoneNumber").orEmpty(),
-                        photoUrl = document.visibleProfilePhotoUrl()
+                        photoUrl = document.visibleProfilePhotoUrlFor(currentUserId)
                     )
                 }
         }.getOrDefault(emptyList())
     }
 
-    private fun DocumentSnapshot.visibleProfilePhotoUrl(): String {
+    private suspend fun DocumentSnapshot.visibleProfilePhotoUrlFor(viewerUserId: String): String {
         val visibility = PrivacyVisibility.fromFirestore(getString("profilePhotoVisibility"))
-        return if (visibility == PrivacyVisibility.Nobody) {
-            ""
-        } else {
-            getString("photoUrl").orEmpty()
+        return when (visibility) {
+            PrivacyVisibility.Everyone -> getString("photoUrl").orEmpty()
+            PrivacyVisibility.Contacts -> {
+                if (isContact(ownerUserId = id, viewerUserId = viewerUserId)) {
+                    getString("photoUrl").orEmpty()
+                } else {
+                    ""
+                }
+            }
+            PrivacyVisibility.Nobody -> ""
         }
+    }
+
+    private suspend fun isContact(ownerUserId: String, viewerUserId: String): Boolean {
+        return firestore.collection(CONTACTS_COLLECTION)
+            .document(ownerUserId)
+            .collection(CONTACT_ITEMS_COLLECTION)
+            .document(viewerUserId)
+            .get()
+            .await()
+            .exists()
     }
 
     private fun normalizeBangladeshNumber(input: String): String? {
@@ -257,6 +273,8 @@ class FirebaseProfileRepository @Inject constructor(
     private companion object {
         const val USERS_COLLECTION = "users"
         const val USERNAMES_COLLECTION = "usernames"
+        const val CONTACTS_COLLECTION = "contacts"
+        const val CONTACT_ITEMS_COLLECTION = "items"
         const val PROFILE_COMPLETE_FIELD = "profileComplete"
         const val MIN_USERNAME_SEARCH_LENGTH = 3
     }

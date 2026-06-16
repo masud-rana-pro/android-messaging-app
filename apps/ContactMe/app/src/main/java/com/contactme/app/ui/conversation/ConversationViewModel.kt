@@ -3,6 +3,7 @@ package com.contactme.app.ui.conversation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
+import com.contactme.app.contact.ContactRepository
 import com.contactme.app.conversation.ConversationRepository
 import com.contactme.app.conversation.ConversationResult
 import com.contactme.app.profile.UserProfile
@@ -13,6 +14,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ConversationViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val contactRepository: ContactRepository,
     private val conversationRepository: ConversationRepository
 ) : ViewModel() {
     fun openDirectConversation(
@@ -29,6 +31,10 @@ class ConversationViewModel @Inject constructor(
                 )
             ) {
                 is ConversationResult.Success -> {
+                    contactRepository.saveContact(
+                        ownerUserId = currentUserId,
+                        contact = otherUser
+                    )
                     onReady(
                         result.conversationId,
                         otherUser.displayName.ifBlank { otherUser.username }

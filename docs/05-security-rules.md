@@ -13,6 +13,9 @@ firebase/firestore.rules
 - Signed-in users can read public user profiles for discovery.
 - Username reservations live in `usernames/{username}`.
 - Username reservation create/update/delete is owner-protected.
+- Contact items live in `contacts/{uid}/items/{contactUid}`.
+- Contact owners can create/update/delete their own contact items.
+- A user can read their own contact item inside another user's contact list, which supports contacts-only privacy checks.
 - Direct conversations require exactly two participants.
 - Conversations can only be read/updated by participants.
 - Conversation participants can read/create messages.

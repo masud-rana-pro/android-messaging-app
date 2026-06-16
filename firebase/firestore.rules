@@ -61,6 +61,19 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
     }
 
+    match /contacts/{ownerUserId}/items/{contactUserId} {
+      allow read: if isOwner(ownerUserId) ||
+        (isSignedIn() && request.auth.uid == contactUserId);
+      allow create, update: if isOwner(ownerUserId)
+        && ownerUserId != contactUserId
+        && request.resource.data.userId == contactUserId
+        && request.resource.data.displayName is string
+        && request.resource.data.username is string
+        && (!("phoneNumber" in request.resource.data) || request.resource.data.phoneNumber is string)
+        && (!("photoUrl" in request.resource.data) || request.resource.data.photoUrl is string);
+      allow delete: if isOwner(ownerUserId);
+    }
+
     match /conversations/{conversationId} {
       allow read: if isSignedIn()
         && request.auth.uid in resource.data.participantIds;
