@@ -8,16 +8,16 @@ firebase/firestore.rules
 
 ## Implemented MVP Rules
 
-- Every write validates `request.auth.uid`.
+- Every protected read/write requires `request.auth.uid`.
 - A user can create/update only their own `users/{uid}` profile.
 - Signed-in users can read public user profiles for discovery.
 - Username reservations live in `usernames/{username}`.
-- A username reservation can only be created/updated/deleted by its owner.
+- Username reservation create/update/delete is owner-protected.
 - Direct conversations require exactly two participants.
-- A conversation can only be read/updated by participants.
-- Only participants can read/write conversation messages.
-- `senderId` must equal the authenticated user.
-- Text messages are limited to 4000 characters.
+- Conversations can only be read/updated by participants.
+- Conversation participants can read/create messages.
+- Message `senderId` must equal `request.auth.uid`.
+- Text messages must be non-empty and no longer than 4000 characters.
 - Message update/delete is denied for now.
 
 ## Deploy
@@ -32,12 +32,21 @@ or run:
 scripts/firebase_deploy.sh
 ```
 
-## Still Planned
+## Next Security Enhancements
 
-- Chat media must be limited to conversation participants.
-- Blocked users cannot message or call each other.
-- Reports are stored for moderation.
-- Stronger username validation in rules.
-- Rules tests with Firebase Emulator Suite.
-- Do not hardcode FCM server keys or Zego secrets in the client.
-- Do not claim E2EE until it is properly implemented and tested.
+- Add Firebase Emulator Suite tests for existing profile, username, conversation, and message rules.
+- Add stricter username validation.
+- Add stricter profile field validation.
+- Add blocked-user enforcement before messaging/calling.
+- Add report creation rules.
+- Add Storage rules for profile photos and chat media.
+- Add group membership and role-based rules.
+- Add call document validation.
+- Add rate limiting through Cloud Functions or server-side controls where Firestore rules are not enough.
+
+## Security Principles
+
+- Do not trust Android client data without rules validation.
+- Do not expose FCM server keys or Zego secrets in the app.
+- Do not show delivered/read receipt unless backed by real recipient-side data.
+- Do not claim end-to-end encryption until cryptography, key storage, and message/media encryption are implemented and tested.
