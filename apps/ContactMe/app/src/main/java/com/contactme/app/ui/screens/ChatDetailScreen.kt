@@ -408,7 +408,7 @@ private fun demoMessages(currentUserId: String): List<ChatMessage> {
 private fun ChatDetailScreenPreview() {
     ContactMeTheme {
         ChatDetailScreen(
-            chatName = "Ayesha Rahman",
+            chatName = "ContactMe User",
             conversationId = null,
             onBack = {}
         )
