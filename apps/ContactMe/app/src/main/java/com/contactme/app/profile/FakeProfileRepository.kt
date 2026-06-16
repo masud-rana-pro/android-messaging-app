@@ -16,15 +16,43 @@ class FakeProfileRepository @Inject constructor() : ProfileRepository {
         return profiles[userId]
     }
 
+    override suspend fun searchProfiles(
+        usernameQuery: String,
+        currentUserId: String
+    ): List<UserProfile> {
+        delay(150)
+        val normalizedQuery = usernameQuery.trim().lowercase()
+
+        if (normalizedQuery.length < 3) {
+            return emptyList()
+        }
+
+        return profiles.values
+            .filter { profile ->
+                profile.userId != currentUserId && profile.username.startsWith(normalizedQuery)
+            }
+            .take(10)
+    }
+
     override suspend fun saveProfile(
         userId: String,
         displayName: String,
         username: String
     ): ProfileResult {
         delay(350)
+        val normalizedUsername = username.trim().lowercase()
+        val usernameOwner = profiles.values.firstOrNull { profile ->
+            profile.username == normalizedUsername && profile.userId != userId
+        }
+
+        if (usernameOwner != null) {
+            return ProfileResult.Error("This username is already taken.")
+        }
+
         profiles[userId] = UserProfile(
+            userId = userId,
             displayName = displayName.trim(),
-            username = username.trim().lowercase()
+            username = normalizedUsername
         )
         return ProfileResult.Success
     }

@@ -17,12 +17,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,7 +35,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.contactme.app.navigation.HomeTab
+import com.contactme.app.profile.UserProfile
+import com.contactme.app.ui.discovery.ContactDiscoveryUiState
+import com.contactme.app.ui.discovery.ContactDiscoveryViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
 
@@ -113,7 +119,25 @@ fun HomeScreen(
 }
 
 @Composable
-private fun ChatsTab(onChatSelected: (String) -> Unit) {
+private fun ChatsTab(
+    onChatSelected: (String) -> Unit,
+    viewModel: ContactDiscoveryViewModel = hiltViewModel()
+) {
+    val discoveryState by viewModel.uiState.collectAsState()
+
+    ChatsContent(
+        discoveryState = discoveryState,
+        onSearchQueryChanged = viewModel::onQueryChanged,
+        onChatSelected = onChatSelected
+    )
+}
+
+@Composable
+private fun ChatsContent(
+    discoveryState: ContactDiscoveryUiState,
+    onSearchQueryChanged: (String) -> Unit,
+    onChatSelected: (String) -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
@@ -127,7 +151,95 @@ private fun ChatsTab(onChatSelected: (String) -> Unit) {
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
             )
         }
+        ContactSearch(
+            discoveryState = discoveryState,
+            onSearchQueryChanged = onSearchQueryChanged,
+            onChatSelected = onChatSelected
+        )
         ChatPreviewList(onChatSelected = onChatSelected)
+    }
+}
+
+@Composable
+private fun ContactSearch(
+    discoveryState: ContactDiscoveryUiState,
+    onSearchQueryChanged: (String) -> Unit,
+    onChatSelected: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = discoveryState.query,
+            onValueChange = onSearchQueryChanged,
+            singleLine = true,
+            label = { Text(text = "Find people") },
+            placeholder = { Text(text = "Search username") }
+        )
+        if (discoveryState.isSearching) {
+            Text(
+                text = "Searching...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
+        discoveryState.message?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
+        discoveryState.results.forEach { profile ->
+            ContactSearchResult(
+                profile = profile,
+                onClick = { onChatSelected(profile.displayName) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContactSearchResult(
+    profile: UserProfile,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = profile.displayName.profileInitials(),
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = profile.displayName.ifBlank { "ContactMe User" },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "@${profile.username}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
+        Text(
+            text = "Open",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
@@ -194,6 +306,17 @@ private fun ChatPreviewItem(
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.56f)
         )
     }
+}
+
+private fun String.profileInitials(): String {
+    val initials = trim()
+        .split(" ")
+        .filter(String::isNotBlank)
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+        .joinToString("")
+
+    return initials.ifBlank { "CM" }
 }
 
 @Composable
