@@ -32,11 +32,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.contactme.app.conversation.ConversationPreview
 import com.contactme.app.navigation.HomeTab
 import com.contactme.app.profile.UserProfile
@@ -236,19 +238,11 @@ private fun ConversationPreviewItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = conversation.title.profileInitials(),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        ContactAvatar(
+            label = conversation.title,
+            photoUrl = conversation.photoUrl,
+            size = 48
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = conversation.title,
@@ -357,19 +351,11 @@ private fun ContactSearchResult(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = profile.displayName.profileInitials(),
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        ContactAvatar(
+            label = profile.displayName,
+            photoUrl = profile.photoUrl,
+            size = 44
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = profile.displayName.ifBlank { "ContactMe User" },
@@ -394,6 +380,36 @@ private fun ContactSearchResult(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary
         )
+    }
+}
+
+@Composable
+private fun ContactAvatar(
+    label: String,
+    photoUrl: String,
+    size: Int
+) {
+    Box(
+        modifier = Modifier
+            .size(size.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center
+    ) {
+        if (photoUrl.isNotBlank()) {
+            AsyncImage(
+                modifier = Modifier.fillMaxSize(),
+                model = photoUrl,
+                contentDescription = "$label profile photo",
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Text(
+                text = label.profileInitials(),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 

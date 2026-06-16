@@ -4,6 +4,7 @@ data class ConversationPreview(
     val conversationId: String,
     val otherUserId: String,
     val title: String,
+    val photoUrl: String,
     val subtitle: String,
     val updatedAtMillis: Long,
     val hasUnreadMessages: Boolean

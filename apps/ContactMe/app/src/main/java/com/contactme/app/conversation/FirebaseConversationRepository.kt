@@ -50,6 +50,7 @@ class FirebaseConversationRepository @Inject constructor(
                             title = otherUser.getString("displayName").orEmpty().ifBlank {
                                 otherUser.getString("username").orEmpty().ifBlank { "ContactMe User" }
                             },
+                            photoUrl = otherUser.getString("photoUrl").orEmpty(),
                             subtitle = document.getString("lastMessageText").orEmpty().ifBlank {
                                 "No messages yet."
                             },

@@ -36,6 +36,7 @@ class FakeConversationRepository @Inject constructor() : ConversationRepository 
                 conversationId = conversationId,
                 otherUserId = otherUserId,
                 title = "ContactMe User",
+                photoUrl = "",
                 subtitle = "No messages yet.",
                 updatedAtMillis = System.currentTimeMillis(),
                 hasUnreadMessages = false
