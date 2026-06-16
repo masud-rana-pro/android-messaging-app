@@ -35,11 +35,19 @@ class ChatDetailViewModel @Inject constructor(
         activeConversationId = conversationId
         markConversationRead(conversationId)
         messagesJob?.cancel()
+        _uiState.update {
+            it.copy(
+                messages = emptyList(),
+                isLoadingMessages = true,
+                errorMessage = null
+            )
+        }
         messagesJob = viewModelScope.launch {
             messageRepository.observeMessages(conversationId).collect { messages ->
                 _uiState.update {
                     it.copy(
                         messages = messages,
+                        isLoadingMessages = false,
                         errorMessage = null
                     )
                 }

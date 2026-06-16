@@ -6,6 +6,7 @@ data class ChatDetailUiState(
     val currentUserId: String = "",
     val messageText: String = "",
     val messages: List<ChatMessage> = emptyList(),
+    val isLoadingMessages: Boolean = false,
     val isSending: Boolean = false,
     val errorMessage: String? = null
 )
