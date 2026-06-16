@@ -7,10 +7,12 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
+import com.contactme.app.profile.PrivacyVisibility
 import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class FirebasePresenceRepository @Inject constructor(
@@ -23,6 +25,7 @@ class FirebasePresenceRepository @Inject constructor(
     ): Flow<PresenceStatus> = callbackFlow {
         var presenceReference: DatabaseReference? = null
         var presenceListener: ValueEventListener? = null
+        var canShowLastSeen = true
 
         fun clearPresenceListener() {
             val reference = presenceReference
@@ -58,33 +61,50 @@ class FirebasePresenceRepository @Inject constructor(
                     return@addSnapshotListener
                 }
 
-                val nextReference = database.reference
-                    .child(PRESENCE_PATH)
-                    .child(peerUserId)
-                val nextListener = object : ValueEventListener {
-                    override fun onDataChange(snapshot: DataSnapshot) {
-                        trySend(
-                            PresenceStatus(
-                                isOnline = snapshot.child("isOnline").getValue(Boolean::class.java) ?: false,
-                                lastSeenAtMillis = snapshot.child("lastSeenAt").getValue(Long::class.java) ?: 0L
+                launch {
+                    canShowLastSeen = canShowPeerLastSeen(peerUserId)
+
+                    val nextReference = database.reference
+                        .child(PRESENCE_PATH)
+                        .child(peerUserId)
+                    val nextListener = object : ValueEventListener {
+                        override fun onDataChange(snapshot: DataSnapshot) {
+                            trySend(
+                                PresenceStatus(
+                                    isOnline = snapshot.child("isOnline").getValue(Boolean::class.java) ?: false,
+                                    lastSeenAtMillis = snapshot.child("lastSeenAt").getValue(Long::class.java) ?: 0L,
+                                    canShowLastSeen = canShowLastSeen
+                                )
                             )
-                        )
+                        }
+
+                        override fun onCancelled(error: DatabaseError) {
+                            trySend(PresenceStatus())
+                        }
                     }
 
-                    override fun onCancelled(error: DatabaseError) {
-                        trySend(PresenceStatus())
-                    }
+                    presenceReference = nextReference
+                    presenceListener = nextListener
+                    nextReference.addValueEventListener(nextListener)
                 }
-
-                presenceReference = nextReference
-                presenceListener = nextListener
-                nextReference.addValueEventListener(nextListener)
             }
 
         awaitClose {
             conversationRegistration.remove()
             clearPresenceListener()
         }
+    }
+
+    private suspend fun canShowPeerLastSeen(peerUserId: String): Boolean {
+        return runCatching {
+            val visibility = firestore.collection(USERS_COLLECTION)
+                .document(peerUserId)
+                .get()
+                .await()
+                .getString("lastSeenVisibility")
+
+            PrivacyVisibility.fromFirestore(visibility) != PrivacyVisibility.Nobody
+        }.getOrDefault(true)
     }
 
     override suspend fun markOnline(userId: String) {
@@ -124,6 +144,7 @@ class FirebasePresenceRepository @Inject constructor(
 
     private companion object {
         const val CONVERSATIONS_COLLECTION = "conversations"
+        const val USERS_COLLECTION = "users"
         const val PRESENCE_PATH = "presence"
     }
 }
