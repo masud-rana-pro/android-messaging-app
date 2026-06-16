@@ -28,6 +28,7 @@ import com.contactme.app.ui.theme.ContactMeTheme
 @Composable
 fun ChatDetailScreen(
     chatName: String,
+    conversationId: String? = null,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -37,7 +38,11 @@ fun ChatDetailScreen(
                     Column {
                         Text(text = chatName, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "online",
+                            text = if (conversationId == null) {
+                                "online"
+                            } else {
+                                "last seen recently"
+                            },
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.62f)
                         )
@@ -123,6 +128,7 @@ private fun ChatDetailScreenPreview() {
     ContactMeTheme {
         ChatDetailScreen(
             chatName = "Ayesha Rahman",
+            conversationId = null,
             onBack = {}
         )
     }

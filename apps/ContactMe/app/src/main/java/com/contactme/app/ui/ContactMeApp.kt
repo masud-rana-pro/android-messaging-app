@@ -17,14 +17,17 @@ import com.contactme.app.ui.screens.HomeScreen
 import com.contactme.app.ui.screens.ProfileSetupScreen
 import com.contactme.app.ui.screens.SettingsScreen
 import com.contactme.app.ui.screens.SplashScreen
+import com.contactme.app.ui.conversation.ConversationViewModel
 import com.contactme.app.ui.session.SessionViewModel
 
 @Composable
 fun ContactMeApp(
-    sessionViewModel: SessionViewModel = hiltViewModel()
+    sessionViewModel: SessionViewModel = hiltViewModel(),
+    conversationViewModel: ConversationViewModel = hiltViewModel()
 ) {
     var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
     var selectedChatName by remember { mutableStateOf("Ayesha Rahman") }
+    var selectedConversationId by remember { mutableStateOf<String?>(null) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -50,7 +53,15 @@ fun ContactMeApp(
             AppScreen.Home -> HomeScreen(
                 onChatSelected = { chatName ->
                     selectedChatName = chatName
+                    selectedConversationId = null
                     currentScreen = AppScreen.ChatDetail
+                },
+                onDiscoveredUserSelected = { userProfile ->
+                    conversationViewModel.openDirectConversation(userProfile) { conversationId, chatName ->
+                        selectedConversationId = conversationId
+                        selectedChatName = chatName
+                        currentScreen = AppScreen.ChatDetail
+                    }
                 },
                 onSettingsSelected = {
                     currentScreen = AppScreen.Settings
@@ -59,6 +70,7 @@ fun ContactMeApp(
 
             AppScreen.ChatDetail -> ChatDetailScreen(
                 chatName = selectedChatName,
+                conversationId = selectedConversationId,
                 onBack = { currentScreen = AppScreen.Home }
             )
 
