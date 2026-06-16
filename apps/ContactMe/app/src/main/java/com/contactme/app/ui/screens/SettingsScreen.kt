@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.contactme.app.profile.PrivacyVisibility
 import com.contactme.app.ui.settings.SettingsUiState
 import com.contactme.app.ui.settings.SettingsViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
@@ -47,7 +49,10 @@ fun SettingsScreen(
         uiState = uiState,
         onBack = onBack,
         onEditProfile = onEditProfile,
-        onSignOut = onSignOut
+        onSignOut = onSignOut,
+        onLastSeenClick = viewModel::cycleLastSeenVisibility,
+        onProfilePhotoClick = viewModel::cycleProfilePhotoVisibility,
+        onReadReceiptsClick = viewModel::toggleReadReceipts
     )
 }
 
@@ -57,7 +62,10 @@ private fun SettingsContent(
     uiState: SettingsUiState,
     onBack: () -> Unit,
     onEditProfile: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onLastSeenClick: () -> Unit,
+    onProfilePhotoClick: () -> Unit,
+    onReadReceiptsClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -137,9 +145,28 @@ private fun SettingsContent(
             ) {
                 Text(text = "Edit profile")
             }
-            SettingsItem(
-                title = "Privacy",
-                subtitle = "Last seen, profile photo, read receipts"
+            Text(
+                text = "Privacy",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            PrivacyChoiceItem(
+                title = "Last seen",
+                value = uiState.privacySettings.lastSeenVisibility.toDisplayText(),
+                enabled = !uiState.isSavingPrivacy,
+                onClick = onLastSeenClick
+            )
+            PrivacyChoiceItem(
+                title = "Profile photo",
+                value = uiState.privacySettings.profilePhotoVisibility.toDisplayText(),
+                enabled = !uiState.isSavingPrivacy,
+                onClick = onProfilePhotoClick
+            )
+            PrivacyToggleItem(
+                title = "Read receipts",
+                checked = uiState.privacySettings.readReceiptsEnabled,
+                enabled = !uiState.isSavingPrivacy,
+                onClick = onReadReceiptsClick
             )
             SettingsItem(
                 title = "Notifications",
@@ -163,6 +190,57 @@ private fun SettingsContent(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PrivacyChoiceItem(
+    title: String,
+    value: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+        TextButton(
+            enabled = enabled,
+            onClick = onClick
+        ) {
+            Text(text = value)
+        }
+    }
+}
+
+@Composable
+private fun PrivacyToggleItem(
+    title: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+        Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = { onClick() }
+        )
     }
 }
 
@@ -200,8 +278,19 @@ private fun SettingsScreenPreview() {
             ),
             onBack = {},
             onEditProfile = {},
-            onSignOut = {}
+            onSignOut = {},
+            onLastSeenClick = {},
+            onProfilePhotoClick = {},
+            onReadReceiptsClick = {}
         )
+    }
+}
+
+private fun PrivacyVisibility.toDisplayText(): String {
+    return when (this) {
+        PrivacyVisibility.Everyone -> "Everyone"
+        PrivacyVisibility.Contacts -> "Contacts"
+        PrivacyVisibility.Nobody -> "Nobody"
     }
 }
 

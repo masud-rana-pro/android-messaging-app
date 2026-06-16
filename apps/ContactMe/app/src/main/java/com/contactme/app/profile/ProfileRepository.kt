@@ -5,6 +5,8 @@ interface ProfileRepository {
 
     suspend fun getProfile(userId: String): UserProfile?
 
+    suspend fun getPrivacySettings(userId: String): PrivacySettings
+
     suspend fun searchProfiles(
         query: String,
         currentUserId: String
@@ -15,5 +17,10 @@ interface ProfileRepository {
         displayName: String,
         username: String,
         photoUrl: String
+    ): ProfileResult
+
+    suspend fun savePrivacySettings(
+        userId: String,
+        privacySettings: PrivacySettings
     ): ProfileResult
 }

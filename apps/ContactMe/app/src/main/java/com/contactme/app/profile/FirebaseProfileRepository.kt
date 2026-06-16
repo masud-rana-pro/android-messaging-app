@@ -42,6 +42,25 @@ class FirebaseProfileRepository @Inject constructor(
         }.getOrNull()
     }
 
+    override suspend fun getPrivacySettings(userId: String): PrivacySettings {
+        return runCatching {
+            val document = firestore.collection(USERS_COLLECTION)
+                .document(userId)
+                .get()
+                .await()
+
+            PrivacySettings(
+                lastSeenVisibility = PrivacyVisibility.fromFirestore(
+                    document.getString("lastSeenVisibility")
+                ),
+                profilePhotoVisibility = PrivacyVisibility.fromFirestore(
+                    document.getString("profilePhotoVisibility")
+                ),
+                readReceiptsEnabled = document.getBoolean("readReceiptsEnabled") ?: true
+            )
+        }.getOrDefault(PrivacySettings())
+    }
+
     override suspend fun searchProfiles(
         query: String,
         currentUserId: String
@@ -116,6 +135,18 @@ class FirebaseProfileRepository @Inject constructor(
                     "phoneNumber" to currentUser?.phoneNumber.orEmpty(),
                     "email" to currentUser?.email.orEmpty(),
                     "photoUrl" to photoUrl,
+                    "lastSeenVisibility" to (
+                        profileSnapshot.getString("lastSeenVisibility")
+                            ?: PrivacySettings().lastSeenVisibility.firestoreValue
+                        ),
+                    "profilePhotoVisibility" to (
+                        profileSnapshot.getString("profilePhotoVisibility")
+                            ?: PrivacySettings().profilePhotoVisibility.firestoreValue
+                        ),
+                    "readReceiptsEnabled" to (
+                        profileSnapshot.getBoolean("readReceiptsEnabled")
+                            ?: PrivacySettings().readReceiptsEnabled
+                        ),
                     PROFILE_COMPLETE_FIELD to true,
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
@@ -141,6 +172,31 @@ class FirebaseProfileRepository @Inject constructor(
                 } else {
                     ProfileResult.Error("We could not save your profile. Please try again.")
                 }
+            }
+        )
+    }
+
+    override suspend fun savePrivacySettings(
+        userId: String,
+        privacySettings: PrivacySettings
+    ): ProfileResult {
+        return runCatching {
+            firestore.collection(USERS_COLLECTION)
+                .document(userId)
+                .set(
+                    mapOf(
+                        "lastSeenVisibility" to privacySettings.lastSeenVisibility.firestoreValue,
+                        "profilePhotoVisibility" to privacySettings.profilePhotoVisibility.firestoreValue,
+                        "readReceiptsEnabled" to privacySettings.readReceiptsEnabled,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    ),
+                    SetOptions.merge()
+                )
+                .await()
+        }.fold(
+            onSuccess = { ProfileResult.Success },
+            onFailure = {
+                ProfileResult.Error("We could not save privacy settings. Please try again.")
             }
         )
     }
