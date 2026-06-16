@@ -76,6 +76,15 @@ service cloud.firestore {
           && request.resource.data.text.size() <= 4000;
         allow update, delete: if false;
       }
+
+      match /typing/{userId} {
+        allow read: if isConversationParticipant(conversationId);
+        allow create, update: if isConversationParticipant(conversationId)
+          && userId == request.auth.uid
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.isTyping is bool;
+        allow delete: if false;
+      }
     }
 
     match /{document=**} {

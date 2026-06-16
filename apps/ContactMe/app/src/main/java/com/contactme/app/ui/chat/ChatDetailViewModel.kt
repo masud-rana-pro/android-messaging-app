@@ -6,6 +6,7 @@ import com.contactme.app.auth.AuthRepository
 import com.contactme.app.conversation.ConversationRepository
 import com.contactme.app.message.MessageRepository
 import com.contactme.app.message.MessageResult
+import com.contactme.app.typing.TypingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -19,7 +20,8 @@ import kotlinx.coroutines.launch
 class ChatDetailViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val conversationRepository: ConversationRepository,
-    private val messageRepository: MessageRepository
+    private val messageRepository: MessageRepository,
+    private val typingRepository: TypingRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         ChatDetailUiState(currentUserId = authRepository.currentUserId().orEmpty())
@@ -28,17 +30,29 @@ class ChatDetailViewModel @Inject constructor(
 
     private var activeConversationId: String? = null
     private var messagesJob: Job? = null
+    private var typingJob: Job? = null
+    private var lastTypingValue = false
 
     fun openConversation(conversationId: String?) {
         if (conversationId == null || activeConversationId == conversationId) return
 
+        activeConversationId?.let { previousConversationId ->
+            updateTypingState(
+                conversationId = previousConversationId,
+                isTyping = false
+            )
+        }
+
         activeConversationId = conversationId
+        lastTypingValue = false
         markConversationRead(conversationId)
         messagesJob?.cancel()
+        typingJob?.cancel()
         _uiState.update {
             it.copy(
                 messages = emptyList(),
                 isLoadingMessages = true,
+                isOtherUserTyping = false,
                 errorMessage = null
             )
         }
@@ -56,15 +70,31 @@ class ChatDetailViewModel @Inject constructor(
                 }
             }
         }
+
+        val currentUserId = authRepository.currentUserId()
+        if (currentUserId != null) {
+            typingJob = viewModelScope.launch {
+                typingRepository.observeOtherTyping(
+                    conversationId = conversationId,
+                    currentUserId = currentUserId
+                ).collect { isOtherUserTyping ->
+                    _uiState.update {
+                        it.copy(isOtherUserTyping = isOtherUserTyping)
+                    }
+                }
+            }
+        }
     }
 
     fun onMessageTextChanged(value: String) {
+        val nextMessageText = value.take(MAX_MESSAGE_LENGTH)
         _uiState.update {
             it.copy(
-                messageText = value.take(MAX_MESSAGE_LENGTH),
+                messageText = nextMessageText,
                 errorMessage = null
             )
         }
+        updateTypingState(isTyping = nextMessageText.isNotBlank())
     }
 
     fun sendMessage() {
@@ -101,6 +131,7 @@ class ChatDetailViewModel @Inject constructor(
                 )
             ) {
                 MessageResult.Success -> {
+                    updateTypingState(isTyping = false)
                     _uiState.update {
                         it.copy(
                             messageText = "",
@@ -122,6 +153,16 @@ class ChatDetailViewModel @Inject constructor(
         }
     }
 
+    override fun onCleared() {
+        activeConversationId?.let { conversationId ->
+            updateTypingState(
+                conversationId = conversationId,
+                isTyping = false
+            )
+        }
+        super.onCleared()
+    }
+
     private companion object {
         const val MAX_MESSAGE_LENGTH = 4000
     }
@@ -133,6 +174,27 @@ class ChatDetailViewModel @Inject constructor(
             conversationRepository.markConversationRead(
                 conversationId = conversationId,
                 userId = userId
+            )
+        }
+    }
+
+    private fun updateTypingState(
+        conversationId: String? = activeConversationId,
+        isTyping: Boolean
+    ) {
+        val targetConversationId = conversationId ?: return
+        val userId = authRepository.currentUserId() ?: return
+
+        if (conversationId == activeConversationId && lastTypingValue == isTyping) return
+        if (conversationId == activeConversationId) {
+            lastTypingValue = isTyping
+        }
+
+        viewModelScope.launch {
+            typingRepository.setTyping(
+                conversationId = targetConversationId,
+                userId = userId,
+                isTyping = isTyping
             )
         }
     }
