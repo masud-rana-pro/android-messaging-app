@@ -1,6 +1,7 @@
 package com.contactme.app.profile
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -95,7 +96,7 @@ class FirebaseProfileRepository @Inject constructor(
                         displayName = document.getString("displayName").orEmpty(),
                         username = document.getString("username").orEmpty(),
                         phoneNumber = document.getString("phoneNumber").orEmpty(),
-                        photoUrl = document.getString("photoUrl").orEmpty()
+                        photoUrl = document.visibleProfilePhotoUrl()
                     )
                 }
         }.getOrDefault(emptyList())
@@ -219,10 +220,19 @@ class FirebaseProfileRepository @Inject constructor(
                         displayName = document.getString("displayName").orEmpty(),
                         username = document.getString("username").orEmpty(),
                         phoneNumber = document.getString("phoneNumber").orEmpty(),
-                        photoUrl = document.getString("photoUrl").orEmpty()
+                        photoUrl = document.visibleProfilePhotoUrl()
                     )
                 }
         }.getOrDefault(emptyList())
+    }
+
+    private fun DocumentSnapshot.visibleProfilePhotoUrl(): String {
+        val visibility = PrivacyVisibility.fromFirestore(getString("profilePhotoVisibility"))
+        return if (visibility == PrivacyVisibility.Nobody) {
+            ""
+        } else {
+            getString("photoUrl").orEmpty()
+        }
     }
 
     private fun normalizeBangladeshNumber(input: String): String? {
