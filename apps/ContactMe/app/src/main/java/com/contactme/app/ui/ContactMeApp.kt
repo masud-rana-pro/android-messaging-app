@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.contactme.app.navigation.AppScreen
+import com.contactme.app.navigation.ChatTarget
 import com.contactme.app.ui.screens.AuthScreen
 import com.contactme.app.ui.screens.ChatDetailScreen
 import com.contactme.app.ui.screens.HomeScreen
@@ -26,8 +27,14 @@ fun ContactMeApp(
     conversationViewModel: ConversationViewModel = hiltViewModel()
 ) {
     var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
-    var selectedChatName by remember { mutableStateOf("Ayesha Rahman") }
-    var selectedConversationId by remember { mutableStateOf<String?>(null) }
+    var selectedChatTarget by remember {
+        mutableStateOf(ChatTarget(title = "Ayesha Rahman", conversationId = null))
+    }
+
+    fun openChat(target: ChatTarget) {
+        selectedChatTarget = target
+        currentScreen = AppScreen.ChatDetail
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -52,20 +59,29 @@ fun ContactMeApp(
 
             AppScreen.Home -> HomeScreen(
                 onChatSelected = { chatName ->
-                    selectedChatName = chatName
-                    selectedConversationId = null
-                    currentScreen = AppScreen.ChatDetail
+                    openChat(
+                        ChatTarget(
+                            title = chatName,
+                            conversationId = null
+                        )
+                    )
                 },
                 onConversationSelected = { conversationId, chatName ->
-                    selectedConversationId = conversationId
-                    selectedChatName = chatName
-                    currentScreen = AppScreen.ChatDetail
+                    openChat(
+                        ChatTarget(
+                            title = chatName,
+                            conversationId = conversationId
+                        )
+                    )
                 },
                 onDiscoveredUserSelected = { userProfile ->
                     conversationViewModel.openDirectConversation(userProfile) { conversationId, chatName ->
-                        selectedConversationId = conversationId
-                        selectedChatName = chatName
-                        currentScreen = AppScreen.ChatDetail
+                        openChat(
+                            ChatTarget(
+                                title = chatName,
+                                conversationId = conversationId
+                            )
+                        )
                     }
                 },
                 onSettingsSelected = {
@@ -74,8 +90,8 @@ fun ContactMeApp(
             )
 
             AppScreen.ChatDetail -> ChatDetailScreen(
-                chatName = selectedChatName,
-                conversationId = selectedConversationId,
+                chatName = selectedChatTarget.title,
+                conversationId = selectedChatTarget.conversationId,
                 onBack = { currentScreen = AppScreen.Home }
             )
 
