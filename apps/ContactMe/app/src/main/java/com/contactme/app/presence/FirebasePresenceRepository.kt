@@ -62,7 +62,10 @@ class FirebasePresenceRepository @Inject constructor(
                 }
 
                 launch {
-                    canShowLastSeen = canShowPeerLastSeen(peerUserId)
+                    canShowLastSeen = canShowPeerLastSeen(
+                        peerUserId = peerUserId,
+                        currentUserId = currentUserId
+                    )
 
                     val nextReference = database.reference
                         .child(PRESENCE_PATH)
@@ -95,7 +98,10 @@ class FirebasePresenceRepository @Inject constructor(
         }
     }
 
-    private suspend fun canShowPeerLastSeen(peerUserId: String): Boolean {
+    private suspend fun canShowPeerLastSeen(
+        peerUserId: String,
+        currentUserId: String
+    ): Boolean {
         return runCatching {
             val visibility = firestore.collection(USERS_COLLECTION)
                 .document(peerUserId)
@@ -103,8 +109,25 @@ class FirebasePresenceRepository @Inject constructor(
                 .await()
                 .getString("lastSeenVisibility")
 
-            PrivacyVisibility.fromFirestore(visibility) != PrivacyVisibility.Nobody
+            when (PrivacyVisibility.fromFirestore(visibility)) {
+                PrivacyVisibility.Everyone -> true
+                PrivacyVisibility.Contacts -> isContact(
+                    ownerUserId = peerUserId,
+                    viewerUserId = currentUserId
+                )
+                PrivacyVisibility.Nobody -> false
+            }
         }.getOrDefault(true)
+    }
+
+    private suspend fun isContact(ownerUserId: String, viewerUserId: String): Boolean {
+        return firestore.collection(CONTACTS_COLLECTION)
+            .document(ownerUserId)
+            .collection(CONTACT_ITEMS_COLLECTION)
+            .document(viewerUserId)
+            .get()
+            .await()
+            .exists()
     }
 
     override suspend fun markOnline(userId: String) {
@@ -145,6 +168,8 @@ class FirebasePresenceRepository @Inject constructor(
     private companion object {
         const val CONVERSATIONS_COLLECTION = "conversations"
         const val USERS_COLLECTION = "users"
+        const val CONTACTS_COLLECTION = "contacts"
+        const val CONTACT_ITEMS_COLLECTION = "items"
         const val PRESENCE_PATH = "presence"
     }
 }

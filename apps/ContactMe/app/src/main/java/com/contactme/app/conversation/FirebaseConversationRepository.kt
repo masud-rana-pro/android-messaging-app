@@ -52,7 +52,7 @@ class FirebaseConversationRepository @Inject constructor(
                             title = otherUser.getString("displayName").orEmpty().ifBlank {
                                 otherUser.getString("username").orEmpty().ifBlank { "ContactMe User" }
                             },
-                            photoUrl = otherUser.visibleProfilePhotoUrl(),
+                            photoUrl = otherUser.visibleProfilePhotoUrlFor(currentUserId),
                             subtitle = document.getString("lastMessageText").orEmpty().ifBlank {
                                 "No messages yet."
                             },
@@ -175,18 +175,36 @@ class FirebaseConversationRepository @Inject constructor(
         }
     }
 
-    private fun DocumentSnapshot.visibleProfilePhotoUrl(): String {
+    private suspend fun DocumentSnapshot.visibleProfilePhotoUrlFor(viewerUserId: String): String {
         val visibility = PrivacyVisibility.fromFirestore(getString("profilePhotoVisibility"))
-        return if (visibility == PrivacyVisibility.Nobody) {
-            ""
-        } else {
-            getString("photoUrl").orEmpty()
+        return when (visibility) {
+            PrivacyVisibility.Everyone -> getString("photoUrl").orEmpty()
+            PrivacyVisibility.Contacts -> {
+                if (isContact(ownerUserId = id, viewerUserId = viewerUserId)) {
+                    getString("photoUrl").orEmpty()
+                } else {
+                    ""
+                }
+            }
+            PrivacyVisibility.Nobody -> ""
         }
+    }
+
+    private suspend fun isContact(ownerUserId: String, viewerUserId: String): Boolean {
+        return firestore.collection(CONTACTS_COLLECTION)
+            .document(ownerUserId)
+            .collection(CONTACT_ITEMS_COLLECTION)
+            .document(viewerUserId)
+            .get()
+            .await()
+            .exists()
     }
 
     private companion object {
         const val CONVERSATIONS_COLLECTION = "conversations"
         const val USERS_COLLECTION = "users"
+        const val CONTACTS_COLLECTION = "contacts"
+        const val CONTACT_ITEMS_COLLECTION = "items"
         const val DIRECT_TYPE = "direct"
         const val DIRECT_ID_SEPARATOR = "__"
     }
