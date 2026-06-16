@@ -1,10 +1,21 @@
 package com.contactme.app.conversation
 
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class FakeConversationRepository @Inject constructor() : ConversationRepository {
-    private val conversationIds = mutableSetOf<String>()
+    private val conversations = MutableStateFlow<Map<String, ConversationPreview>>(emptyMap())
+
+    override fun observeConversationPreviews(currentUserId: String): Flow<List<ConversationPreview>> {
+        return conversations.map { previews ->
+            previews.values
+                .filter { preview -> preview.conversationId.contains(currentUserId) }
+                .sortedByDescending { preview -> preview.updatedAtMillis }
+        }
+    }
 
     override suspend fun getOrCreateDirectConversation(
         currentUserId: String,
@@ -20,7 +31,15 @@ class FakeConversationRepository @Inject constructor() : ConversationRepository 
             .sorted()
             .joinToString(separator = "__")
 
-        conversationIds.add(conversationId)
+        conversations.value = conversations.value.toMutableMap().also {
+            it[conversationId] = ConversationPreview(
+                conversationId = conversationId,
+                otherUserId = otherUserId,
+                title = "ContactMe User",
+                subtitle = "No messages yet.",
+                updatedAtMillis = System.currentTimeMillis()
+            )
+        }
 
         return ConversationResult.Success(conversationId)
     }

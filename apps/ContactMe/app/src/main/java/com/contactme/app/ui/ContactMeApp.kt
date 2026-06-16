@@ -56,6 +56,11 @@ fun ContactMeApp(
                     selectedConversationId = null
                     currentScreen = AppScreen.ChatDetail
                 },
+                onConversationSelected = { conversationId, chatName ->
+                    selectedConversationId = conversationId
+                    selectedChatName = chatName
+                    currentScreen = AppScreen.ChatDetail
+                },
                 onDiscoveredUserSelected = { userProfile ->
                     conversationViewModel.openDirectConversation(userProfile) { conversationId, chatName ->
                         selectedConversationId = conversationId

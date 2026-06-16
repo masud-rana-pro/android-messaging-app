@@ -36,10 +36,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.contactme.app.conversation.ConversationPreview
 import com.contactme.app.navigation.HomeTab
 import com.contactme.app.profile.UserProfile
 import com.contactme.app.ui.discovery.ContactDiscoveryUiState
 import com.contactme.app.ui.discovery.ContactDiscoveryViewModel
+import com.contactme.app.ui.conversation.ConversationListUiState
+import com.contactme.app.ui.conversation.ConversationListViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
 
@@ -47,6 +50,7 @@ import com.contactme.app.ui.theme.ContactMeTheme
 @Composable
 fun HomeScreen(
     onChatSelected: (String) -> Unit,
+    onConversationSelected: (String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
     onSettingsSelected: () -> Unit
 ) {
@@ -96,6 +100,7 @@ fun HomeScreen(
             when (selectedTab) {
                 HomeTab.Chats -> ChatsTab(
                     onChatSelected = onChatSelected,
+                    onConversationSelected = onConversationSelected,
                     onDiscoveredUserSelected = onDiscoveredUserSelected
                 )
                 HomeTab.Status -> PlaceholderTab(
@@ -125,15 +130,20 @@ fun HomeScreen(
 @Composable
 private fun ChatsTab(
     onChatSelected: (String) -> Unit,
+    onConversationSelected: (String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
-    viewModel: ContactDiscoveryViewModel = hiltViewModel()
+    discoveryViewModel: ContactDiscoveryViewModel = hiltViewModel(),
+    conversationListViewModel: ConversationListViewModel = hiltViewModel()
 ) {
-    val discoveryState by viewModel.uiState.collectAsState()
+    val discoveryState by discoveryViewModel.uiState.collectAsState()
+    val conversationListState by conversationListViewModel.uiState.collectAsState()
 
     ChatsContent(
         discoveryState = discoveryState,
-        onSearchQueryChanged = viewModel::onQueryChanged,
+        conversationListState = conversationListState,
+        onSearchQueryChanged = discoveryViewModel::onQueryChanged,
         onChatSelected = onChatSelected,
+        onConversationSelected = onConversationSelected,
         onDiscoveredUserSelected = onDiscoveredUserSelected
     )
 }
@@ -141,8 +151,10 @@ private fun ChatsTab(
 @Composable
 private fun ChatsContent(
     discoveryState: ContactDiscoveryUiState,
+    conversationListState: ConversationListUiState,
     onSearchQueryChanged: (String) -> Unit,
     onChatSelected: (String) -> Unit,
+    onConversationSelected: (String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -163,7 +175,88 @@ private fun ChatsContent(
             onSearchQueryChanged = onSearchQueryChanged,
             onDiscoveredUserSelected = onDiscoveredUserSelected
         )
-        ChatPreviewList(onChatSelected = onChatSelected)
+        ConversationPreviewList(
+            conversationListState = conversationListState,
+            onConversationSelected = onConversationSelected
+        )
+        if (conversationListState.conversations.isEmpty()) {
+            ChatPreviewList(onChatSelected = onChatSelected)
+        }
+    }
+}
+
+@Composable
+private fun ConversationPreviewList(
+    conversationListState: ConversationListUiState,
+    onConversationSelected: (String, String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (conversationListState.isLoading) {
+            Text(
+                text = "Loading conversations...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
+        conversationListState.message?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
+        conversationListState.conversations.forEach { conversation ->
+            ConversationPreviewItem(
+                conversation = conversation,
+                onClick = {
+                    onConversationSelected(
+                        conversation.conversationId,
+                        conversation.title
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConversationPreviewItem(
+    conversation: ConversationPreview,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = conversation.title.profileInitials(),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = conversation.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = conversation.subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+            )
+        }
     }
 }
 
@@ -351,6 +444,7 @@ private fun HomeScreenPreview() {
     ContactMeTheme {
         HomeScreen(
             onChatSelected = {},
+            onConversationSelected = { _, _ -> },
             onDiscoveredUserSelected = {},
             onSettingsSelected = {}
         )
