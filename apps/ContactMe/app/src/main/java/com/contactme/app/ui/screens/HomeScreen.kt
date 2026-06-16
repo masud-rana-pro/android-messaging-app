@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,6 +46,10 @@ import com.contactme.app.ui.conversation.ConversationListUiState
 import com.contactme.app.ui.conversation.ConversationListViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -248,15 +253,24 @@ private fun ConversationPreviewItem(
             Text(
                 text = conversation.title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = conversation.subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
+        Text(
+            text = conversation.updatedAtMillis.formatConversationTime(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.56f)
+        )
     }
 }
 
@@ -417,6 +431,32 @@ private fun String.profileInitials(): String {
         .joinToString("")
 
     return initials.ifBlank { "CM" }
+}
+
+private fun Long.formatConversationTime(): String {
+    if (this <= 0L) return ""
+
+    val messageCalendar = Calendar.getInstance().apply { timeInMillis = this@formatConversationTime }
+    val todayCalendar = Calendar.getInstance()
+
+    return when {
+        messageCalendar.isSameDay(todayCalendar) -> {
+            SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this))
+        }
+        messageCalendar.isYesterday(todayCalendar) -> "Yesterday"
+        else -> SimpleDateFormat("M/d/yy", Locale.getDefault()).format(Date(this))
+    }
+}
+
+private fun Calendar.isSameDay(other: Calendar): Boolean {
+    return get(Calendar.YEAR) == other.get(Calendar.YEAR) &&
+        get(Calendar.DAY_OF_YEAR) == other.get(Calendar.DAY_OF_YEAR)
+}
+
+private fun Calendar.isYesterday(today: Calendar): Boolean {
+    val yesterday = today.clone() as Calendar
+    yesterday.add(Calendar.DAY_OF_YEAR, -1)
+    return isSameDay(yesterday)
 }
 
 @Composable
