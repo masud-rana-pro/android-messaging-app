@@ -20,25 +20,27 @@ ContactMe is an Android-first messaging app inspired by WhatsApp-style flows. It
 - Chat detail timestamp and auto-scroll.
 - Conversation list timestamp and unread/read foundation.
 - Message sent status foundation.
+- Typing indicator foundation.
+- Presence and last-seen foundation.
+- Profile photo upload/display through Cloudinary.
+- Image messages through Cloudinary with retry, preview, validation, and compression foundation.
+- FCM token sync, notification channels, runtime permission, and foreground notification renderer foundation.
 - Firestore MVP security rules for current chat/auth/profile flows.
 
 ## Current Partial Areas
 
-- Chat UI is functional but still needs WhatsApp-like polish, better navigation state, retry, typing, presence, and message actions.
-- Contact discovery supports username; phone search is planned next.
-- Profile has persisted display name/username; profile photo and privacy settings are still planned.
+- Chat UI is functional but still needs message actions, deep-link navigation, and broader WhatsApp-like polish.
+- Contact discovery supports username and phone-style search foundation; native contacts sync is planned later.
+- Profile has persisted display name/username/photo; privacy settings foundation exists and still needs full feature hardening.
 - Message status supports `sent`; delivered/read receipts require real recipient state before UI shows them.
-- Firestore rules cover MVP text chat; media, block/report, groups, calls, and emulator tests are still planned.
+- Firestore rules cover MVP chat/profile/media metadata/device-token flows; block/report, groups, calls, and emulator tests are still planned.
 
 ## Not Implemented Yet
 
 - Native contacts sync.
-- Profile photo upload.
-- Phone-number user search.
-- Typing indicator and online/last-seen presence.
 - Message actions: reply, forward, star, pin, edit, delete, reactions.
-- Media messages: image, video, document, audio, voice note.
-- Push notifications and notification deep links.
+- Media messages beyond images: video, document, audio, voice note.
+- Cloud Functions notification fanout and notification deep links.
 - Groups and communities.
 - Voice/video calls.
 - Status/stories.

@@ -1,15 +1,21 @@
 # Notification Flow
 
-Notifications will be added after Chat MVP polish, so payloads and deep links are based on stable conversation and message models.
+Notification foundation has started. The app can create channels, sync device tokens, request Android 13+ notification permission, and render incoming foreground FCM payloads. Cloud Functions fanout and deep links are still planned.
+
+## Current Components
+
+- Firebase Cloud Messaging dependency.
+- `ContactMeMessagingService`.
+- Notification channels: `messages`, `calls`, `system`.
+- Device token storage under `user_devices/{uid}/devices/{deviceId}`.
+- Runtime `POST_NOTIFICATIONS` request.
+- Foreground notification renderer.
 
 ## Planned Components
 
-- Firebase Cloud Messaging.
-- `FirebaseMessagingService`.
-- Notification channels.
 - Cloud Functions for secure fanout.
-- Device token storage.
 - Deep link navigation into chat/call screens.
+- Notification action buttons for calls.
 
 ## Device Token Flow
 
@@ -22,7 +28,7 @@ user_devices/{uid}/devices/{deviceId}
 ```
 
 4. Token is refreshed when FCM rotates it.
-5. Sign-out should stop using that local device token for the old user.
+5. Sign-out token cleanup is still planned.
 
 ## Message Notification Flow
 
@@ -32,6 +38,8 @@ user_devices/{uid}/devices/{deviceId}
 4. FCM sends a message notification.
 5. Android shows notification in the `messages` channel.
 6. Tapping notification opens the exact conversation.
+
+Current Android client opens the app from a notification tap. Exact conversation deep-linking is still planned.
 
 ## Call Notification Flow
 

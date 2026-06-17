@@ -14,12 +14,17 @@
 - [x] Real conversation list exists.
 - [x] Unread/read foundation exists.
 - [x] Message sent status foundation exists.
+- [x] Profile photo upload is implemented.
+- [x] Image messages are implemented.
+- [x] Media retry/preview/validation/compression foundation exists.
+- [x] FCM token sync foundation exists.
+- [x] Notification permission request exists.
+- [x] Foreground FCM notification renderer exists.
 - [x] Firestore MVP rules exist.
 - [ ] Chat MVP polish is complete.
 - [ ] Phone search is implemented.
-- [ ] Profile photo upload is implemented.
-- [ ] Push notifications are implemented.
-- [ ] Media messages are implemented.
+- [ ] Push notification Cloud Functions fanout is implemented.
+- [ ] Notification deep links are implemented.
 - [ ] Groups are implemented.
 - [ ] Calls are implemented.
 - [ ] Status/channels are implemented.
@@ -35,7 +40,9 @@
 - [ ] Test direct conversation creation.
 - [ ] Test message send/receive between two accounts.
 - [ ] Test unread/read behavior.
-- [ ] Test notification permission flow after notifications are added.
+- [ ] Test notification permission flow.
+- [ ] Test FCM token document creation.
+- [ ] Test foreground FCM notification display.
 - [ ] Test denied permissions for media/call features after they are added.
 - [ ] Check Firebase rules before sharing APK.
 - [ ] Add screenshots under `docs/screenshots`.

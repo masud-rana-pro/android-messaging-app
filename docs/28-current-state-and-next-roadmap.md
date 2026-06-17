@@ -31,19 +31,23 @@ This document is the implementation checkpoint after the message status foundati
 | Message status | Done foundation | `sent` status exists; delivered/read not yet real. |
 | Profile photo | Done MVP | Photo Picker uploads image to Cloudinary and stores `photoUrl` in Firestore. |
 | Media messages | Done MVP | Chat images upload to Cloudinary and store metadata in Firestore. |
-| Firestore rules | Done MVP | Rules cover current user/profile/direct chat flows. |
+| Typing/presence | Done foundation | Firestore typing and Realtime Database presence foundations exist. |
+| FCM token sync | Done foundation | Android token syncs to `user_devices/{uid}/devices/{deviceId}`. |
+| Notification channels | Done foundation | Messages, calls, and system channels are created. |
+| Notification permission | Done foundation | Android 13+ `POST_NOTIFICATIONS` runtime request exists. |
+| Notification renderer | Done foundation | Foreground FCM payloads can render Android notifications. |
+| Firestore rules | Done MVP | Rules cover current user/profile/direct chat/device-token flows. |
 
 ## Partial Or Not Started
 
 | Area | Status | Next Need |
 | --- | --- | --- |
 | Chat UI polish | Partial | Better navigation, empty/loading/error states, retry. |
-| Phone search | Not started | Normalize and query phone identity. |
-| Privacy settings | Not started | Last seen/profile photo/read receipt visibility. |
+| Phone search | Done foundation | Normalize and query phone identity; native contacts sync remains later. |
+| Privacy settings | Done foundation | Last seen/profile photo/read receipt settings exist; more hardening remains. |
 | Block/report | Not started | Data model, rules, UI. |
-| Typing/presence | Not started | Realtime Database or Firestore typing path. |
-| Notifications | Not started | FCM, token sync, channels, Cloud Functions. |
-| Media polish | Partial | Upload progress, retry, compression, signed upload hardening. |
+| Notifications | Partial | Cloud Functions fanout, deep links, and notification actions remain. |
+| Media polish | Partial | Upload retry/preview/validation/compression exists; background WorkManager and signed upload remain. |
 | Groups | Not started | Group model, members, roles, group messages. |
 | Calls | Not started | ZegoCloud, call state, notification, foreground service. |
 | Status/channels | Not started | Media/status/channel models and UI. |
@@ -53,9 +57,9 @@ This document is the implementation checkpoint after the message status foundati
 
 1. Chat MVP finish.
 2. Phone search and profile polish.
-3. Privacy, block, and report foundation.
-4. FCM notification foundation.
-5. Media polish with upload progress, retry, and compression.
+3. Block and report foundation.
+4. Notification fanout and deep-link foundation.
+5. Media hardening with WorkManager and signed upload.
 6. Group chat foundation.
 7. One-to-one calling foundation.
 8. Status/stories.
