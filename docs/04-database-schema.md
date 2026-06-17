@@ -62,13 +62,14 @@ conversations/{conversationId}
 ```text
 conversations/{conversationId}/messages/{messageId}
   senderId
-  type: "text"
+  type: "text" | "image"
   text
+  mediaUrl
   status: "sent"
   createdAt
 ```
 
-Only text messages are implemented now. Delivered/read status should not be shown until real recipient state exists.
+Text and image messages are implemented now. Image files are stored in Firebase Storage and referenced from message metadata.
 
 ## Planned Firestore Collections
 

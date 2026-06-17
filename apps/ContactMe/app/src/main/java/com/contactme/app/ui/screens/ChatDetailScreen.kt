@@ -1,5 +1,9 @@
 package com.contactme.app.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -32,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -39,11 +45,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.contactme.app.conversation.ReadReceiptState
 import com.contactme.app.message.ChatMessage
 import com.contactme.app.message.MessageStatus
+import com.contactme.app.message.MessageType
 import com.contactme.app.presence.PresenceStatus
 import com.contactme.app.ui.chat.ChatDetailUiState
 import com.contactme.app.ui.chat.ChatDetailViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
+import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -68,7 +76,8 @@ fun ChatDetailScreen(
         uiState = uiState,
         onBack = onBack,
         onMessageTextChanged = viewModel::onMessageTextChanged,
-        onSendMessage = viewModel::sendMessage
+        onSendMessage = viewModel::sendMessage,
+        onImageSelected = viewModel::sendImageMessage
     )
 }
 
@@ -80,10 +89,15 @@ private fun ChatDetailContent(
     uiState: ChatDetailUiState,
     onBack: () -> Unit,
     onMessageTextChanged: (String) -> Unit,
-    onSendMessage: () -> Unit
+    onSendMessage: () -> Unit,
+    onImageSelected: (Uri) -> Unit
 ) {
     val messages = uiState.messages
     val listState = rememberLazyListState()
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> uri?.let(onImageSelected) }
+    )
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -176,7 +190,12 @@ private fun ChatDetailContent(
                     enabled = conversationId != null && !uiState.isSending,
                     isSending = uiState.isSending,
                     onMessageTextChanged = onMessageTextChanged,
-                    onSendMessage = onSendMessage
+                    onSendMessage = onSendMessage,
+                    onImageClick = {
+                        imagePickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
                 )
             }
         }
@@ -349,12 +368,17 @@ private fun MessageBubble(
                 .padding(horizontal = 14.dp, vertical = 9.dp),
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
         ) {
-            Text(
-                modifier = Modifier.fillMaxWidth(),
-                text = message.text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
+            if (message.text.isNotBlank()) {
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = message.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+            if (message.type == MessageType.Image) {
+                ImageMessageContent(message = message)
+            }
             MessageMetaRow(
                 sentAtMillis = message.sentAtMillis,
                 status = message.status,
@@ -363,6 +387,29 @@ private fun MessageBubble(
             )
         }
     }
+}
+
+@Composable
+private fun ImageMessageContent(message: ChatMessage) {
+    if (message.mediaUrl.isBlank()) {
+        Text(
+            text = "Photo unavailable",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.64f)
+        )
+        return
+    }
+
+    AsyncImage(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .padding(top = 2.dp)
+            .clip(RoundedCornerShape(14.dp)),
+        model = message.mediaUrl,
+        contentDescription = "Photo message",
+        contentScale = ContentScale.Crop
+    )
 }
 
 @Composable
@@ -402,7 +449,8 @@ private fun MessageInputBar(
     enabled: Boolean,
     isSending: Boolean,
     onMessageTextChanged: (String) -> Unit,
-    onSendMessage: () -> Unit
+    onSendMessage: () -> Unit,
+    onImageClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -425,6 +473,19 @@ private fun MessageInputBar(
                 placeholder = {
                     Text(text = if (enabled) "Message" else "Select a chat")
                 }
+            )
+            Text(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(enabled = enabled && !isSending, onClick = onImageClick)
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                text = "+",
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f)
+                },
+                fontWeight = FontWeight.Bold
             )
             Text(
                 modifier = Modifier

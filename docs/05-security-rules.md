@@ -21,7 +21,9 @@ firebase/firestore.rules
 - Conversation participants can read/create messages.
 - Message `senderId` must equal `request.auth.uid`.
 - Text messages must be non-empty and no longer than 4000 characters.
+- Image messages must include a non-empty `mediaUrl`.
 - Message update/delete is denied for now.
+- Storage allows signed-in users to upload image files under `chat_media/{conversationId}/{messageId}` with a 10 MB limit.
 
 ## Deploy
 
