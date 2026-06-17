@@ -1,6 +1,7 @@
 package com.contactme.app.conversation
 
 import com.contactme.app.profile.PrivacyVisibility
+import com.contactme.app.safety.SafetyRepository
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -12,7 +13,8 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 class FirebaseConversationRepository @Inject constructor(
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val safetyRepository: SafetyRepository
 ) : ConversationRepository {
     override fun observeConversationPreviews(
         currentUserId: String
@@ -124,6 +126,10 @@ class FirebaseConversationRepository @Inject constructor(
     ): ConversationResult {
         if (currentUserId == otherUserId) {
             return ConversationResult.Error("You cannot open a chat with yourself.")
+        }
+
+        if (safetyRepository.hasBlockBetween(currentUserId, otherUserId)) {
+            return ConversationResult.Error("This chat is not available.")
         }
 
         val participantIds = listOf(currentUserId, otherUserId).sorted()
