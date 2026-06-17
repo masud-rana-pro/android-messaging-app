@@ -39,6 +39,9 @@ Desktop.ini
 # Secrets and signing files
 .env
 .env.*
+cloudinary.properties
+cloudinary.local.properties
+scripts/cloudinary_onboarding.gradle.kts
 *.keystore
 *.jks
 *.p12
