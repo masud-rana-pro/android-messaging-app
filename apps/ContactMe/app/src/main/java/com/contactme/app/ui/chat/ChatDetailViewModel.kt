@@ -150,6 +150,7 @@ class ChatDetailViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isSending = true,
+                    failedImageUri = "",
                     errorMessage = null
                 )
             }
@@ -167,6 +168,7 @@ class ChatDetailViewModel @Inject constructor(
                         it.copy(
                             messageText = "",
                             isSending = false,
+                            failedImageUri = "",
                             errorMessage = null
                         )
                     }
@@ -205,6 +207,7 @@ class ChatDetailViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isSending = true,
+                    failedImageUri = "",
                     errorMessage = null
                 )
             }
@@ -221,6 +224,7 @@ class ChatDetailViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isSending = false,
+                            failedImageUri = "",
                             errorMessage = null
                         )
                     }
@@ -230,12 +234,21 @@ class ChatDetailViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isSending = false,
+                            failedImageUri = imageUri.toString(),
                             errorMessage = result.message
                         )
                     }
                 }
             }
         }
+    }
+
+    fun retryFailedImageMessage() {
+        val failedImageUri = _uiState.value.failedImageUri
+
+        if (failedImageUri.isBlank()) return
+
+        sendImageMessage(Uri.parse(failedImageUri))
     }
 
     override fun onCleared() {

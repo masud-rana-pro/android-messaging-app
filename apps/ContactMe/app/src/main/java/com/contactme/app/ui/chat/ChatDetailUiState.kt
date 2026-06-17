@@ -13,5 +13,6 @@ data class ChatDetailUiState(
     val peerPresence: PresenceStatus = PresenceStatus(),
     val readReceiptState: ReadReceiptState = ReadReceiptState(),
     val isSending: Boolean = false,
+    val failedImageUri: String = "",
     val errorMessage: String? = null
 )
