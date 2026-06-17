@@ -82,6 +82,7 @@ fun ChatDetailScreen(
         onRetryImageMessage = viewModel::retryFailedImageMessage,
         onReportChat = viewModel::reportCurrentChat,
         onBlockChat = viewModel::blockCurrentChat,
+        onUnblockChat = viewModel::unblockCurrentChat,
         onImageSelected = viewModel::sendImageMessage
     )
 }
@@ -99,6 +100,7 @@ private fun ChatDetailContent(
     onRetryImageMessage: () -> Unit,
     onReportChat: () -> Unit,
     onBlockChat: () -> Unit,
+    onUnblockChat: () -> Unit,
     onImageSelected: (Uri) -> Unit
 ) {
     val messages = uiState.messages
@@ -140,10 +142,17 @@ private fun ChatDetailContent(
                             Text(text = "Report")
                         }
                         TextButton(
-                            enabled = !uiState.isSafetyActionInProgress && !uiState.isChatBlocked,
-                            onClick = onBlockChat
+                            enabled = !uiState.isSafetyActionInProgress &&
+                                (!uiState.isChatBlocked || uiState.canUnblockChat),
+                            onClick = {
+                                if (uiState.canUnblockChat) {
+                                    onUnblockChat()
+                                } else {
+                                    onBlockChat()
+                                }
+                            }
                         ) {
-                            Text(text = "Block")
+                            Text(text = if (uiState.canUnblockChat) "Unblock" else "Block")
                         }
                     }
                 },

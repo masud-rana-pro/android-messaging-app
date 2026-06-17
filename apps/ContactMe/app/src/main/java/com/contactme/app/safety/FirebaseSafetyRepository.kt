@@ -108,6 +108,21 @@ class FirebaseSafetyRepository @Inject constructor(
         )
     }
 
+    override suspend fun unblockConversationPeer(
+        currentUserId: String,
+        conversationId: String
+    ): SafetyResult {
+        val peerUserId = peerUserIdForConversation(
+            currentUserId = currentUserId,
+            conversationId = conversationId
+        ) ?: return SafetyResult.Error("We could not update this chat. Please try again.")
+
+        return unblockUser(
+            currentUserId = currentUserId,
+            blockedUserId = peerUserId
+        )
+    }
+
     override suspend fun reportConversationPeer(
         reporterUserId: String,
         conversationId: String,
@@ -152,6 +167,36 @@ class FirebaseSafetyRepository @Inject constructor(
         }.getOrDefault(false)
     }
 
+    override suspend fun hasCurrentUserBlockedConversationPeer(
+        currentUserId: String,
+        conversationId: String
+    ): Boolean {
+        val peerUserId = peerUserIdForConversation(
+            currentUserId = currentUserId,
+            conversationId = conversationId
+        ) ?: return false
+
+        return hasCurrentUserBlocked(
+            currentUserId = currentUserId,
+            blockedUserId = peerUserId
+        )
+    }
+
+    override suspend fun hasBlockInConversation(
+        currentUserId: String,
+        conversationId: String
+    ): Boolean {
+        val peerUserId = peerUserIdForConversation(
+            currentUserId = currentUserId,
+            conversationId = conversationId
+        ) ?: return false
+
+        return hasBlockBetween(
+            currentUserId = currentUserId,
+            otherUserId = peerUserId
+        )
+    }
+
     private companion object {
         const val CONVERSATIONS_COLLECTION = "conversations"
         const val BLOCKED_USERS_COLLECTION = "blocked_users"
@@ -174,5 +219,20 @@ class FirebaseSafetyRepository @Inject constructor(
             .orEmpty()
             .filterIsInstance<String>()
             .firstOrNull { userId -> userId != currentUserId }
+    }
+
+    private suspend fun hasCurrentUserBlocked(
+        currentUserId: String,
+        blockedUserId: String
+    ): Boolean {
+        return runCatching {
+            firestore.collection(BLOCKED_USERS_COLLECTION)
+                .document(currentUserId)
+                .collection(ITEMS_COLLECTION)
+                .document(blockedUserId)
+                .get()
+                .await()
+                .exists()
+        }.getOrDefault(false)
     }
 }
