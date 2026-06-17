@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +37,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -67,6 +71,7 @@ fun HomeScreen(
     onSettingsSelected: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(HomeTab.Chats) }
+    var newChatRequestCount by remember { mutableStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -92,7 +97,10 @@ fun HomeScreen(
         floatingActionButton = {
             if (selectedTab == HomeTab.Chats) {
                 FloatingActionButton(
-                    onClick = { selectedTab = HomeTab.Chats },
+                    onClick = {
+                        selectedTab = HomeTab.Chats
+                        newChatRequestCount += 1
+                    },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = RoundedCornerShape(18.dp)
@@ -129,6 +137,7 @@ fun HomeScreen(
         ) {
             when (selectedTab) {
                 HomeTab.Chats -> ChatsTab(
+                    newChatRequestCount = newChatRequestCount,
                     onConversationSelected = onConversationSelected,
                     onDiscoveredUserSelected = onDiscoveredUserSelected
                 )
@@ -158,6 +167,7 @@ fun HomeScreen(
 
 @Composable
 private fun ChatsTab(
+    newChatRequestCount: Int,
     onConversationSelected: (String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
     discoveryViewModel: ContactDiscoveryViewModel = hiltViewModel(),
@@ -169,6 +179,7 @@ private fun ChatsTab(
     val conversationListState by conversationListViewModel.uiState.collectAsState()
 
     ChatsContent(
+        newChatRequestCount = newChatRequestCount,
         discoveryState = discoveryState,
         contactListState = contactListState,
         conversationListState = conversationListState,
@@ -180,6 +191,7 @@ private fun ChatsTab(
 
 @Composable
 private fun ChatsContent(
+    newChatRequestCount: Int,
     discoveryState: ContactDiscoveryUiState,
     contactListState: ContactListUiState,
     conversationListState: ConversationListUiState,
@@ -187,8 +199,16 @@ private fun ChatsContent(
     onConversationSelected: (String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(newChatRequestCount) {
+        if (newChatRequestCount > 0) {
+            scrollState.animateScrollTo(0)
+        }
+    }
+
     Column(
-        modifier = Modifier.verticalScroll(rememberScrollState()),
+        modifier = Modifier.verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -204,6 +224,7 @@ private fun ChatsContent(
             )
         }
         ContactSearch(
+            newChatRequestCount = newChatRequestCount,
             discoveryState = discoveryState,
             onSearchQueryChanged = onSearchQueryChanged,
             onDiscoveredUserSelected = onDiscoveredUserSelected
@@ -448,14 +469,27 @@ private fun EmptyConversationState() {
 
 @Composable
 private fun ContactSearch(
+    newChatRequestCount: Int,
     discoveryState: ContactDiscoveryUiState,
     onSearchQueryChanged: (String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit
 ) {
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(newChatRequestCount) {
+        if (newChatRequestCount > 0) {
+            searchFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SearchSurface {
             OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(searchFocusRequester),
                 value = discoveryState.query,
                 onValueChange = onSearchQueryChanged,
                 singleLine = true,
