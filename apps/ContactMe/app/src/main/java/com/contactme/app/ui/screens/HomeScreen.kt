@@ -15,14 +15,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -76,14 +78,32 @@ fun HomeScreen(
                     )
                 },
                 actions = {
-                    TextButton(onClick = onSettingsSelected) {
-                        Text(text = "Settings")
-                    }
+                    TopBarAction(
+                        label = "Settings",
+                        onClick = onSettingsSelected
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    titleContentColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
+        },
+        floatingActionButton = {
+            if (selectedTab == HomeTab.Chats) {
+                FloatingActionButton(
+                    onClick = { selectedTab = HomeTab.Chats },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Text(
+                        text = "+",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         },
         bottomBar = {
             NavigationBar {
@@ -169,16 +189,16 @@ private fun ChatsContent(
 ) {
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = "Chats",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Messenger core UI demo",
+                text = "Real conversations and saved contacts",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
             )
@@ -204,35 +224,23 @@ private fun SavedContactsList(
     contactListState: ContactListUiState,
     onContactSelected: (UserProfile) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = "Saved contacts",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionHeader(title = "Saved contacts")
         if (contactListState.isLoading) {
-            Text(
+            SupportingText(
                 text = "Loading contacts...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
             )
         }
         contactListState.message?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
-            )
+            SupportingText(text = message)
         }
         if (!contactListState.isLoading && contactListState.contacts.isEmpty()) {
-            Text(
+            SupportingText(
                 text = "Search people to save contacts and start chats.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
             )
         }
         contactListState.contacts.forEach { contact ->
-            ContactSearchResult(
+            ContactRow(
                 profile = contact,
                 actionText = "Chat",
                 onClick = { onContactSelected(contact) }
@@ -246,20 +254,18 @@ private fun ConversationPreviewList(
     conversationListState: ConversationListUiState,
     onConversationSelected: (String, String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionHeader(title = "Recent chats")
         if (conversationListState.isLoading) {
-            Text(
+            SupportingText(
                 text = "Loading conversations...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
             )
         }
         conversationListState.message?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
-            )
+            SupportingText(text = message)
+        }
+        if (!conversationListState.isLoading && conversationListState.conversations.isEmpty()) {
+            EmptyConversationState()
         }
         conversationListState.conversations.forEach { conversation ->
             ConversationPreviewItem(
@@ -280,72 +286,162 @@ private fun ConversationPreviewItem(
     conversation: ConversationPreview,
     onClick: () -> Unit
 ) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(18.dp),
+        tonalElevation = 1.dp
     ) {
-        ContactAvatar(
-            label = conversation.title,
-            photoUrl = conversation.photoUrl,
-            size = 48
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = conversation.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (conversation.hasUnreadMessages) {
-                    FontWeight.Bold
-                } else {
-                    FontWeight.SemiBold
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ContactAvatar(
+                label = conversation.title,
+                photoUrl = conversation.photoUrl,
+                size = 50
             )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = conversation.subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(
-                    alpha = if (conversation.hasUnreadMessages) 0.86f else 0.68f
-                ),
-                fontWeight = if (conversation.hasUnreadMessages) {
-                    FontWeight.SemiBold
-                } else {
-                    FontWeight.Normal
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = conversation.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (conversation.hasUnreadMessages) {
+                        FontWeight.Bold
+                    } else {
+                        FontWeight.SemiBold
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = conversation.subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(
+                        alpha = if (conversation.hasUnreadMessages) 0.86f else 0.62f
+                    ),
+                    fontWeight = if (conversation.hasUnreadMessages) {
+                        FontWeight.SemiBold
+                    } else {
+                        FontWeight.Normal
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = conversation.updatedAtMillis.formatConversationTime(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (conversation.hasUnreadMessages) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.54f)
+                    },
+                    fontWeight = if (conversation.hasUnreadMessages) {
+                        FontWeight.Bold
+                    } else {
+                        FontWeight.Normal
+                    }
+                )
+                if (conversation.hasUnreadMessages) {
+                    UnreadDot()
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun UnreadDot() {
+    Box(
+        modifier = Modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "1",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimary,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.74f),
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
+private fun SupportingText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.64f)
+    )
+}
+
+@Composable
+private fun TopBarAction(
+    label: String,
+    onClick: () -> Unit
+) {
+    Text(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        text = label,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.SemiBold
+    )
+}
+
+@Composable
+private fun SearchSurface(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Box(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun EmptyConversationState() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+        shape = RoundedCornerShape(18.dp)
+    ) {
         Column(
-            horizontalAlignment = Alignment.End,
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text = conversation.updatedAtMillis.formatConversationTime(),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (conversation.hasUnreadMessages) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.56f)
-                },
-                fontWeight = if (conversation.hasUnreadMessages) {
-                    FontWeight.Bold
-                } else {
-                    FontWeight.Normal
-                }
+                text = "No chats yet",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
             )
-            if (conversation.hasUnreadMessages) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                )
-            }
+            SupportingText(text = "Search by username or phone number, then open a real chat.")
         }
     }
 }
@@ -357,30 +453,24 @@ private fun ContactSearch(
     onDiscoveredUserSelected: (UserProfile) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = discoveryState.query,
-            onValueChange = onSearchQueryChanged,
-            singleLine = true,
-            label = { Text(text = "Find people") },
-            placeholder = { Text(text = "Search username or phone") }
-        )
-        if (discoveryState.isSearching) {
-            Text(
-                text = "Searching...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+        SearchSurface {
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = discoveryState.query,
+                onValueChange = onSearchQueryChanged,
+                singleLine = true,
+                label = { Text(text = "Find people") },
+                placeholder = { Text(text = "Search username or phone") }
             )
+        }
+        if (discoveryState.isSearching) {
+            SupportingText(text = "Searching...")
         }
         discoveryState.message?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
-            )
+            SupportingText(text = message)
         }
         discoveryState.results.forEach { profile ->
-            ContactSearchResult(
+            ContactRow(
                 profile = profile,
                 actionText = "Open",
                 onClick = { onDiscoveredUserSelected(profile) }
@@ -390,47 +480,65 @@ private fun ContactSearch(
 }
 
 @Composable
-private fun ContactSearchResult(
+private fun ContactRow(
     profile: UserProfile,
     actionText: String,
     onClick: () -> Unit
 ) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(18.dp),
+        tonalElevation = 1.dp
     ) {
-        ContactAvatar(
-            label = profile.displayName,
-            photoUrl = profile.photoUrl,
-            size = 44
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = profile.displayName.ifBlank { "ContactMe User" },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ContactAvatar(
+                label = profile.displayName,
+                photoUrl = profile.photoUrl,
+                size = 46
             )
-            Text(
-                text = "@${profile.username}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
-            )
-            if (profile.phoneNumber.isNotBlank()) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = profile.phoneNumber,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.52f)
+                    text = profile.displayName.ifBlank { "ContactMe User" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Text(
+                    text = "@${profile.username}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.66f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (profile.phoneNumber.isNotBlank()) {
+                    Text(
+                        text = profile.phoneNumber,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+            Text(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                text = actionText,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Bold
+            )
         }
-        Text(
-            text = actionText,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
     }
 }
 
@@ -463,7 +571,6 @@ private fun ContactAvatar(
         }
     }
 }
-
 private fun String.profileInitials(): String {
     val initials = trim()
         .split(" ")
