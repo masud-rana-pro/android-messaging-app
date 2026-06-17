@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,7 +74,7 @@ private fun SettingsContent(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Profile & Settings",
+                        text = "Settings",
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -82,7 +84,8 @@ private fun SettingsContent(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    titleContentColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         }
@@ -97,39 +100,46 @@ private fun SettingsContent(
                 ),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Row(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(18.dp),
+                tonalElevation = 1.dp
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(58.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = uiState.displayName.profileInitials(),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Column {
-                    Text(
-                        text = if (uiState.isLoadingProfile) {
-                            "Loading profile..."
-                        } else {
-                            uiState.displayName
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "@${uiState.username}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(58.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = uiState.displayName.profileInitials(),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (uiState.isLoadingProfile) {
+                                "Loading..."
+                            } else {
+                                uiState.displayName
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "@${uiState.username}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
+                        )
+                    }
                 }
             }
             uiState.errorMessage?.let { message ->
@@ -167,18 +177,6 @@ private fun SettingsContent(
                 checked = uiState.privacySettings.readReceiptsEnabled,
                 enabled = !uiState.isSavingPrivacy,
                 onClick = onReadReceiptsClick
-            )
-            SettingsItem(
-                title = "Notifications",
-                subtitle = "Messages, groups, calls, and channels"
-            )
-            SettingsItem(
-                title = "Storage",
-                subtitle = "Media cleanup and local cache"
-            )
-            SettingsItem(
-                title = "Blocked users",
-                subtitle = "Manage blocked contacts"
             )
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
@@ -240,28 +238,6 @@ private fun PrivacyToggleItem(
             checked = checked,
             enabled = enabled,
             onCheckedChange = { onClick() }
-        )
-    }
-}
-
-@Composable
-private fun SettingsItem(
-    title: String,
-    subtitle: String
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
         )
     }
 }

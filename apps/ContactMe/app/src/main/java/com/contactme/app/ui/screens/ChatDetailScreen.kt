@@ -140,8 +140,8 @@ private fun ChatDetailContent(
                     item {
                         if (conversationId == null) {
                             ChatListStateMessage(
-                                title = "Open a real chat",
-                                subtitle = "Select a saved contact or search a user to start messaging."
+                                title = "No chat selected",
+                                subtitle = "Choose a contact to start."
                             )
                         } else {
                             ChatListStateMessage(
@@ -421,8 +421,9 @@ private fun MessageInputBar(
                 onValueChange = onMessageTextChanged,
                 enabled = enabled,
                 singleLine = true,
+                shape = RoundedCornerShape(22.dp),
                 placeholder = {
-                    Text(text = if (enabled) "Message" else "Open a contact to message")
+                    Text(text = if (enabled) "Message" else "Select a chat")
                 }
             )
             Text(

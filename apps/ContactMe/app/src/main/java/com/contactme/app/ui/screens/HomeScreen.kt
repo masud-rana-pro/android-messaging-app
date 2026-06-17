@@ -142,23 +142,19 @@ fun HomeScreen(
                     onDiscoveredUserSelected = onDiscoveredUserSelected
                 )
                 HomeTab.Status -> PlaceholderTab(
-                    title = "Status",
-                    subtitle = "24-hour updates will appear here."
+                    title = "Status"
                 )
 
                 HomeTab.Calls -> PlaceholderTab(
-                    title = "Calls",
-                    subtitle = "Voice and video call history will appear here."
+                    title = "Calls"
                 )
 
                 HomeTab.Communities -> PlaceholderTab(
-                    title = "Communities",
-                    subtitle = "Linked groups and announcements will appear here."
+                    title = "Communities"
                 )
 
                 HomeTab.Channels -> PlaceholderTab(
-                    title = "Channels",
-                    subtitle = "Broadcast channels and posts will appear here."
+                    title = "Channels"
                 )
             }
         }
@@ -218,7 +214,7 @@ private fun ChatsContent(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Real conversations and saved contacts",
+                text = "Search or open a chat",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
             )
@@ -257,7 +253,7 @@ private fun SavedContactsList(
         }
         if (!contactListState.isLoading && contactListState.contacts.isEmpty()) {
             SupportingText(
-                text = "Search people to save contacts and start chats.",
+                text = "No saved contacts",
             )
         }
         contactListState.contacts.forEach { contact ->
@@ -493,8 +489,9 @@ private fun ContactSearch(
                 value = discoveryState.query,
                 onValueChange = onSearchQueryChanged,
                 singleLine = true,
+                shape = RoundedCornerShape(22.dp),
                 label = { Text(text = "Find people") },
-                placeholder = { Text(text = "Search username or phone") }
+                placeholder = { Text(text = "Username or phone") }
             )
         }
         if (discoveryState.isSearching) {
@@ -644,8 +641,7 @@ private fun Calendar.isYesterday(today: Calendar): Boolean {
 
 @Composable
 private fun PlaceholderTab(
-    title: String,
-    subtitle: String
+    title: String
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -654,7 +650,7 @@ private fun PlaceholderTab(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = subtitle,
+            text = "Coming soon",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
         )
