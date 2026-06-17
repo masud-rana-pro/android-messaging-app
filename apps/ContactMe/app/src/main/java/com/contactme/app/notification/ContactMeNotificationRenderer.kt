@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.contactme.app.MainActivity
 import com.contactme.app.R
+import com.contactme.app.navigation.NotificationNavigation
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -28,6 +29,9 @@ class ContactMeNotificationRenderer @Inject constructor(
             payload.notificationId,
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(NotificationNavigation.EXTRA_CONVERSATION_ID, payload.conversationId)
+                putExtra(NotificationNavigation.EXTRA_CHAT_TITLE, payload.title)
+                putExtra(NotificationNavigation.EXTRA_CHAT_PHOTO_URL, payload.photoUrl)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -61,7 +65,9 @@ class ContactMeNotificationRenderer @Inject constructor(
 private data class ContactMeNotificationPayload(
     val notificationId: Int,
     val channelId: String,
+    val conversationId: String,
     val title: String,
+    val photoUrl: String,
     val body: String,
     val priority: Int
 ) {
@@ -69,6 +75,7 @@ private data class ContactMeNotificationPayload(
         fun from(message: RemoteMessage): ContactMeNotificationPayload {
             val type = message.data["type"].orEmpty()
             val conversationId = message.data["conversationId"].orEmpty()
+            val photoUrl = message.data["photoUrl"].orEmpty()
             val title = message.data["title"]
                 ?: message.notification?.title
                 ?: DEFAULT_TITLE
@@ -88,7 +95,9 @@ private data class ContactMeNotificationPayload(
             return ContactMeNotificationPayload(
                 notificationId = stableNotificationId(conversationId.ifBlank { message.messageId.orEmpty() }),
                 channelId = channelId,
+                conversationId = conversationId,
                 title = title,
+                photoUrl = photoUrl,
                 body = body,
                 priority = priority
             )
