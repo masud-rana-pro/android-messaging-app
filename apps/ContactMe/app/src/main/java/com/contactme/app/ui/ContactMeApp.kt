@@ -30,6 +30,7 @@ import com.contactme.app.ui.session.SessionViewModel
 
 @Composable
 fun ContactMeApp(
+    notificationChatTarget: ChatTarget? = null,
     sessionViewModel: SessionViewModel = hiltViewModel(),
     conversationViewModel: ConversationViewModel = hiltViewModel(),
     presenceViewModel: PresenceViewModel = hiltViewModel(),
@@ -42,6 +43,11 @@ fun ContactMeApp(
     }
 
     fun openChat(target: ChatTarget) {
+        selectedChatTarget = target
+        currentScreen = AppScreen.ChatDetail
+    }
+
+    fun openNotificationChatIfPossible(target: ChatTarget) {
         selectedChatTarget = target
         currentScreen = AppScreen.ChatDetail
     }
@@ -65,6 +71,17 @@ fun ContactMeApp(
     LaunchedEffect(currentScreen) {
         presenceViewModel.markOnline()
         deviceTokenSyncViewModel.syncCurrentDevice()
+    }
+
+    LaunchedEffect(notificationChatTarget, currentScreen) {
+        val target = notificationChatTarget ?: return@LaunchedEffect
+        if (
+            currentScreen == AppScreen.Home ||
+            currentScreen == AppScreen.ChatDetail ||
+            currentScreen == AppScreen.Settings
+        ) {
+            openNotificationChatIfPossible(target)
+        }
     }
 
     Surface(
