@@ -86,20 +86,22 @@ fun ContactMeApp(
             )
 
             AppScreen.Home -> HomeScreen(
-                onConversationSelected = { conversationId, chatName ->
+                onConversationSelected = { conversationId, chatName, photoUrl ->
                     openChat(
                         ChatTarget(
                             title = chatName,
-                            conversationId = conversationId
+                            conversationId = conversationId,
+                            photoUrl = photoUrl
                         )
                     )
                 },
                 onDiscoveredUserSelected = { userProfile ->
-                    conversationViewModel.openDirectConversation(userProfile) { conversationId, chatName ->
+                    conversationViewModel.openDirectConversation(userProfile) { conversationId, chatName, photoUrl ->
                         openChat(
                             ChatTarget(
                                 title = chatName,
-                                conversationId = conversationId
+                                conversationId = conversationId,
+                                photoUrl = photoUrl
                             )
                         )
                     }
@@ -112,6 +114,7 @@ fun ContactMeApp(
             AppScreen.ChatDetail -> ChatDetailScreen(
                 chatName = selectedChatTarget.title,
                 conversationId = selectedChatTarget.conversationId,
+                chatPhotoUrl = selectedChatTarget.photoUrl,
                 onBack = { currentScreen = AppScreen.Home }
             )
 

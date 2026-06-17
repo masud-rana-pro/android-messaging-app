@@ -19,7 +19,7 @@ class ConversationViewModel @Inject constructor(
 ) : ViewModel() {
     fun openDirectConversation(
         otherUser: UserProfile,
-        onReady: (conversationId: String, chatName: String) -> Unit
+        onReady: (conversationId: String, chatName: String, photoUrl: String) -> Unit
     ) {
         val currentUserId = authRepository.currentUserId() ?: return
 
@@ -37,7 +37,8 @@ class ConversationViewModel @Inject constructor(
                     )
                     onReady(
                         result.conversationId,
-                        otherUser.displayName.ifBlank { otherUser.username }
+                        otherUser.displayName.ifBlank { otherUser.username },
+                        otherUser.photoUrl
                     )
                 }
 

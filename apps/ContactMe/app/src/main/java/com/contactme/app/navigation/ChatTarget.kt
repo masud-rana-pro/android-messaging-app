@@ -2,5 +2,6 @@ package com.contactme.app.navigation
 
 data class ChatTarget(
     val title: String,
-    val conversationId: String?
+    val conversationId: String?,
+    val photoUrl: String = ""
 )
