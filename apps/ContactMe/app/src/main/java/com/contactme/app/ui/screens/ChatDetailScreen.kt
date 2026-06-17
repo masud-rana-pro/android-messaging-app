@@ -79,6 +79,7 @@ fun ChatDetailScreen(
         onBack = onBack,
         onMessageTextChanged = viewModel::onMessageTextChanged,
         onSendMessage = viewModel::sendMessage,
+        onRetryImageMessage = viewModel::retryFailedImageMessage,
         onImageSelected = viewModel::sendImageMessage
     )
 }
@@ -93,6 +94,7 @@ private fun ChatDetailContent(
     onBack: () -> Unit,
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
+    onRetryImageMessage: () -> Unit,
     onImageSelected: (Uri) -> Unit
 ) {
     val messages = uiState.messages
@@ -183,16 +185,26 @@ private fun ChatDetailContent(
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 uiState.errorMessage?.let { message ->
+                    val hasFailedImage = uiState.failedImageUri.isNotBlank()
                     SendErrorMessage(
                         message = message,
-                        canRetry = uiState.messageText.isNotBlank() && conversationId != null,
-                        onRetry = onSendMessage
+                        canRetry = conversationId != null && (
+                            uiState.messageText.isNotBlank() || hasFailedImage
+                            ),
+                        onRetry = {
+                            if (hasFailedImage) {
+                                onRetryImageMessage()
+                            } else {
+                                onSendMessage()
+                            }
+                        }
                     )
                 }
                 MessageInputBar(
                     text = uiState.messageText,
                     enabled = conversationId != null && !uiState.isSending,
                     isSending = uiState.isSending,
+                    hasFailedImage = uiState.failedImageUri.isNotBlank(),
                     onMessageTextChanged = onMessageTextChanged,
                     onSendMessage = onSendMessage,
                     onImageClick = {
@@ -462,6 +474,7 @@ private fun MessageInputBar(
     text: String,
     enabled: Boolean,
     isSending: Boolean,
+    hasFailedImage: Boolean,
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
     onImageClick: () -> Unit
@@ -485,7 +498,14 @@ private fun MessageInputBar(
                 singleLine = true,
                 shape = RoundedCornerShape(22.dp),
                 placeholder = {
-                    Text(text = if (enabled) "Message" else "Select a chat")
+                    Text(
+                        text = when {
+                            isSending -> "Sending..."
+                            hasFailedImage -> "Retry photo or choose another"
+                            enabled -> "Message"
+                            else -> "Select a chat"
+                        }
+                    )
                 }
             )
             Text(
