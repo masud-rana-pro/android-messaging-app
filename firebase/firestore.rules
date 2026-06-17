@@ -74,6 +74,14 @@ service cloud.firestore {
       allow delete: if isOwner(ownerUserId);
     }
 
+    match /user_devices/{userId}/devices/{deviceId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.token is string
+        && request.resource.data.platform == "android";
+      allow delete: if isOwner(userId);
+    }
+
     match /conversations/{conversationId} {
       allow read: if isSignedIn()
         && request.auth.uid in resource.data.participantIds;
