@@ -27,10 +27,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.contactme.app.profile.PrivacyVisibility
 import com.contactme.app.ui.settings.SettingsUiState
 import com.contactme.app.ui.settings.SettingsViewModel
@@ -118,11 +120,20 @@ private fun SettingsContent(
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = uiState.displayName.profileInitials(),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold
-                        )
+                        if (uiState.photoUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = uiState.photoUrl,
+                                contentDescription = "Profile photo",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                text = uiState.displayName.profileInitials(),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                     Column {
                         Text(
@@ -250,6 +261,7 @@ private fun SettingsScreenPreview() {
             uiState = SettingsUiState(
                 displayName = "Masud Rana",
                 username = "masud_rana",
+                photoUrl = "",
                 isLoadingProfile = false
             ),
             onBack = {},
