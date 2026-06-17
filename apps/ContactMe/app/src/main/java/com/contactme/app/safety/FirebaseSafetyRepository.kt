@@ -93,6 +93,39 @@ class FirebaseSafetyRepository @Inject constructor(
         )
     }
 
+    override suspend fun blockConversationPeer(
+        currentUserId: String,
+        conversationId: String
+    ): SafetyResult {
+        val peerUserId = peerUserIdForConversation(
+            currentUserId = currentUserId,
+            conversationId = conversationId
+        ) ?: return SafetyResult.Error("We could not update this chat. Please try again.")
+
+        return blockUser(
+            currentUserId = currentUserId,
+            blockedUserId = peerUserId
+        )
+    }
+
+    override suspend fun reportConversationPeer(
+        reporterUserId: String,
+        conversationId: String,
+        reason: ReportReason
+    ): SafetyResult {
+        val peerUserId = peerUserIdForConversation(
+            currentUserId = reporterUserId,
+            conversationId = conversationId
+        ) ?: return SafetyResult.Error("We could not send this report. Please try again.")
+
+        return reportUser(
+            reporterUserId = reporterUserId,
+            reportedUserId = peerUserId,
+            conversationId = conversationId,
+            reason = reason
+        )
+    }
+
     override suspend fun hasBlockBetween(
         currentUserId: String,
         otherUserId: String
@@ -120,9 +153,26 @@ class FirebaseSafetyRepository @Inject constructor(
     }
 
     private companion object {
+        const val CONVERSATIONS_COLLECTION = "conversations"
         const val BLOCKED_USERS_COLLECTION = "blocked_users"
         const val ITEMS_COLLECTION = "items"
         const val REPORTS_COLLECTION = "reports"
         const val OPEN_STATUS = "open"
+    }
+
+    private suspend fun peerUserIdForConversation(
+        currentUserId: String,
+        conversationId: String
+    ): String? {
+        val participantIds = firestore.collection(CONVERSATIONS_COLLECTION)
+            .document(conversationId)
+            .get()
+            .await()
+            .get("participantIds") as? List<*>
+
+        return participantIds
+            .orEmpty()
+            .filterIsInstance<String>()
+            .firstOrNull { userId -> userId != currentUserId }
     }
 }
