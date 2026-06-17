@@ -15,6 +15,7 @@ data class ChatDetailUiState(
     val isSending: Boolean = false,
     val isSafetyActionInProgress: Boolean = false,
     val isChatBlocked: Boolean = false,
+    val canUnblockChat: Boolean = false,
     val pendingImageUri: String = "",
     val failedImageUri: String = "",
     val statusMessage: String? = null,

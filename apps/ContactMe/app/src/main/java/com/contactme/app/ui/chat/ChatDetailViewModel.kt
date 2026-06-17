@@ -68,10 +68,12 @@ class ChatDetailViewModel @Inject constructor(
                 readReceiptState = com.contactme.app.conversation.ReadReceiptState(),
                 isSafetyActionInProgress = false,
                 isChatBlocked = false,
+                canUnblockChat = false,
                 statusMessage = null,
                 errorMessage = null
             )
         }
+        loadSafetyState(conversationId)
         messagesJob = viewModelScope.launch {
             messageRepository.observeMessages(conversationId).collect { messages ->
                 _uiState.update {
@@ -297,7 +299,58 @@ class ChatDetailViewModel @Inject constructor(
                             messageText = "",
                             isSafetyActionInProgress = false,
                             isChatBlocked = true,
+                            canUnblockChat = true,
                             statusMessage = "User blocked.",
+                            errorMessage = null
+                        )
+                    }
+                }
+
+                is SafetyResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSafetyActionInProgress = false,
+                            errorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun unblockCurrentChat() {
+        val conversationId = activeConversationId
+        val userId = authRepository.currentUserId()
+
+        if (conversationId == null || userId == null) {
+            _uiState.update { it.copy(errorMessage = "Open a real conversation first.") }
+            return
+        }
+
+        if (_uiState.value.isSafetyActionInProgress) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSafetyActionInProgress = true,
+                    statusMessage = null,
+                    errorMessage = null
+                )
+            }
+
+            when (
+                val result = safetyRepository.unblockConversationPeer(
+                    currentUserId = userId,
+                    conversationId = conversationId
+                )
+            ) {
+                SafetyResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSafetyActionInProgress = false,
+                            isChatBlocked = false,
+                            canUnblockChat = false,
+                            statusMessage = "User unblocked.",
                             errorMessage = null
                         )
                     }
@@ -386,6 +439,33 @@ class ChatDetailViewModel @Inject constructor(
                 conversationId = conversationId,
                 userId = userId
             )
+        }
+    }
+
+    private fun loadSafetyState(conversationId: String) {
+        val userId = authRepository.currentUserId() ?: return
+
+        viewModelScope.launch {
+            val isBlocked = safetyRepository.hasBlockInConversation(
+                currentUserId = userId,
+                conversationId = conversationId
+            )
+            val canUnblock = safetyRepository.hasCurrentUserBlockedConversationPeer(
+                currentUserId = userId,
+                conversationId = conversationId
+            )
+
+            _uiState.update {
+                it.copy(
+                    isChatBlocked = isBlocked,
+                    canUnblockChat = canUnblock,
+                    statusMessage = if (isBlocked) {
+                        "Chat unavailable."
+                    } else {
+                        it.statusMessage
+                    }
+                )
+            }
         }
     }
 

@@ -23,6 +23,11 @@ interface SafetyRepository {
         conversationId: String
     ): SafetyResult
 
+    suspend fun unblockConversationPeer(
+        currentUserId: String,
+        conversationId: String
+    ): SafetyResult
+
     suspend fun reportConversationPeer(
         reporterUserId: String,
         conversationId: String,
@@ -32,5 +37,15 @@ interface SafetyRepository {
     suspend fun hasBlockBetween(
         currentUserId: String,
         otherUserId: String
+    ): Boolean
+
+    suspend fun hasCurrentUserBlockedConversationPeer(
+        currentUserId: String,
+        conversationId: String
+    ): Boolean
+
+    suspend fun hasBlockInConversation(
+        currentUserId: String,
+        conversationId: String
     ): Boolean
 }
