@@ -1,5 +1,6 @@
 package com.contactme.app.ui.chat
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
@@ -165,6 +166,60 @@ class ChatDetailViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             messageText = "",
+                            isSending = false,
+                            errorMessage = null
+                        )
+                    }
+                }
+
+                is MessageResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            errorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun sendImageMessage(imageUri: Uri) {
+        val conversationId = activeConversationId
+
+        if (conversationId == null) {
+            _uiState.update { it.copy(errorMessage = "Select a chat first.") }
+            return
+        }
+
+        if (_uiState.value.isSending) return
+
+        val senderId = authRepository.currentUserId()
+
+        if (senderId == null) {
+            _uiState.update { it.copy(errorMessage = "Session expired. Please log in again.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSending = true,
+                    errorMessage = null
+                )
+            }
+
+            when (
+                val result = messageRepository.sendImageMessage(
+                    conversationId = conversationId,
+                    senderId = senderId,
+                    imageUri = imageUri
+                )
+            ) {
+                MessageResult.Success -> {
+                    updateTypingState(isTyping = false)
+                    _uiState.update {
+                        it.copy(
                             isSending = false,
                             errorMessage = null
                         )

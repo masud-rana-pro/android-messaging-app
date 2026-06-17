@@ -1,5 +1,6 @@
 package com.contactme.app.message
 
+import android.net.Uri
 import kotlinx.coroutines.flow.Flow
 
 interface MessageRepository {
@@ -9,5 +10,11 @@ interface MessageRepository {
         conversationId: String,
         senderId: String,
         text: String
+    ): MessageResult
+
+    suspend fun sendImageMessage(
+        conversationId: String,
+        senderId: String,
+        imageUri: Uri
     ): MessageResult
 }
