@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -123,7 +124,7 @@ private fun ProfileSetupContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Add the name people will see in ContactMe.",
+            text = "Your public profile",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
         )
@@ -134,6 +135,7 @@ private fun ProfileSetupContent(
             onValueChange = onDisplayNameChanged,
             enabled = !uiState.isLoading,
             singleLine = true,
+            shape = RoundedCornerShape(18.dp),
             label = { Text(text = "Display name") }
         )
         Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
@@ -143,6 +145,7 @@ private fun ProfileSetupContent(
             onValueChange = onUsernameChanged,
             enabled = !uiState.isLoading,
             singleLine = true,
+            shape = RoundedCornerShape(18.dp),
             label = { Text(text = "Username") },
             placeholder = { Text(text = "your_name") }
         )

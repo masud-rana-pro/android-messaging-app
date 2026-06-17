@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -89,9 +90,9 @@ private fun AuthContent(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = if (uiState.authMode == AuthMode.Phone) {
-                "Enter your mobile number to receive a verification code."
+                "Enter your phone number."
             } else {
-                "Email and password are available as a fallback login method."
+                "Use your email and password."
             },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
@@ -105,6 +106,7 @@ private fun AuthContent(
                 onValueChange = onPhoneNumberChanged,
                 enabled = !uiState.isLoading,
                 singleLine = true,
+                shape = RoundedCornerShape(18.dp),
                 label = { Text(text = "Phone number") },
                 placeholder = { Text(text = "01XXXXXXXXX") }
             )
@@ -116,6 +118,7 @@ private fun AuthContent(
                     onValueChange = onOtpCodeChanged,
                     enabled = !uiState.isLoading,
                     singleLine = true,
+                    shape = RoundedCornerShape(18.dp),
                     label = { Text(text = "Verification code") },
                     placeholder = { Text(text = "6-digit code") }
                 )
@@ -127,6 +130,7 @@ private fun AuthContent(
                 onValueChange = onEmailChanged,
                 enabled = !uiState.isLoading,
                 singleLine = true,
+                shape = RoundedCornerShape(18.dp),
                 label = { Text(text = "Email") }
             )
             Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
@@ -136,6 +140,7 @@ private fun AuthContent(
                 onValueChange = onPasswordChanged,
                 enabled = !uiState.isLoading,
                 singleLine = true,
+                shape = RoundedCornerShape(18.dp),
                 label = { Text(text = "Password") },
                 visualTransformation = PasswordVisualTransformation()
             )
@@ -211,9 +216,9 @@ private fun AuthContent(
             ) {
                 Text(
                     text = if (uiState.authMode == AuthMode.EmailLogin) {
-                        "Need an account? Register with email"
+                        "Create account"
                     } else {
-                        "Already have an account? Log in with email"
+                        "Log in"
                     }
                 )
             }
