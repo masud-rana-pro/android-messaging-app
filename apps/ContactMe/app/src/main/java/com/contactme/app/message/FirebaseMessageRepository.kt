@@ -2,6 +2,7 @@ package com.contactme.app.message
 
 import android.net.Uri
 import com.contactme.app.media.CloudinaryUploadClient
+import com.contactme.app.media.MediaUploadException
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -134,8 +135,11 @@ class FirebaseMessageRepository @Inject constructor(
             }.await()
         }.fold(
             onSuccess = { MessageResult.Success },
-            onFailure = {
-                MessageResult.Error("We could not send this photo. Please try again.")
+            onFailure = { error ->
+                MessageResult.Error(
+                    (error as? MediaUploadException)?.userMessage
+                        ?: "We could not send this photo. Please try again."
+                )
             }
         )
     }
