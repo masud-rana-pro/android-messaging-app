@@ -184,6 +184,13 @@ private fun ChatDetailContent(
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val imagePreviewUri = uiState.pendingImageUri.ifBlank { uiState.failedImageUri }
+                if (imagePreviewUri.isNotBlank()) {
+                    PendingImagePreview(
+                        imageUri = imagePreviewUri,
+                        isUploading = uiState.pendingImageUri.isNotBlank() && uiState.isSending
+                    )
+                }
                 uiState.errorMessage?.let { message ->
                     val hasFailedImage = uiState.failedImageUri.isNotBlank()
                     SendErrorMessage(
@@ -436,6 +443,64 @@ private fun ImageMessageContent(message: ChatMessage) {
         contentDescription = "Photo message",
         contentScale = ContentScale.Crop
     )
+}
+
+@Composable
+private fun PendingImagePreview(
+    imageUri: String,
+    isUploading: Boolean
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (isUploading) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+        } else {
+            MaterialTheme.colorScheme.errorContainer
+        },
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(RoundedCornerShape(14.dp)),
+                model = imageUri,
+                contentDescription = "Selected photo",
+                contentScale = ContentScale.Crop
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isUploading) "Sending photo" else "Photo not sent",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isUploading) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (isUploading) "Uploading..." else "Retry or choose another photo",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isUploading) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f)
+                    } else {
+                        MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.72f)
+                    }
+                )
+            }
+            if (isUploading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        }
+    }
 }
 
 @Composable
