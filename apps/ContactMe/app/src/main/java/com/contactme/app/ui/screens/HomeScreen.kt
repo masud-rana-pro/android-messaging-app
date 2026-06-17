@@ -66,7 +66,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onConversationSelected: (String, String) -> Unit,
+    onConversationSelected: (String, String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
     onSettingsSelected: () -> Unit
 ) {
@@ -164,7 +164,7 @@ fun HomeScreen(
 @Composable
 private fun ChatsTab(
     newChatRequestCount: Int,
-    onConversationSelected: (String, String) -> Unit,
+    onConversationSelected: (String, String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
     discoveryViewModel: ContactDiscoveryViewModel = hiltViewModel(),
     contactListViewModel: ContactListViewModel = hiltViewModel(),
@@ -192,7 +192,7 @@ private fun ChatsContent(
     contactListState: ContactListUiState,
     conversationListState: ConversationListUiState,
     onSearchQueryChanged: (String) -> Unit,
-    onConversationSelected: (String, String) -> Unit,
+    onConversationSelected: (String, String, String) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -269,7 +269,7 @@ private fun SavedContactsList(
 @Composable
 private fun ConversationPreviewList(
     conversationListState: ConversationListUiState,
-    onConversationSelected: (String, String) -> Unit
+    onConversationSelected: (String, String, String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeader(title = "Recent chats")
@@ -290,7 +290,8 @@ private fun ConversationPreviewList(
                 onClick = {
                     onConversationSelected(
                         conversation.conversationId,
-                        conversation.title
+                        conversation.title,
+                        conversation.photoUrl
                     )
                 }
             )
@@ -662,7 +663,7 @@ private fun PlaceholderTab(
 private fun HomeScreenPreview() {
     ContactMeTheme {
         HomeScreen(
-            onConversationSelected = { _, _ -> },
+            onConversationSelected = { _, _, _ -> },
             onDiscoveredUserSelected = {},
             onSettingsSelected = {}
         )

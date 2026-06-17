@@ -61,6 +61,7 @@ import java.util.Locale
 fun ChatDetailScreen(
     chatName: String,
     conversationId: String? = null,
+    chatPhotoUrl: String = "",
     onBack: () -> Unit,
     viewModel: ChatDetailViewModel = hiltViewModel()
 ) {
@@ -72,6 +73,7 @@ fun ChatDetailScreen(
 
     ChatDetailContent(
         chatName = chatName,
+        chatPhotoUrl = chatPhotoUrl,
         conversationId = conversationId,
         uiState = uiState,
         onBack = onBack,
@@ -85,6 +87,7 @@ fun ChatDetailScreen(
 @Composable
 private fun ChatDetailContent(
     chatName: String,
+    chatPhotoUrl: String,
     conversationId: String?,
     uiState: ChatDetailUiState,
     onBack: () -> Unit,
@@ -111,6 +114,7 @@ private fun ChatDetailContent(
                 title = {
                     ChatHeaderTitle(
                         chatName = chatName,
+                        chatPhotoUrl = chatPhotoUrl,
                         subtitle = chatSubtitle(
                             conversationId = conversationId,
                             isOtherUserTyping = uiState.isOtherUserTyping,
@@ -205,6 +209,7 @@ private fun ChatDetailContent(
 @Composable
 private fun ChatHeaderTitle(
     chatName: String,
+    chatPhotoUrl: String,
     subtitle: String
 ) {
     Row(
@@ -218,11 +223,20 @@ private fun ChatHeaderTitle(
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = chatName.profileInitials(),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Bold
-            )
+            if (chatPhotoUrl.isNotBlank()) {
+                AsyncImage(
+                    modifier = Modifier.fillMaxSize(),
+                    model = chatPhotoUrl,
+                    contentDescription = "$chatName profile photo",
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(
+                    text = chatName.profileInitials(),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
         Column {
             Text(
@@ -549,6 +563,7 @@ private fun ChatDetailScreenPreview() {
         ChatDetailScreen(
             chatName = "ContactMe User",
             conversationId = null,
+            chatPhotoUrl = "",
             onBack = {}
         )
     }
