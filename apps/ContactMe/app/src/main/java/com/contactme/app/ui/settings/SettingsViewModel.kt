@@ -60,6 +60,7 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         displayName = profile.displayName.ifBlank { "ContactMe User" },
                         username = profile.username.ifBlank { "contactme" },
+                        photoUrl = profile.photoUrl,
                         privacySettings = privacySettings,
                         isLoadingProfile = false,
                         errorMessage = null
