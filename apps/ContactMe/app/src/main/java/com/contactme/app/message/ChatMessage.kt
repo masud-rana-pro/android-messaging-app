@@ -6,6 +6,9 @@ data class ChatMessage(
     val type: MessageType = MessageType.Text,
     val text: String,
     val mediaUrl: String = "",
+    val mediaProvider: String = "",
+    val mediaPublicId: String = "",
+    val mimeType: String = "",
     val sentAtMillis: Long,
     val status: MessageStatus = MessageStatus.Sent
 )
