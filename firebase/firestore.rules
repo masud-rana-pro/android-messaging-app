@@ -82,6 +82,25 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    match /blocked_users/{userId}/items/{blockedUserId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && userId != blockedUserId
+        && request.resource.data.userId == blockedUserId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /reports/{reportId} {
+      allow read: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.reporterUserId == request.auth.uid
+        && request.resource.data.reportedUserId is string
+        && request.resource.data.reportedUserId != request.auth.uid
+        && request.resource.data.reason is string
+        && request.resource.data.status == "open";
+      allow update, delete: if false;
+    }
+
     match /conversations/{conversationId} {
       allow read: if isSignedIn()
         && request.auth.uid in resource.data.participantIds;

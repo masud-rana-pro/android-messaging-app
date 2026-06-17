@@ -3,6 +3,7 @@ package com.contactme.app.message
 import android.net.Uri
 import com.contactme.app.media.CloudinaryUploadClient
 import com.contactme.app.media.MediaUploadException
+import com.contactme.app.safety.SafetyRepository
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -14,7 +15,8 @@ import kotlinx.coroutines.tasks.await
 
 class FirebaseMessageRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val cloudinaryUploadClient: CloudinaryUploadClient
+    private val cloudinaryUploadClient: CloudinaryUploadClient,
+    private val safetyRepository: SafetyRepository
 ) : MessageRepository {
     override fun observeMessages(conversationId: String): Flow<List<ChatMessage>> = callbackFlow {
         val registration = firestore.collection(CONVERSATIONS_COLLECTION)
@@ -62,6 +64,10 @@ class FirebaseMessageRepository @Inject constructor(
         val conversationDocument = firestore.collection(CONVERSATIONS_COLLECTION)
             .document(conversationId)
 
+        if (isBlockedConversation(conversationId, senderId)) {
+            return MessageResult.Error("This chat is not available.")
+        }
+
         val messageData = mapOf(
             "senderId" to senderId,
             "text" to trimmedText,
@@ -104,6 +110,10 @@ class FirebaseMessageRepository @Inject constructor(
         val messageDocument = conversationDocument
             .collection(MESSAGES_COLLECTION)
             .document()
+
+        if (isBlockedConversation(conversationId, senderId)) {
+            return MessageResult.Error("This chat is not available.")
+        }
 
         return runCatching {
             val uploadResult = cloudinaryUploadClient.upload(
@@ -150,5 +160,23 @@ class FirebaseMessageRepository @Inject constructor(
         const val IMAGE_FILE_NAME = "image.jpg"
         const val IMAGE_LAST_MESSAGE = "Photo"
         const val CLOUDINARY_PROVIDER = "cloudinary"
+    }
+
+    private suspend fun isBlockedConversation(
+        conversationId: String,
+        senderId: String
+    ): Boolean {
+        val participantIds = firestore.collection(CONVERSATIONS_COLLECTION)
+            .document(conversationId)
+            .get()
+            .await()
+            .get("participantIds") as? List<*>
+        val peerUserId = participantIds
+            .orEmpty()
+            .filterIsInstance<String>()
+            .firstOrNull { userId -> userId != senderId }
+            ?: return false
+
+        return safetyRepository.hasBlockBetween(senderId, peerUserId)
     }
 }
