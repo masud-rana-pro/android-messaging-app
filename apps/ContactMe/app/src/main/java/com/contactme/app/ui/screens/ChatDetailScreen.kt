@@ -1,6 +1,7 @@
 package com.contactme.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,17 +9,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -29,6 +31,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -79,11 +82,7 @@ private fun ChatDetailContent(
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit
 ) {
-    val messages = if (conversationId == null) {
-        demoMessages(currentUserId = uiState.currentUserId)
-    } else {
-        uiState.messages
-    }
+    val messages = uiState.messages
     val listState = rememberLazyListState()
 
     LaunchedEffect(messages.size) {
@@ -96,26 +95,21 @@ private fun ChatDetailContent(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(text = chatName, fontWeight = FontWeight.Bold)
-                        Text(
-                            text = chatSubtitle(
-                                conversationId = conversationId,
-                                isOtherUserTyping = uiState.isOtherUserTyping,
-                                peerPresence = uiState.peerPresence
-                            ),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.62f)
+                    ChatHeaderTitle(
+                        chatName = chatName,
+                        subtitle = chatSubtitle(
+                            conversationId = conversationId,
+                            isOtherUserTyping = uiState.isOtherUserTyping,
+                            peerPresence = uiState.peerPresence
                         )
-                    }
+                    )
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(text = "Back")
-                    }
+                    HeaderBackButton(onClick = onBack)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    titleContentColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         }
@@ -126,7 +120,7 @@ private fun ChatDetailContent(
                 .padding(innerPadding)
                 .padding(
                     horizontal = ContactMeSpacing.screenHorizontal,
-                    vertical = ContactMeSpacing.contentGap
+                    vertical = 8.dp
                 ),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -144,10 +138,17 @@ private fun ChatDetailContent(
                     }
                 } else if (messages.isEmpty()) {
                     item {
-                        ChatListStateMessage(
-                            title = "No messages yet",
-                            subtitle = "Send the first message to start the conversation."
-                        )
+                        if (conversationId == null) {
+                            ChatListStateMessage(
+                                title = "Open a real chat",
+                                subtitle = "Select a saved contact or search a user to start messaging."
+                            )
+                        } else {
+                            ChatListStateMessage(
+                                title = "No messages yet",
+                                subtitle = "Send the first message to start the conversation."
+                            )
+                        }
                     }
                 }
 
@@ -162,10 +163,7 @@ private fun ChatDetailContent(
                     )
                 }
             }
-            Column(
-                modifier = Modifier.padding(top = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 uiState.errorMessage?.let { message ->
                     SendErrorMessage(
                         message = message,
@@ -173,41 +171,67 @@ private fun ChatDetailContent(
                         onRetry = onSendMessage
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        modifier = Modifier.weight(1f),
-                        value = uiState.messageText,
-                        onValueChange = onMessageTextChanged,
-                        enabled = conversationId != null && !uiState.isSending,
-                        singleLine = true,
-                        placeholder = {
-                            Text(
-                                text = if (conversationId == null) {
-                                    "Open a contact to message"
-                                } else {
-                                    "Message"
-                                }
-                            )
-                        }
-                    )
-                    Button(
-                        enabled = conversationId != null && !uiState.isSending,
-                        onClick = onSendMessage,
-                        shape = RoundedCornerShape(22.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Text(text = "Send")
-                    }
-                }
+                MessageInputBar(
+                    text = uiState.messageText,
+                    enabled = conversationId != null && !uiState.isSending,
+                    isSending = uiState.isSending,
+                    onMessageTextChanged = onMessageTextChanged,
+                    onSendMessage = onSendMessage
+                )
             }
         }
     }
+}
+
+@Composable
+private fun ChatHeaderTitle(
+    chatName: String,
+    subtitle: String
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = chatName.profileInitials(),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Column {
+            Text(
+                text = chatName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.62f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeaderBackButton(onClick: () -> Unit) {
+    Text(
+        modifier = Modifier
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        text = "<",
+        style = MaterialTheme.typography.titleLarge,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold
+    )
 }
 
 private fun chatSubtitle(
@@ -235,13 +259,15 @@ private fun ChatListStateMessage(
     title: String,
     subtitle: String
 ) {
-    Box(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 36.dp),
-        contentAlignment = Alignment.Center
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(
+            modifier = Modifier.padding(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -309,20 +335,25 @@ private fun MessageBubble(
                 .fillMaxWidth(0.78f)
                 .background(
                     color = if (isMine) {
-                        MaterialTheme.colorScheme.primaryContainer
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
                     } else {
-                        MaterialTheme.colorScheme.surfaceVariant
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
                     },
-                    shape = RoundedCornerShape(18.dp)
+                    shape = RoundedCornerShape(
+                        topStart = 18.dp,
+                        topEnd = 18.dp,
+                        bottomStart = if (isMine) 18.dp else 4.dp,
+                        bottomEnd = if (isMine) 4.dp else 18.dp
+                    )
                 )
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 9.dp),
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
         ) {
             Text(
                 modifier = Modifier.fillMaxWidth(),
                 text = message.text,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onBackground,
             )
             MessageMetaRow(
                 sentAtMillis = message.sentAtMillis,
@@ -342,7 +373,8 @@ private fun MessageMetaRow(
     isSeen: Boolean
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(top = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -354,7 +386,64 @@ private fun MessageMetaRow(
             Text(
                 text = status.toDisplayMark(isSeen = isSeen),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
+                color = if (isSeen) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MessageInputBar(
+    text: String,
+    enabled: Boolean,
+    isSending: Boolean,
+    onMessageTextChanged: (String) -> Unit,
+    onSendMessage: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(28.dp),
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                modifier = Modifier.weight(1f),
+                value = text,
+                onValueChange = onMessageTextChanged,
+                enabled = enabled,
+                singleLine = true,
+                placeholder = {
+                    Text(text = if (enabled) "Message" else "Open a contact to message")
+                }
+            )
+            Text(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(
+                        if (enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.16f)
+                        }
+                    )
+                    .clickable(enabled = enabled && !isSending, onClick = onSendMessage)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                text = if (isSending) "..." else ">",
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f)
+                },
+                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -380,27 +469,15 @@ private fun Long.formatChatTime(): String {
     return SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this))
 }
 
-private fun demoMessages(currentUserId: String): List<ChatMessage> {
-    return listOf(
-        ChatMessage(
-            id = "demo-1",
-            senderId = "other",
-            text = "Hey, is the ContactMe UI demo ready?",
-            sentAtMillis = 0L
-        ),
-        ChatMessage(
-            id = "demo-2",
-            senderId = currentUserId,
-            text = "The first screen map is almost done.",
-            sentAtMillis = 0L
-        ),
-        ChatMessage(
-            id = "demo-3",
-            senderId = currentUserId,
-            text = "Next we can connect real auth.",
-            sentAtMillis = 0L
-        )
-    )
+private fun String.profileInitials(): String {
+    val initials = trim()
+        .split(" ")
+        .filter(String::isNotBlank)
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+        .joinToString("")
+
+    return initials.ifBlank { "CM" }
 }
 
 @Preview(showBackground = true)
