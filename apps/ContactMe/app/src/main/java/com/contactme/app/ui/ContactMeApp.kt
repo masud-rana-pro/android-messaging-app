@@ -17,6 +17,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.contactme.app.navigation.AppScreen
 import com.contactme.app.navigation.ChatTarget
+import com.contactme.app.ui.notification.DeviceTokenSyncViewModel
 import com.contactme.app.ui.presence.PresenceViewModel
 import com.contactme.app.ui.screens.AuthScreen
 import com.contactme.app.ui.screens.ChatDetailScreen
@@ -31,7 +32,8 @@ import com.contactme.app.ui.session.SessionViewModel
 fun ContactMeApp(
     sessionViewModel: SessionViewModel = hiltViewModel(),
     conversationViewModel: ConversationViewModel = hiltViewModel(),
-    presenceViewModel: PresenceViewModel = hiltViewModel()
+    presenceViewModel: PresenceViewModel = hiltViewModel(),
+    deviceTokenSyncViewModel: DeviceTokenSyncViewModel = hiltViewModel()
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
@@ -62,6 +64,7 @@ fun ContactMeApp(
 
     LaunchedEffect(currentScreen) {
         presenceViewModel.markOnline()
+        deviceTokenSyncViewModel.syncCurrentDevice()
     }
 
     Surface(
