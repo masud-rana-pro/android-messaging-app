@@ -1,6 +1,7 @@
 package com.contactme.app.notification
 
 import com.google.firebase.messaging.FirebaseMessagingService
+import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +14,9 @@ class ContactMeMessagingService : FirebaseMessagingService() {
     @Inject
     lateinit var deviceTokenRepository: DeviceTokenRepository
 
+    @Inject
+    lateinit var notificationRenderer: ContactMeNotificationRenderer
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onNewToken(token: String) {
@@ -20,5 +24,10 @@ class ContactMeMessagingService : FirebaseMessagingService() {
         serviceScope.launch {
             deviceTokenRepository.syncRefreshedToken(token)
         }
+    }
+
+    override fun onMessageReceived(message: RemoteMessage) {
+        super.onMessageReceived(message)
+        notificationRenderer.show(message)
     }
 }
