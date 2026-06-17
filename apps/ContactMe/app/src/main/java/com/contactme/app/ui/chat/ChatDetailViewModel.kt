@@ -150,6 +150,7 @@ class ChatDetailViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isSending = true,
+                    pendingImageUri = "",
                     failedImageUri = "",
                     errorMessage = null
                 )
@@ -168,6 +169,7 @@ class ChatDetailViewModel @Inject constructor(
                         it.copy(
                             messageText = "",
                             isSending = false,
+                            pendingImageUri = "",
                             failedImageUri = "",
                             errorMessage = null
                         )
@@ -207,6 +209,7 @@ class ChatDetailViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isSending = true,
+                    pendingImageUri = imageUri.toString(),
                     failedImageUri = "",
                     errorMessage = null
                 )
@@ -224,6 +227,7 @@ class ChatDetailViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isSending = false,
+                            pendingImageUri = "",
                             failedImageUri = "",
                             errorMessage = null
                         )
@@ -234,6 +238,7 @@ class ChatDetailViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isSending = false,
+                            pendingImageUri = "",
                             failedImageUri = imageUri.toString(),
                             errorMessage = result.message
                         )
