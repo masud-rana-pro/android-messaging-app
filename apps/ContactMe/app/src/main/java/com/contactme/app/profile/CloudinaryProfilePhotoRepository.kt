@@ -1,12 +1,11 @@
 package com.contactme.app.profile
 
 import android.net.Uri
-import com.google.firebase.storage.FirebaseStorage
+import com.contactme.app.media.CloudinaryUploadClient
 import javax.inject.Inject
-import kotlinx.coroutines.tasks.await
 
-class FirebaseProfilePhotoRepository @Inject constructor(
-    private val firebaseStorage: FirebaseStorage
+class CloudinaryProfilePhotoRepository @Inject constructor(
+    private val cloudinaryUploadClient: CloudinaryUploadClient
 ) : ProfilePhotoRepository {
     override suspend fun uploadProfilePhoto(
         userId: String,
@@ -17,18 +16,19 @@ class FirebaseProfilePhotoRepository @Inject constructor(
         }
 
         return runCatching {
-            val photoReference = firebaseStorage.reference
-                .child("profile_photos")
-                .child(userId)
-                .child("profile.jpg")
-
-            photoReference.putFile(photoUri).await()
-            photoReference.downloadUrl.await().toString()
+            cloudinaryUploadClient.upload(
+                uri = photoUri,
+                fileName = PROFILE_PHOTO_FILE_NAME
+            ).secureUrl
         }.fold(
             onSuccess = { photoUrl -> ProfilePhotoResult.Success(photoUrl) },
             onFailure = {
                 ProfilePhotoResult.Error("We could not upload your profile photo. Please try again.")
             }
         )
+    }
+
+    private companion object {
+        const val PROFILE_PHOTO_FILE_NAME = "profile.jpg"
     }
 }

@@ -1,7 +1,7 @@
 package com.contactme.app.di
 
+import com.contactme.app.profile.CloudinaryProfilePhotoRepository
 import com.contactme.app.profile.FirebaseProfileRepository
-import com.contactme.app.profile.FirebaseProfilePhotoRepository
 import com.contactme.app.profile.ProfilePhotoRepository
 import com.contactme.app.profile.ProfileRepository
 import dagger.Binds
@@ -22,6 +22,6 @@ abstract class ProfileModule {
     @Binds
     @Singleton
     abstract fun bindProfilePhotoRepository(
-        firebaseProfilePhotoRepository: FirebaseProfilePhotoRepository
+        cloudinaryProfilePhotoRepository: CloudinaryProfilePhotoRepository
     ): ProfilePhotoRepository
 }

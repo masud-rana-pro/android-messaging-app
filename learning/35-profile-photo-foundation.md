@@ -1,131 +1,92 @@
 # Step 35: Profile Photo Foundation
 
-এই step-এ আমরা ContactMe app-এ profile photo upload foundation করেছি। এখন user profile setup/edit screen থেকে image pick করতে পারবে, preview দেখতে পারবে, এবং save করলে Firebase Storage-এ upload হবে।
+এই step-এ ContactMe app-এ profile photo upload foundation তৈরি হয়েছিল। শুরুতে plan ছিল Firebase Storage ব্যবহার করা, কিন্তু current বাস্তব implementation এখন Cloudinary ব্যবহার করে।
 
-## 1. Profile photo কেন আলাদা feature?
+## 1. Profile photo feature-এর কাজ কী?
 
-Profile data যেমন display name, username, phone number Firestore-এ থাকে। কিন্তু image file Firestore-এ রাখা উচিত না।
+User profile setup/edit screen থেকে image pick করতে পারে, preview দেখতে পারে, এবং save করলে সেই image upload হয়। তারপর image URL Firestore user profile document-এ save হয়।
 
-কারণ:
-
-- Firestore document text/metadata-এর জন্য
-- image file বড় binary data
-- Firebase Storage binary file রাখার জন্য তৈরি
-
-তাই architecture:
+Architecture:
 
 ```text
-Firebase Storage -> actual image file
-Firestore users/{uid}.photoUrl -> image download URL
+Cloudinary -> actual image file
+Firestore users/{uid}.photoUrl -> image secure URL
 ```
 
-## 2. Dependency যোগ করা
+Firestore-এ image file রাখা হয় না, কারণ Firestore metadata/document database। বড় binary file আলাদা media provider-এ রাখা professional design।
+
+## 2. Main dependencies
 
 File:
 
-`apps/ContactMe/app/build.gradle.kts`
+```text
+apps/ContactMe/app/build.gradle.kts
+```
 
-নতুন dependencies:
+বর্তমান দরকারি dependencies:
 
 ```kotlin
 implementation("io.coil-kt:coil-compose:2.7.0")
-implementation("com.google.firebase:firebase-storage")
+implementation("com.squareup.okhttp3:okhttp:4.12.0")
 ```
 
-`firebase-storage` image upload করতে লাগে।
+- `coil-compose`: image preview/display করতে লাগে।
+- `okhttp`: Cloudinary API-তে upload request পাঠাতে লাগে।
 
-`coil-compose` image preview/display করতে লাগে।
-
-## 3. FirebaseStorage provider
+## 3. `photoUrl` field
 
 File:
 
-`apps/ContactMe/app/src/main/java/com/contactme/app/di/FirebaseModule.kt`
-
-```kotlin
-fun provideFirebaseStorage(): FirebaseStorage = FirebaseStorage.getInstance()
+```text
+apps/ContactMe/app/src/main/java/com/contactme/app/profile/UserProfile.kt
 ```
 
-এতে repository Hilt থেকে Storage dependency পাবে।
-
-## 4. `photoUrl` field
-
-File:
-
-`apps/ContactMe/app/src/main/java/com/contactme/app/profile/UserProfile.kt`
-
-নতুন field:
+Profile model-এ image URL রাখার জন্য field আছে:
 
 ```kotlin
 val photoUrl: String = ""
 ```
 
-Default empty রাখা হয়েছে যাতে পুরনো profile document ভাঙে না।
+Default empty রাখা হয়েছে যাতে পুরনো profile document ভেঙে না যায়।
 
-## 5. Profile save এখন `photoUrl` নেয়
+## 4. Profile photo repository
 
-File:
-
-`apps/ContactMe/app/src/main/java/com/contactme/app/profile/ProfileRepository.kt`
-
-```kotlin
-suspend fun saveProfile(
-    userId: String,
-    displayName: String,
-    username: String,
-    photoUrl: String
-): ProfileResult
-```
-
-কারণ profile save করার সময় Firestore document-এ photoUrl রাখতে হবে।
-
-## 6. Profile photo repository
-
-Files:
+Photo upload আলাদা repository-তে রাখা হয়েছে:
 
 ```text
-profile/ProfilePhotoRepository.kt
-profile/FirebaseProfilePhotoRepository.kt
-profile/FakeProfilePhotoRepository.kt
-profile/ProfilePhotoResult.kt
+ProfilePhotoRepository
+CloudinaryProfilePhotoRepository
+ProfilePhotoResult
 ```
 
-Photo upload আলাদা repository-তে রাখা হয়েছে, কারণ এটা profile metadata save নয়; এটা file upload।
-
-## 7. Upload path
-
-Firebase Storage path:
-
-```text
-profile_photos/{uid}/profile.jpg
-```
-
-প্রতিটা user-এর একটাই current profile photo থাকবে। নতুন photo দিলে same path overwrite হবে।
-
-## 8. Upload flow
-
-`FirebaseProfilePhotoRepository`:
-
-```kotlin
-photoReference.putFile(photoUri).await()
-photoReference.downloadUrl.await().toString()
-```
+কারণ profile metadata save আর image upload একই কাজ না।
 
 Flow:
 
-1. picked image URI নেয়
-2. Storage-এ upload করে
-3. download URL নেয়
-4. ViewModel-কে URL দেয়
-5. ViewModel profile save করার সময় URL পাঠায়
+```text
+ProfileSetupViewModel
+-> ProfilePhotoRepository
+-> CloudinaryProfilePhotoRepository
+-> CloudinaryUploadClient
+-> Cloudinary secure URL
+-> Firestore users/{uid}.photoUrl
+```
 
-## 9. Profile UI picker
+## 5. Cloudinary profile upload
 
-File:
+`CloudinaryProfilePhotoRepository` selected image URI নেয় এবং Cloudinary-তে upload করে।
 
-`apps/ContactMe/app/src/main/java/com/contactme/app/ui/screens/ProfileSetupScreen.kt`
+Upload success হলে:
 
-Android Photo Picker launcher:
+```text
+secureUrl
+```
+
+ফিরে আসে। এই URL profile save-এর সময় Firestore-এ যায়।
+
+## 6. Profile UI picker
+
+Profile screen Android Photo Picker ব্যবহার করে:
 
 ```kotlin
 rememberLauncherForActivityResult(
@@ -134,90 +95,24 @@ rememberLauncherForActivityResult(
 )
 ```
 
-Circle avatar click করলে picker open হয়।
+Circle avatar tap করলে picker open হয়।
 
-## 10. Preview image
+## 7. Preview image
 
-Selected photo থাকলে:
-
-```kotlin
-AsyncImage(
-    model = photoModel,
-    contentScale = ContentScale.Crop
-)
-```
-
-`photoModel` হলো:
-
-```kotlin
-uiState.selectedPhotoUri.ifBlank { uiState.photoUrl }
-```
-
-মানে:
-
-- নতুন selected photo থাকলে সেটা দেখাবে
-- না থাকলে saved photoUrl দেখাবে
-- দুটোই না থাকলে `Photo` placeholder দেখাবে
-
-## 11. ViewModel save flow
-
-File:
-
-`apps/ContactMe/app/src/main/java/com/contactme/app/ui/profile/ProfileSetupViewModel.kt`
-
-Save flow:
-
-1. validate display name/username
-2. selected photo থাকলে upload
-3. upload success হলে photoUrl পাওয়া যায়
-4. profile save হয় photoUrl সহ
-
-যদি upload fail করে, profile save বন্ধ হয় এবং error দেখায়।
-
-## 12. Storage rules
-
-File:
-
-`firebase/storage.rules`
-
-Rule:
+Selected photo থাকলে screen-এ আগে local selected image preview দেখায়। Saved photo থাকলে `photoUrl` থেকে image load হয়।
 
 ```text
-profile_photos/{userId}/profile.jpg
+selectedPhotoUri থাকলে -> selected preview
+না থাকলে photoUrl থাকলে -> saved photo
+না থাকলে -> placeholder
 ```
 
-Only owner can write:
-
-```text
-request.auth.uid == userId
-```
-
-Only image under 5MB:
-
-```text
-request.resource.size < 5 * 1024 * 1024
-request.resource.contentType.matches('image/.*')
-```
-
-Signed-in users can read profile photos।
-
-## 13. Deploy script update
-
-File:
-
-`scripts/firebase_deploy.sh`
-
-এখন Storage rules-ও deploy করে:
-
-```bash
-firebase deploy --only firestore:rules,firestore:indexes,database,storage
-```
-
-## 14. কীভাবে verify করবে?
+## 8. কীভাবে verify করবে?
 
 Build:
 
 ```powershell
+cd apps/ContactMe
 $env:JAVA_HOME='C:\Program Files\Java\jdk-21.0.11'
 $env:PATH="$env:JAVA_HOME\bin;$env:PATH"
 .\gradlew.bat assembleDebug
@@ -226,24 +121,18 @@ $env:PATH="$env:JAVA_HOME\bin;$env:PATH"
 Manual test:
 
 1. Profile setup/edit screen open করো।
-2. circle photo area tap করো।
-3. image select করো।
-4. preview দেখা যায় কি না দেখো।
+2. Circle photo area tap করো।
+3. Image select করো।
+4. Preview দেখা যায় কি না দেখো।
 5. Save চাপো।
-6. Firebase Storage-এ `profile_photos/{uid}/profile.jpg` আছে কি না দেখো।
-7. Firestore `users/{uid}.photoUrl` fill হয়েছে কি না দেখো।
+6. Cloudinary Media Library-তে image আছে কি না দেখো।
+7. Firestore `users/{uid}.photoUrl` secure URL দিয়ে fill হয়েছে কি না দেখো।
 
-Rules deploy:
-
-```bash
-scripts/firebase_deploy.sh
-```
-
-## 15. Main learning
+## 9. Main learning
 
 Profile photo feature-এ দুই ধরনের data থাকে:
 
-- file data: Firebase Storage
+- file data: Cloudinary
 - metadata/url: Firestore
 
-এই separation professional app architecture-এর জন্য দরকার।
+এটা clean architecture, কারণ app database আর media file storage আলাদা responsibility পালন করে।

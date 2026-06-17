@@ -64,12 +64,15 @@ conversations/{conversationId}/messages/{messageId}
   senderId
   type: "text" | "image"
   text
+  mediaProvider
   mediaUrl
+  mediaPublicId
+  mimeType
   status: "sent"
   createdAt
 ```
 
-Text and image messages are implemented now. Image files are stored in Firebase Storage and referenced from message metadata.
+Text and image messages are implemented now. Image files are uploaded to Cloudinary through the current unsigned MVP preset, and Firestore stores message metadata such as `mediaProvider`, `mediaUrl`, `mediaPublicId`, and `mimeType`.
 
 ## Planned Firestore Collections
 
@@ -96,19 +99,27 @@ typing_fast/{conversationId}/{uid}
 call_ringing/{receiverUid}/{callId}
 ```
 
-## Planned Storage Paths
+## Current Media Provider
 
 ```text
-profile_photos/{uid}/profile.jpg
-chat_media/{conversationId}/{messageId}/file
-status_media/{uid}/{statusId}/file
-channel_media/{channelId}/{postId}/file
+provider: cloudinary
+cloud_name: dew95musb
+upload_preset: contactme_unsigned
+profile photo URL: users/{uid}.photoUrl
+chat image URL: conversations/{conversationId}/messages/{messageId}.mediaUrl
 ```
+
+Firebase Storage paths are paused for now because Storage requires billing in the current Firebase project. If the project later moves media back to Firebase Storage, planned paths can be:
+
+- `profile_photos/{uid}/profile.jpg`
+- `chat_media/{conversationId}/{messageId}/file`
+- `status_media/{uid}/{statusId}/file`
+- `channel_media/{channelId}/{postId}/file`
 
 ## Schema Rules
 
 - Conversations should own messages as subcollections.
-- Media metadata belongs in message documents; binary files belong in Storage.
+- Media metadata belongs in message documents; binary files currently belong in Cloudinary.
 - Direct conversation documents must contain exactly two participants.
 - Group membership and permissions must be modeled before group messages.
 - Block/report data must exist before enforcing blocked-user restrictions.

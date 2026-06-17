@@ -7,7 +7,7 @@ This document is the implementation checkpoint after the message status foundati
 - App name: ContactMe.
 - Platform: Android first.
 - Android project path: `apps/ContactMe`.
-- Backend strategy: Firebase-first.
+- Backend strategy: Firebase-first for auth/data, Cloudinary for current media upload.
 - Current branch: `feature/auth-build`.
 - Current release direction: personal beta APK before Play Store hardening.
 - UI direction: WhatsApp-like custom ContactMe theme, not a trademark clone.
@@ -29,6 +29,8 @@ This document is the implementation checkpoint after the message status foundati
 | Conversation list | Done foundation | Firestore conversation previews exist. |
 | Unread/read | Done foundation | Conversation-level read marker exists. |
 | Message status | Done foundation | `sent` status exists; delivered/read not yet real. |
+| Profile photo | Done MVP | Photo Picker uploads image to Cloudinary and stores `photoUrl` in Firestore. |
+| Media messages | Done MVP | Chat images upload to Cloudinary and store metadata in Firestore. |
 | Firestore rules | Done MVP | Rules cover current user/profile/direct chat flows. |
 
 ## Partial Or Not Started
@@ -37,12 +39,11 @@ This document is the implementation checkpoint after the message status foundati
 | --- | --- | --- |
 | Chat UI polish | Partial | Better navigation, empty/loading/error states, retry. |
 | Phone search | Not started | Normalize and query phone identity. |
-| Profile photo | Not started | Storage upload and image UI. |
 | Privacy settings | Not started | Last seen/profile photo/read receipt visibility. |
 | Block/report | Not started | Data model, rules, UI. |
 | Typing/presence | Not started | Realtime Database or Firestore typing path. |
 | Notifications | Not started | FCM, token sync, channels, Cloud Functions. |
-| Media messages | Not started | Storage, picker, upload progress, retry. |
+| Media polish | Partial | Upload progress, retry, compression, signed upload hardening. |
 | Groups | Not started | Group model, members, roles, group messages. |
 | Calls | Not started | ZegoCloud, call state, notification, foreground service. |
 | Status/channels | Not started | Media/status/channel models and UI. |
@@ -54,7 +55,7 @@ This document is the implementation checkpoint after the message status foundati
 2. Phone search and profile polish.
 3. Privacy, block, and report foundation.
 4. FCM notification foundation.
-5. Media message foundation.
+5. Media polish with upload progress, retry, and compression.
 6. Group chat foundation.
 7. One-to-one calling foundation.
 8. Status/stories.

@@ -1,31 +1,25 @@
 # Step 47 - Image Message Foundation
 
-এই ধাপে আমরা ContactMe app-এ real image message foundation যোগ করেছি।
+এই ধাপে ContactMe app-এ real image message foundation যোগ করা হয়েছে।
 
-আগে app শুধু text message পাঠাতে পারত। এখন user chat screen থেকে image pick করে পাঠাতে পারবে। Image file যাবে Firebase Storage-এ, আর message metadata যাবে Firestore-এ।
+আগে app শুধু text message পাঠাতে পারত। এখন user chat screen থেকে image pick করে পাঠাতে পারে। Current implementation-এ image file Cloudinary-তে upload হয়, আর message metadata Firestore-এ save হয়।
 
 ## Fake কিছু রাখা হয়েছে?
 
 না।
 
-এই step-এ পুরনো `FakeMessageRepository` delete করা হয়েছে।
+পুরনো fake message repository remove করা হয়েছে, যাতে chat feature real Firestore repository দিয়েই চলে।
 
-```text
-apps/ContactMe/app/src/main/java/com/contactme/app/message/FakeMessageRepository.kt
-```
+## MessageType কেন দরকার?
 
-Message feature এখন Firebase repository দিয়েই চলবে।
-
-## MessageType কেন যোগ করা হলো?
-
-আগে message ধরে নেওয়া হচ্ছিল শুধু text। কিন্তু এখন message দুই রকম:
+আগে message মানেই text ধরে নেওয়া হচ্ছিল। এখন message দুই ধরনের:
 
 ```text
 text
 image
 ```
 
-তাই enum যোগ করা হয়েছে:
+তাই enum দরকার:
 
 ```kotlin
 enum class MessageType(val firestoreValue: String) {
@@ -34,58 +28,44 @@ enum class MessageType(val firestoreValue: String) {
 }
 ```
 
-এতে UI বুঝতে পারে কোন message text আর কোন message image।
+UI এই `type` দেখে বুঝতে পারে text bubble দেখাবে নাকি image bubble দেখাবে।
 
 ## ChatMessage কীভাবে বদলেছে?
 
-আগে:
-
-```kotlin
-val text: String
-```
-
-এখন যোগ হয়েছে:
+Image message support করার জন্য model-এ media fields যোগ হয়েছে:
 
 ```kotlin
 val type: MessageType
 val mediaUrl: String
+val mediaProvider: String
+val mediaPublicId: String
+val mimeType: String
 ```
 
 Image message হলে:
 
 ```text
 type = image
-mediaUrl = Firebase Storage download URL
+mediaProvider = cloudinary
+mediaUrl = Cloudinary secure URL
 text = empty
 ```
 
 ## Image send flow
 
-Flow:
-
 ```text
 User image picks
     |
-Firebase Storage upload
+Cloudinary unsigned upload
     |
-Download URL নেওয়া
+secure_url, public_id, mime_type পাওয়া
     |
 Firestore message create
     |
 Conversation lastMessageText = Photo
 ```
 
-## Storage path
-
-Image রাখা হচ্ছে:
-
-```text
-chat_media/{conversationId}/{messageId}/image.jpg
-```
-
-এখানে `messageId` আগে generate করা হয়, তারপর ওই id দিয়ে Storage path তৈরি হয়।
-
-## FirebaseMessageRepository change
+## FirebaseMessageRepository কী করে?
 
 নতুন method:
 
@@ -99,15 +79,29 @@ suspend fun sendImageMessage(
 
 এটা:
 
-1. message document id বানায়
-2. Storage reference বানায়
-3. `putFile(imageUri)` দিয়ে upload করে
-4. `downloadUrl` নেয়
-5. Firestore-এ image message save করে
+1. Cloudinary-তে selected image upload করে।
+2. `secureUrl`, `publicId`, `mimeType` নেয়।
+3. Firestore message document তৈরি করে।
+4. Conversation preview update করে।
+
+## Firestore image message shape
+
+```text
+conversations/{conversationId}/messages/{messageId}
+  senderId
+  type: "image"
+  text: ""
+  mediaProvider: "cloudinary"
+  mediaUrl: secure_url
+  mediaPublicId: public_id
+  mimeType: image/jpeg
+  status: "sent"
+  createdAt
+```
 
 ## Chat UI change
 
-Chat input bar-এ `+` action যোগ হয়েছে। এটা Android Photo Picker open করে।
+Chat input bar-এর `+` action Android Photo Picker open করে।
 
 Picker result এলে:
 
@@ -117,7 +111,7 @@ viewModel.sendImageMessage(uri)
 
 ## Image display
 
-Image message দেখানোর জন্য `AsyncImage` use করা হয়েছে:
+Image message দেখানোর জন্য `AsyncImage` use করা হয়:
 
 ```kotlin
 AsyncImage(
@@ -126,46 +120,32 @@ AsyncImage(
 )
 ```
 
+মানে UI Cloudinary URL থেকে image load করে।
+
 ## Firestore rules
 
-Message rules এখন দুই type support করে:
+Firestore rules image message-এর জন্য minimum metadata validate করে:
 
-- text message
-- image message
+- `type = image`
+- `mediaUrl` empty না
+- `senderId` current user
 
-Image message-এর জন্য `mediaUrl` non-empty হতে হবে।
-
-## Storage rules
-
-MVP হিসেবে signed-in user image upload করতে পারবে:
-
-```text
-chat_media/{conversationId}/{messageId}/{fileName}
-```
-
-Limit:
-
-```text
-10 MB
-image/*
-```
-
-পরে এই rules আরও strict করা উচিত, যাতে শুধু conversation participant upload/read করতে পারে।
+Actual image file validation Cloudinary upload preset restriction দিয়ে control করতে হবে।
 
 ## কীভাবে verify করবে?
 
-1. Firebase rules deploy করো।
+1. Cloudinary dashboard-এ `contactme_unsigned` preset enabled আছে কি না দেখো।
 2. App চালাও।
-3. real chat open করো।
-4. input bar-এর `+` tap করো।
-5. image select করো।
-6. image chat bubble-এ দেখা উচিত।
-7. Firebase Storage-এ `chat_media` path তৈরি হয়েছে কিনা দেখো।
-8. Firestore message document-এ `type = image` এবং `mediaUrl` আছে কিনা দেখো।
+3. Real chat open করো।
+4. Input bar-এর `+` tap করো।
+5. Image select করো।
+6. Image chat bubble-এ দেখা উচিত।
+7. Cloudinary Media Library-তে image আছে কি না দেখো।
+8. Firestore message document-এ `type`, `mediaProvider`, `mediaUrl`, `mediaPublicId`, `mimeType` আছে কি না দেখো।
 
 ## শেখার বিষয়
 
-- Media message দুই জায়গায় data রাখে: file Storage-এ, metadata Firestore-এ।
-- Firestore document id আগে বানালে Storage path stable হয়।
-- UI শুধু `type` দেখে ঠিক renderer choose করে।
-- Production-ready media feature করতে progress, retry, compression, stricter security rules দরকার।
+- Media message দুই জায়গায় data রাখে: file Cloudinary-তে, metadata Firestore-এ।
+- Firestore বড় binary file রাখার জায়গা না।
+- UI শুধু message `type` দেখে renderer choose করে।
+- Production-ready media feature করতে progress, retry, compression, signed upload দরকার।

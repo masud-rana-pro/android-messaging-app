@@ -23,7 +23,7 @@ firebase/firestore.rules
 - Text messages must be non-empty and no longer than 4000 characters.
 - Image messages must include a non-empty `mediaUrl`.
 - Message update/delete is denied for now.
-- Storage allows signed-in users to upload image files under `chat_media/{conversationId}/{messageId}` with a 10 MB limit.
+- Media files are uploaded through Cloudinary for the current MVP; Firestore rules validate only the message metadata.
 
 ## Deploy
 
@@ -44,7 +44,8 @@ scripts/firebase_deploy.sh
 - Add stricter profile field validation.
 - Add blocked-user enforcement before messaging/calling.
 - Add report creation rules.
-- Add Storage rules for profile photos and chat media.
+- Harden Cloudinary unsigned preset restrictions and move to signed uploads through Cloud Functions when production hardening starts.
+- Add Firebase Storage rules only if the project later moves media back to Firebase Storage.
 - Add group membership and role-based rules.
 - Add call document validation.
 - Add rate limiting through Cloud Functions or server-side controls where Firestore rules are not enough.

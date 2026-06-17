@@ -12,6 +12,7 @@ ContactMe is an Android-first app. There is no separate web app in the current b
 - Flow
 - Firebase Auth
 - Firestore
+- Cloudinary unsigned upload for current media/profile photo uploads
 
 The Android app lives in:
 
@@ -19,17 +20,19 @@ The Android app lives in:
 apps/ContactMe
 ```
 
-## Planned Firebase Stack
+## Current Backend Stack
 
 | Area | Service |
 | --- | --- |
 | Auth | Firebase Auth |
 | Realtime chat | Firestore listeners |
 | Presence and call ringing | Firebase Realtime Database |
-| Media | Firebase Storage |
+| Media | Cloudinary unsigned upload for MVP, with Firestore metadata |
 | Push notifications | FCM |
 | Server-side notification fanout | Cloud Functions |
-| Security | Firestore, Storage, and Realtime Database rules |
+| Security | Firestore and Realtime Database rules; Cloudinary preset restrictions |
+
+Firebase Storage is not part of the active free-plan media path because the current Firebase project cannot enable Storage without billing. If billing is added later, media can move behind a signed backend upload flow.
 
 ## Planned Android Components
 

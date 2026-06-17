@@ -32,7 +32,7 @@ The app does not yet use:
 | Chat MVP finish | Firestore listeners + local state | Typing, unread, better message state. |
 | Contacts/Profile | Android Photo Picker, later FileProvider if needed | Profile photo and safe media URI handling. |
 | Notifications | FirebaseMessagingService + notification channels | Message/call push notifications and deep links. |
-| Media | Firebase Storage + WorkManager + FileProvider when sharing/camera requires it | Reliable attachment upload and retry. |
+| Media | Cloudinary upload + WorkManager + FileProvider when sharing/camera requires it | Reliable attachment upload and retry. |
 | Groups | Firestore listeners + notification channels | Group chat and group notifications. |
 | Calling | Foreground Service + notification actions | Active call, ringing, accept/reject. |
 | Status/Channels | WorkManager where useful | Status cleanup, channel sync, retry tasks. |
@@ -225,9 +225,9 @@ Design deep link routes before implementing complex notifications.
 | Feature | Android Component |
 | --- | --- |
 | Splash/Auth/Home UI | Activity + Compose |
-| Profile photo upload | Photo Picker/FileProvider if needed + Firebase Storage |
+| Profile photo upload | Photo Picker/FileProvider if needed + Cloudinary |
 | Text chat | Firestore listener, ViewModel, Flow |
-| Media message | Photo Picker/FileProvider, WorkManager, Firebase Storage |
+| Media message | Photo Picker/FileProvider, WorkManager, Cloudinary |
 | Voice note | Media recorder APIs, optional foreground handling if background recording is supported |
 | Push notification | FirebaseMessagingService, notification channels |
 | Incoming call | FirebaseMessagingService, Foreground Service, notification actions |

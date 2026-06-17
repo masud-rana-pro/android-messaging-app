@@ -1,10 +1,10 @@
 package com.contactme.app.message
 
 import android.net.Uri
+import com.contactme.app.media.CloudinaryUploadClient
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.storage.FirebaseStorage
 import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -13,7 +13,7 @@ import kotlinx.coroutines.tasks.await
 
 class FirebaseMessageRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val storage: FirebaseStorage
+    private val cloudinaryUploadClient: CloudinaryUploadClient
 ) : MessageRepository {
     override fun observeMessages(conversationId: String): Flow<List<ChatMessage>> = callbackFlow {
         val registration = firestore.collection(CONVERSATIONS_COLLECTION)
@@ -33,6 +33,9 @@ class FirebaseMessageRepository @Inject constructor(
                         type = MessageType.fromFirestore(document.getString("type")),
                         text = document.getString("text").orEmpty(),
                         mediaUrl = document.getString("mediaUrl").orEmpty(),
+                        mediaProvider = document.getString("mediaProvider").orEmpty(),
+                        mediaPublicId = document.getString("mediaPublicId").orEmpty(),
+                        mimeType = document.getString("mimeType").orEmpty(),
                         sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
                         status = MessageStatus.fromFirestore(document.getString("status"))
                     )
@@ -100,20 +103,20 @@ class FirebaseMessageRepository @Inject constructor(
         val messageDocument = conversationDocument
             .collection(MESSAGES_COLLECTION)
             .document()
-        val mediaReference = storage.reference
-            .child(CHAT_MEDIA_PATH)
-            .child(conversationId)
-            .child(messageDocument.id)
-            .child(IMAGE_FILE_NAME)
 
         return runCatching {
-            mediaReference.putFile(imageUri).await()
-            val mediaUrl = mediaReference.downloadUrl.await().toString()
+            val uploadResult = cloudinaryUploadClient.upload(
+                uri = imageUri,
+                fileName = IMAGE_FILE_NAME
+            )
             val messageData = mapOf(
                 "senderId" to senderId,
                 "text" to "",
                 "type" to MessageType.Image.firestoreValue,
-                "mediaUrl" to mediaUrl,
+                "mediaProvider" to CLOUDINARY_PROVIDER,
+                "mediaUrl" to uploadResult.secureUrl,
+                "mediaPublicId" to uploadResult.publicId,
+                "mimeType" to uploadResult.mimeType,
                 "status" to MessageStatus.Sent.firestoreValue,
                 "createdAt" to FieldValue.serverTimestamp()
             )
@@ -140,8 +143,8 @@ class FirebaseMessageRepository @Inject constructor(
     private companion object {
         const val CONVERSATIONS_COLLECTION = "conversations"
         const val MESSAGES_COLLECTION = "messages"
-        const val CHAT_MEDIA_PATH = "chat_media"
         const val IMAGE_FILE_NAME = "image.jpg"
         const val IMAGE_LAST_MESSAGE = "Photo"
+        const val CLOUDINARY_PROVIDER = "cloudinary"
     }
 }

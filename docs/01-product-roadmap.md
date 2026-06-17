@@ -15,6 +15,8 @@ The project has moved beyond the original UI demo. The current implemented found
 - Username reservation and discovery.
 - Direct one-to-one conversation creation.
 - Real text message send and render.
+- Real image message upload through Cloudinary with Firestore metadata.
+- Real profile photo upload through Cloudinary.
 - Real conversation list from Firestore.
 - Chat detail timestamp and auto-scroll polish.
 - Conversation list timestamp and unread/read foundation.
@@ -27,7 +29,7 @@ The project has moved beyond the original UI demo. The current implemented found
 2. Chat MVP finish.
 3. Contacts, phone search, profile photo, and privacy.
 4. Notifications with FCM and Cloud Functions.
-5. Media messaging with Firebase Storage and WorkManager.
+5. Media messaging with Cloudinary for MVP, later signed upload/WorkManager hardening.
 6. Groups and group admin.
 7. Calls with ZegoCloud, FCM, and foreground service.
 8. Status/stories.
@@ -46,7 +48,7 @@ The project has moved beyond the original UI demo. The current implemented found
 | v0.4 Chat Plus | Unread/read, status foundation, typing, presence, actions. |
 | v0.5 Contacts/Privacy | Phone search, profile photo, block/report, privacy settings. |
 | v0.6 Notifications | FCM token sync, notification channels, deep links. |
-| v0.7 Media | Image/file messages, Storage, upload progress, retry. |
+| v0.7 Media | Image/file messages, Cloudinary MVP upload, upload progress, retry. |
 | v0.8 Groups | Group chat, members, roles, group settings. |
 | v0.9 Calls | One-to-one voice/video calls with call history. |
 | v1.0 Personal Beta | Stable APK for real-device testing with core messenger flows. |
