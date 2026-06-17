@@ -18,6 +18,17 @@ interface SafetyRepository {
         reason: ReportReason
     ): SafetyResult
 
+    suspend fun blockConversationPeer(
+        currentUserId: String,
+        conversationId: String
+    ): SafetyResult
+
+    suspend fun reportConversationPeer(
+        reporterUserId: String,
+        conversationId: String,
+        reason: ReportReason
+    ): SafetyResult
+
     suspend fun hasBlockBetween(
         currentUserId: String,
         otherUserId: String

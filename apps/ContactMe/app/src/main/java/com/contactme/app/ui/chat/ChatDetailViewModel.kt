@@ -8,6 +8,9 @@ import com.contactme.app.conversation.ConversationRepository
 import com.contactme.app.message.MessageRepository
 import com.contactme.app.message.MessageResult
 import com.contactme.app.presence.PresenceRepository
+import com.contactme.app.safety.ReportReason
+import com.contactme.app.safety.SafetyRepository
+import com.contactme.app.safety.SafetyResult
 import com.contactme.app.typing.TypingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -24,7 +27,8 @@ class ChatDetailViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val messageRepository: MessageRepository,
     private val typingRepository: TypingRepository,
-    private val presenceRepository: PresenceRepository
+    private val presenceRepository: PresenceRepository,
+    private val safetyRepository: SafetyRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         ChatDetailUiState(currentUserId = authRepository.currentUserId().orEmpty())
@@ -62,6 +66,9 @@ class ChatDetailViewModel @Inject constructor(
                 isOtherUserTyping = false,
                 peerPresence = com.contactme.app.presence.PresenceStatus(),
                 readReceiptState = com.contactme.app.conversation.ReadReceiptState(),
+                isSafetyActionInProgress = false,
+                isChatBlocked = false,
+                statusMessage = null,
                 errorMessage = null
             )
         }
@@ -122,6 +129,7 @@ class ChatDetailViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 messageText = nextMessageText,
+                statusMessage = null,
                 errorMessage = null
             )
         }
@@ -137,7 +145,7 @@ class ChatDetailViewModel @Inject constructor(
             return
         }
 
-        if (state.isSending) return
+        if (state.isSending || state.isChatBlocked) return
 
         val senderId = authRepository.currentUserId()
 
@@ -196,7 +204,7 @@ class ChatDetailViewModel @Inject constructor(
             return
         }
 
-        if (_uiState.value.isSending) return
+        if (_uiState.value.isSending || _uiState.value.isChatBlocked) return
 
         val senderId = authRepository.currentUserId()
 
@@ -254,6 +262,106 @@ class ChatDetailViewModel @Inject constructor(
         if (failedImageUri.isBlank()) return
 
         sendImageMessage(Uri.parse(failedImageUri))
+    }
+
+    fun blockCurrentChat() {
+        val conversationId = activeConversationId
+        val userId = authRepository.currentUserId()
+
+        if (conversationId == null || userId == null) {
+            _uiState.update { it.copy(errorMessage = "Open a real conversation first.") }
+            return
+        }
+
+        if (_uiState.value.isSafetyActionInProgress) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSafetyActionInProgress = true,
+                    statusMessage = null,
+                    errorMessage = null
+                )
+            }
+
+            when (
+                val result = safetyRepository.blockConversationPeer(
+                    currentUserId = userId,
+                    conversationId = conversationId
+                )
+            ) {
+                SafetyResult.Success -> {
+                    updateTypingState(isTyping = false)
+                    _uiState.update {
+                        it.copy(
+                            messageText = "",
+                            isSafetyActionInProgress = false,
+                            isChatBlocked = true,
+                            statusMessage = "User blocked.",
+                            errorMessage = null
+                        )
+                    }
+                }
+
+                is SafetyResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSafetyActionInProgress = false,
+                            errorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun reportCurrentChat() {
+        val conversationId = activeConversationId
+        val userId = authRepository.currentUserId()
+
+        if (conversationId == null || userId == null) {
+            _uiState.update { it.copy(errorMessage = "Open a real conversation first.") }
+            return
+        }
+
+        if (_uiState.value.isSafetyActionInProgress) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSafetyActionInProgress = true,
+                    statusMessage = null,
+                    errorMessage = null
+                )
+            }
+
+            when (
+                val result = safetyRepository.reportConversationPeer(
+                    reporterUserId = userId,
+                    conversationId = conversationId,
+                    reason = ReportReason.Other
+                )
+            ) {
+                SafetyResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSafetyActionInProgress = false,
+                            statusMessage = "Report sent.",
+                            errorMessage = null
+                        )
+                    }
+                }
+
+                is SafetyResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSafetyActionInProgress = false,
+                            errorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
     }
 
     override fun onCleared() {

@@ -80,6 +80,8 @@ fun ChatDetailScreen(
         onMessageTextChanged = viewModel::onMessageTextChanged,
         onSendMessage = viewModel::sendMessage,
         onRetryImageMessage = viewModel::retryFailedImageMessage,
+        onReportChat = viewModel::reportCurrentChat,
+        onBlockChat = viewModel::blockCurrentChat,
         onImageSelected = viewModel::sendImageMessage
     )
 }
@@ -95,6 +97,8 @@ private fun ChatDetailContent(
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
     onRetryImageMessage: () -> Unit,
+    onReportChat: () -> Unit,
+    onBlockChat: () -> Unit,
     onImageSelected: (Uri) -> Unit
 ) {
     val messages = uiState.messages
@@ -126,6 +130,22 @@ private fun ChatDetailContent(
                 },
                 navigationIcon = {
                     HeaderBackButton(onClick = onBack)
+                },
+                actions = {
+                    if (conversationId != null) {
+                        TextButton(
+                            enabled = !uiState.isSafetyActionInProgress,
+                            onClick = onReportChat
+                        ) {
+                            Text(text = "Report")
+                        }
+                        TextButton(
+                            enabled = !uiState.isSafetyActionInProgress && !uiState.isChatBlocked,
+                            onClick = onBlockChat
+                        ) {
+                            Text(text = "Block")
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -191,6 +211,9 @@ private fun ChatDetailContent(
                         isUploading = uiState.pendingImageUri.isNotBlank() && uiState.isSending
                     )
                 }
+                uiState.statusMessage?.let { message ->
+                    ChatStatusMessage(message = message)
+                }
                 uiState.errorMessage?.let { message ->
                     val hasFailedImage = uiState.failedImageUri.isNotBlank()
                     SendErrorMessage(
@@ -209,9 +232,10 @@ private fun ChatDetailContent(
                 }
                 MessageInputBar(
                     text = uiState.messageText,
-                    enabled = conversationId != null && !uiState.isSending,
+                    enabled = conversationId != null && !uiState.isSending && !uiState.isChatBlocked,
                     isSending = uiState.isSending,
                     hasFailedImage = uiState.failedImageUri.isNotBlank(),
+                    isChatBlocked = uiState.isChatBlocked,
                     onMessageTextChanged = onMessageTextChanged,
                     onSendMessage = onSendMessage,
                     onImageClick = {
@@ -369,6 +393,22 @@ private fun SendErrorMessage(
                 Text(text = "Retry")
             }
         }
+    }
+}
+
+@Composable
+private fun ChatStatusMessage(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
     }
 }
 
@@ -540,6 +580,7 @@ private fun MessageInputBar(
     enabled: Boolean,
     isSending: Boolean,
     hasFailedImage: Boolean,
+    isChatBlocked: Boolean,
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
     onImageClick: () -> Unit
@@ -565,6 +606,7 @@ private fun MessageInputBar(
                 placeholder = {
                     Text(
                         text = when {
+                            isChatBlocked -> "Chat unavailable"
                             isSending -> "Sending..."
                             hasFailedImage -> "Retry photo or choose another"
                             enabled -> "Message"
