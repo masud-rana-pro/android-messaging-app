@@ -2,6 +2,7 @@ package com.contactme.app.profile
 
 import android.net.Uri
 import com.contactme.app.media.CloudinaryUploadClient
+import com.contactme.app.media.MediaUploadException
 import javax.inject.Inject
 
 class CloudinaryProfilePhotoRepository @Inject constructor(
@@ -22,8 +23,11 @@ class CloudinaryProfilePhotoRepository @Inject constructor(
             ).secureUrl
         }.fold(
             onSuccess = { photoUrl -> ProfilePhotoResult.Success(photoUrl) },
-            onFailure = {
-                ProfilePhotoResult.Error("We could not upload your profile photo. Please try again.")
+            onFailure = { error ->
+                ProfilePhotoResult.Error(
+                    (error as? MediaUploadException)?.userMessage
+                        ?: "We could not upload your profile photo. Please try again."
+                )
             }
         )
     }

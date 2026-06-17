@@ -25,7 +25,13 @@ class CloudinaryUploadClient @Inject constructor(
             val mimeType = context.contentResolver.getType(uri) ?: DEFAULT_IMAGE_MIME_TYPE
             val fileBytes = context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 inputStream.readBytes()
-            } ?: throw IllegalStateException("File is unavailable.")
+            } ?: throw MediaUploadException("This photo is unavailable. Please choose another one.")
+
+            validateImageUpload(
+                mimeType = mimeType,
+                fileSizeBytes = fileBytes.size
+            )
+
             val requestBody = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("upload_preset", CLOUDINARY_UPLOAD_PRESET)
@@ -43,7 +49,7 @@ class CloudinaryUploadClient @Inject constructor(
             okHttpClient.newCall(request).execute().use { response ->
                 val responseBody = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
-                    throw IllegalStateException("Cloudinary upload failed.")
+                    throw MediaUploadException("We could not upload this photo. Please try again.")
                 }
 
                 val json = JSONObject(responseBody)
@@ -56,8 +62,23 @@ class CloudinaryUploadClient @Inject constructor(
         }
     }
 
+    private fun validateImageUpload(
+        mimeType: String,
+        fileSizeBytes: Int
+    ) {
+        if (!mimeType.startsWith(IMAGE_MIME_PREFIX)) {
+            throw MediaUploadException("Only image files can be uploaded here.")
+        }
+
+        if (fileSizeBytes > MAX_IMAGE_SIZE_BYTES) {
+            throw MediaUploadException("Choose a photo smaller than 10 MB.")
+        }
+    }
+
     private companion object {
         const val DEFAULT_IMAGE_MIME_TYPE = "image/jpeg"
+        const val IMAGE_MIME_PREFIX = "image/"
+        const val MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
         const val CLOUDINARY_CLOUD_NAME = "dew95musb"
         const val CLOUDINARY_UPLOAD_PRESET = "contactme_unsigned"
         const val CLOUDINARY_UPLOAD_URL = "https://api.cloudinary.com/v1_1/$CLOUDINARY_CLOUD_NAME/auto/upload"
