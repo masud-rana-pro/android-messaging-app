@@ -42,8 +42,8 @@ scripts/firebase_deploy.sh
 - Add Firebase Emulator Suite tests for existing profile, username, conversation, and message rules.
 - Add stricter username validation.
 - Add stricter profile field validation.
-- Add blocked-user enforcement before messaging/calling.
-- Add report creation rules.
+- Extend existing blocked-user enforcement to calling when calls are implemented.
+- Add report review and moderation tooling for administrators.
 - Harden Cloudinary unsigned preset restrictions and move to signed uploads through Cloud Functions when production hardening starts.
 - Add Firebase Storage rules only if the project later moves media back to Firebase Storage.
 - Add group membership and role-based rules.

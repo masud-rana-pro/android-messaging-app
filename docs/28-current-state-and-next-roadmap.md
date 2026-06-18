@@ -45,7 +45,7 @@ This document is the implementation checkpoint after the message status foundati
 | Chat UI polish | Partial | Better navigation, empty/loading/error states, retry. |
 | Phone search | Done foundation | Normalize and query phone identity; native contacts sync remains later. |
 | Privacy settings | Done foundation | Last seen/profile photo/read receipt settings exist; more hardening remains. |
-| Block/report | Not started | Data model, rules, UI. |
+| Block/report | Done foundation | Data model, rules, chat enforcement, reason selection, block/unblock UI; emulator tests and moderation tools remain. |
 | Notifications | Partial | Cloud Functions fanout, deep links, and notification actions remain. |
 | Media polish | Partial | Upload retry/preview/validation/compression exists; background WorkManager and signed upload remain. |
 | Groups | Not started | Group model, members, roles, group messages. |
@@ -57,7 +57,7 @@ This document is the implementation checkpoint after the message status foundati
 
 1. Chat MVP finish.
 2. Phone search and profile polish.
-3. Block and report foundation.
+3. Block and report foundation. (Completed)
 4. Notification fanout and deep-link foundation.
 5. Media hardening with WorkManager and signed upload.
 6. Group chat foundation.
