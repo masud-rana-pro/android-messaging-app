@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import com.contactme.app.auth.AuthRepository
 import com.contactme.app.conversation.ConversationRepository
+import com.contactme.app.conversation.ConversationType
 import com.contactme.app.message.MessageRepository
 import com.contactme.app.message.MessageResult
 import com.contactme.app.media.ImageMessageQueue
@@ -43,16 +44,24 @@ class ChatDetailViewModel @Inject constructor(
     val uiState: StateFlow<ChatDetailUiState> = _uiState.asStateFlow()
 
     private var activeConversationId: String? = null
+    private var activeConversationType = ConversationType.Direct
     private var messagesJob: Job? = null
     private var typingJob: Job? = null
     private var presenceJob: Job? = null
     private var readReceiptJob: Job? = null
     private var lastTypingValue = false
 
-    fun openConversation(conversationId: String?) {
-        if (conversationId == null || activeConversationId == conversationId) return
+    fun openConversation(
+        conversationId: String?,
+        conversationType: ConversationType = ConversationType.Direct
+    ) {
+        if (
+            conversationId == null ||
+            (activeConversationId == conversationId && activeConversationType == conversationType)
+        ) return
 
-        activeConversationId?.let { previousConversationId ->
+        activeConversationId?.takeIf { activeConversationType == ConversationType.Direct }
+            ?.let { previousConversationId ->
             updateTypingState(
                 conversationId = previousConversationId,
                 isTyping = false
@@ -60,6 +69,7 @@ class ChatDetailViewModel @Inject constructor(
         }
 
         activeConversationId = conversationId
+        activeConversationType = conversationType
         lastTypingValue = false
         markConversationRead(conversationId)
         messagesJob?.cancel()
@@ -80,7 +90,9 @@ class ChatDetailViewModel @Inject constructor(
                 errorMessage = null
             )
         }
-        loadSafetyState(conversationId)
+        if (conversationType == ConversationType.Direct) {
+            loadSafetyState(conversationId)
+        }
         messagesJob = viewModelScope.launch {
             messageRepository.observeMessages(conversationId).collect { messages ->
                 _uiState.update {
@@ -97,7 +109,7 @@ class ChatDetailViewModel @Inject constructor(
         }
 
         val currentUserId = authRepository.currentUserId()
-        if (currentUserId != null) {
+        if (currentUserId != null && conversationType == ConversationType.Direct) {
             typingJob = viewModelScope.launch {
                 typingRepository.observeOtherTyping(
                     conversationId = conversationId,
@@ -457,7 +469,8 @@ class ChatDetailViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        activeConversationId?.let { conversationId ->
+        activeConversationId?.takeIf { activeConversationType == ConversationType.Direct }
+            ?.let { conversationId ->
             updateTypingState(
                 conversationId = conversationId,
                 isTyping = false
@@ -514,6 +527,7 @@ class ChatDetailViewModel @Inject constructor(
     ) {
         val targetConversationId = conversationId ?: return
         val userId = authRepository.currentUserId() ?: return
+        if (activeConversationType != ConversationType.Direct) return
 
         if (conversationId == activeConversationId && lastTypingValue == isTyping) return
         if (conversationId == activeConversationId) {

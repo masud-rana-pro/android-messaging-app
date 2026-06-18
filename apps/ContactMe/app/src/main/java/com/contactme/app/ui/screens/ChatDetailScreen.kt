@@ -50,6 +50,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.contactme.app.conversation.ReadReceiptState
+import com.contactme.app.conversation.ConversationType
 import com.contactme.app.message.ChatMessage
 import com.contactme.app.message.MessageStatus
 import com.contactme.app.message.MessageType
@@ -71,13 +72,14 @@ fun ChatDetailScreen(
     chatName: String,
     conversationId: String? = null,
     chatPhotoUrl: String = "",
+    conversationType: ConversationType = ConversationType.Direct,
     onBack: () -> Unit,
     viewModel: ChatDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(conversationId) {
-        viewModel.openConversation(conversationId)
+    LaunchedEffect(conversationId, conversationType) {
+        viewModel.openConversation(conversationId, conversationType)
     }
 
     DisposableEffect(conversationId) {
@@ -91,6 +93,7 @@ fun ChatDetailScreen(
         chatName = chatName,
         chatPhotoUrl = chatPhotoUrl,
         conversationId = conversationId,
+        conversationType = conversationType,
         uiState = uiState,
         onBack = onBack,
         onMessageTextChanged = viewModel::onMessageTextChanged,
@@ -109,6 +112,7 @@ private fun ChatDetailContent(
     chatName: String,
     chatPhotoUrl: String,
     conversationId: String?,
+    conversationType: ConversationType,
     uiState: ChatDetailUiState,
     onBack: () -> Unit,
     onMessageTextChanged: (String) -> Unit,
@@ -141,6 +145,7 @@ private fun ChatDetailContent(
                         chatPhotoUrl = chatPhotoUrl,
                         subtitle = chatSubtitle(
                             conversationId = conversationId,
+                            conversationType = conversationType,
                             isOtherUserTyping = uiState.isOtherUserTyping,
                             peerPresence = uiState.peerPresence
                         )
@@ -150,7 +155,7 @@ private fun ChatDetailContent(
                     HeaderBackButton(onClick = onBack)
                 },
                 actions = {
-                    if (conversationId != null) {
+                    if (conversationId != null && conversationType == ConversationType.Direct) {
                         ChatActionMenu(
                             uiState = uiState,
                             onReportChat = onReportChat,
@@ -447,11 +452,13 @@ private fun HeaderBackButton(onClick: () -> Unit) {
 
 private fun chatSubtitle(
     conversationId: String?,
+    conversationType: ConversationType,
     isOtherUserTyping: Boolean,
     peerPresence: PresenceStatus
 ): String {
     return when {
         conversationId == null -> "online"
+        conversationType == ConversationType.Group -> "Group"
         isOtherUserTyping -> "typing..."
         peerPresence.isOnline -> "online"
         peerPresence.lastSeenAtMillis > 0L && peerPresence.canShowLastSeen -> {

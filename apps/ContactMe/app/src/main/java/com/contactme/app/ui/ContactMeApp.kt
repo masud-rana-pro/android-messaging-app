@@ -145,6 +145,7 @@ fun ContactMeApp(
                 chatName = selectedChatTarget.title,
                 conversationId = selectedChatTarget.conversationId,
                 chatPhotoUrl = selectedChatTarget.photoUrl,
+                conversationType = selectedChatTarget.type,
                 onBack = { currentScreen = AppScreen.Home }
             )
 

@@ -52,9 +52,15 @@ export const sendMessageNotification = onDocumentCreated(
 
     if (tokenTargets.length === 0) return;
 
-    const title = stringValue(senderSnapshot.get("displayName")) || "New message";
-    const photoUrl = stringValue(senderSnapshot.get("photoUrl"));
-    const body = notificationBody(message);
+    const senderName = stringValue(senderSnapshot.get("displayName")) || "ContactMe user";
+    const conversationType = stringValue(conversationSnapshot.get("type")) || "direct";
+    const isGroup = conversationType === "group";
+    const title = isGroup ? stringValue(conversationSnapshot.get("title")) || "Group" : senderName;
+    const photoUrl = isGroup ?
+      stringValue(conversationSnapshot.get("photoUrl")) :
+      stringValue(senderSnapshot.get("photoUrl"));
+    const messageBody = notificationBody(message);
+    const body = isGroup ? `${senderName}: ${messageBody}` : messageBody;
 
     for (const tokenChunk of chunks(tokenTargets, 500)) {
       const response = await messaging.sendEachForMulticast({
@@ -63,6 +69,7 @@ export const sendMessageNotification = onDocumentCreated(
         data: {
           type: "message",
           conversationId,
+          conversationType,
           messageId,
           title,
           body,

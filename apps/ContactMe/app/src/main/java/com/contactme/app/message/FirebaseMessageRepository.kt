@@ -166,11 +166,13 @@ class FirebaseMessageRepository @Inject constructor(
         conversationId: String,
         senderId: String
     ): Boolean {
-        val participantIds = firestore.collection(CONVERSATIONS_COLLECTION)
+        val conversation = firestore.collection(CONVERSATIONS_COLLECTION)
             .document(conversationId)
             .get()
             .await()
-            .get("participantIds") as? List<*>
+        if (conversation.getString("type") == "group") return false
+
+        val participantIds = conversation.get("participantIds") as? List<*>
         val peerUserId = participantIds
             .orEmpty()
             .filterIsInstance<String>()

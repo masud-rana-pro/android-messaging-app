@@ -30,6 +30,10 @@ class ContactMeNotificationRenderer @Inject constructor(
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(NotificationNavigation.EXTRA_CONVERSATION_ID, payload.conversationId)
+                putExtra(
+                    NotificationNavigation.EXTRA_CONVERSATION_TYPE,
+                    payload.conversationType.firestoreValue
+                )
                 putExtra(NotificationNavigation.EXTRA_CHAT_TITLE, payload.title)
                 putExtra(NotificationNavigation.EXTRA_CHAT_PHOTO_URL, payload.photoUrl)
             },
