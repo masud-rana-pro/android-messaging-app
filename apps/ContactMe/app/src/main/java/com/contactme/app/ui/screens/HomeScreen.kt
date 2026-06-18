@@ -3,6 +3,7 @@ package com.contactme.app.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -27,6 +31,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AddComment
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.GroupAdd
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -85,10 +97,17 @@ fun HomeScreen(
                     )
                 },
                 actions = {
-                    TopBarAction(
-                        label = "Settings",
-                        onClick = onSettingsSelected
-                    )
+                    if (selectedTab == HomeTab.Chats) {
+                        IconButton(onClick = onCreateGroupSelected) {
+                            Icon(
+                                imageVector = Icons.Outlined.GroupAdd,
+                                contentDescription = "New group"
+                            )
+                        }
+                    }
+                    IconButton(onClick = onSettingsSelected) {
+                        Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings")
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -107,21 +126,30 @@ fun HomeScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = RoundedCornerShape(18.dp)
                 ) {
-                    Text(
-                        text = "+",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        imageVector = Icons.Outlined.AddComment,
+                        contentDescription = "New chat"
                     )
                 }
             }
         },
         bottomBar = {
             NavigationBar {
-                HomeTab.entries.forEach { tab ->
+                listOf(HomeTab.Chats, HomeTab.Calls).forEach { tab ->
                     NavigationBarItem(
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
-                        icon = { Text(text = tab.shortLabel.first().toString()) },
+                        icon = {
+                            Icon(
+                                imageVector = when (tab) {
+                                    HomeTab.Chats -> Icons.Outlined.Chat
+                                    HomeTab.Calls -> Icons.Outlined.Call
+                                    HomeTab.Communities -> Icons.Outlined.Groups
+                                    else -> Icons.Outlined.Chat
+                                },
+                                contentDescription = tab.label
+                            )
+                        },
                         label = { Text(text = tab.shortLabel) }
                     )
                 }
@@ -141,8 +169,7 @@ fun HomeScreen(
                 HomeTab.Chats -> ChatsTab(
                     newChatRequestCount = newChatRequestCount,
                     onConversationSelected = onConversationSelected,
-                    onDiscoveredUserSelected = onDiscoveredUserSelected,
-                    onCreateGroupSelected = onCreateGroupSelected
+                    onDiscoveredUserSelected = onDiscoveredUserSelected
                 )
                 HomeTab.Status -> PlaceholderTab(
                     title = "Status"
@@ -169,7 +196,6 @@ private fun ChatsTab(
     newChatRequestCount: Int,
     onConversationSelected: (String, String, String, ConversationType) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
-    onCreateGroupSelected: () -> Unit,
     discoveryViewModel: ContactDiscoveryViewModel = hiltViewModel(),
     contactListViewModel: ContactListViewModel = hiltViewModel(),
     conversationListViewModel: ConversationListViewModel = hiltViewModel()
@@ -185,8 +211,7 @@ private fun ChatsTab(
         conversationListState = conversationListState,
         onSearchQueryChanged = discoveryViewModel::onQueryChanged,
         onConversationSelected = onConversationSelected,
-        onDiscoveredUserSelected = onDiscoveredUserSelected,
-        onCreateGroupSelected = onCreateGroupSelected
+        onDiscoveredUserSelected = onDiscoveredUserSelected
     )
 }
 
@@ -198,10 +223,10 @@ private fun ChatsContent(
     conversationListState: ConversationListUiState,
     onSearchQueryChanged: (String) -> Unit,
     onConversationSelected: (String, String, String, ConversationType) -> Unit,
-    onDiscoveredUserSelected: (UserProfile) -> Unit,
-    onCreateGroupSelected: () -> Unit
+    onDiscoveredUserSelected: (UserProfile) -> Unit
 ) {
     val scrollState = rememberScrollState()
+    var selectedFilter by remember { mutableStateOf(ChatListFilter.All) }
 
     LaunchedEffect(newChatRequestCount) {
         if (newChatRequestCount > 0) {
@@ -213,68 +238,63 @@ private fun ChatsContent(
         modifier = Modifier.verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Chats",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                TopBarAction(label = "New group", onClick = onCreateGroupSelected)
-            }
-            Text(
-                text = "Search or open a chat",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
-            )
-        }
-        ContactSearch(
+        ChatSearch(
             newChatRequestCount = newChatRequestCount,
             discoveryState = discoveryState,
-            onSearchQueryChanged = onSearchQueryChanged,
-            onDiscoveredUserSelected = onDiscoveredUserSelected
+            onSearchQueryChanged = onSearchQueryChanged
         )
-        SavedContactsList(
-            contactListState = contactListState,
-            onContactSelected = onDiscoveredUserSelected
+        ChatFilterRow(
+            selectedFilter = selectedFilter,
+            onFilterSelected = { selectedFilter = it }
         )
         ConversationPreviewList(
             conversationListState = conversationListState,
+            query = discoveryState.query,
+            filter = selectedFilter,
             onConversationSelected = onConversationSelected
         )
+        if (discoveryState.query.isNotBlank()) {
+            PeopleSearchResults(
+                discoveryState = discoveryState,
+                contactListState = contactListState,
+                onUserSelected = onDiscoveredUserSelected
+            )
+        }
     }
 }
 
 @Composable
-private fun SavedContactsList(
+private fun PeopleSearchResults(
+    discoveryState: ContactDiscoveryUiState,
     contactListState: ContactListUiState,
-    onContactSelected: (UserProfile) -> Unit
+    onUserSelected: (UserProfile) -> Unit
 ) {
+    val normalizedQuery = discoveryState.query.trim().lowercase()
+    val matchingContacts = contactListState.contacts.filter { contact ->
+        contact.displayName.lowercase().contains(normalizedQuery) ||
+            contact.username.lowercase().contains(normalizedQuery) ||
+            contact.phoneNumber.contains(normalizedQuery)
+    }
+    val remoteResults = discoveryState.results.filter { result ->
+        matchingContacts.none { it.userId == result.userId }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader(title = "Saved contacts")
-        if (contactListState.isLoading) {
-            SupportingText(
-                text = "Loading contacts...",
-            )
+        SectionHeader(title = "People")
+        if (discoveryState.isSearching || contactListState.isLoading) {
+            SupportingText(text = "Searching...")
         }
-        contactListState.message?.let { message ->
-            SupportingText(text = message)
-        }
-        if (!contactListState.isLoading && contactListState.contacts.isEmpty()) {
-            SupportingText(
-                text = "No saved contacts",
-            )
-        }
-        contactListState.contacts.forEach { contact ->
+        matchingContacts.forEach { contact ->
             ContactRow(
                 profile = contact,
-                actionText = "Chat",
-                onClick = { onContactSelected(contact) }
+                onClick = { onUserSelected(contact) }
             )
+        }
+        remoteResults.forEach { profile ->
+            ContactRow(profile = profile, onClick = { onUserSelected(profile) })
+        }
+        if (!discoveryState.isSearching && matchingContacts.isEmpty() && remoteResults.isEmpty()) {
+            discoveryState.message?.let { SupportingText(text = it) }
         }
     }
 }
@@ -282,22 +302,40 @@ private fun SavedContactsList(
 @Composable
 private fun ConversationPreviewList(
     conversationListState: ConversationListUiState,
+    query: String,
+    filter: ChatListFilter,
     onConversationSelected: (String, String, String, ConversationType) -> Unit
 ) {
+    val normalizedQuery = query.trim().lowercase()
+    val visibleConversations = conversationListState.conversations.filter { conversation ->
+        val matchesQuery = normalizedQuery.isBlank() ||
+            conversation.title.lowercase().contains(normalizedQuery) ||
+            conversation.subtitle.lowercase().contains(normalizedQuery)
+        val matchesFilter = when (filter) {
+            ChatListFilter.All -> true
+            ChatListFilter.Unread -> conversation.hasUnreadMessages
+            ChatListFilter.Groups -> conversation.type == ConversationType.Group
+        }
+        matchesQuery && matchesFilter
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader(title = "Recent chats")
         if (conversationListState.isLoading) {
             SupportingText(
                 text = "Loading conversations...",
             )
         }
-        conversationListState.message?.let { message ->
+        conversationListState.message?.takeIf { query.isBlank() }?.let { message ->
             SupportingText(text = message)
         }
-        if (!conversationListState.isLoading && conversationListState.conversations.isEmpty()) {
-            EmptyConversationState()
+        if (!conversationListState.isLoading && visibleConversations.isEmpty() && query.isBlank()) {
+            when (filter) {
+                ChatListFilter.All -> EmptyConversationState()
+                ChatListFilter.Unread -> SupportingText(text = "No unread chats")
+                ChatListFilter.Groups -> SupportingText(text = "No groups")
+            }
         }
-        conversationListState.conversations.forEach { conversation ->
+        visibleConversations.forEach { conversation ->
             ConversationPreviewItem(
                 conversation = conversation,
                 onClick = {
@@ -318,25 +356,21 @@ private fun ConversationPreviewItem(
     conversation: ConversationPreview,
     onClick: () -> Unit
 ) {
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(18.dp),
-        tonalElevation = 1.dp
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            ContactAvatar(
-                label = conversation.title,
-                photoUrl = conversation.photoUrl,
-                size = 50
-            )
-            Column(modifier = Modifier.weight(1f)) {
+        ContactAvatar(
+            label = conversation.title,
+            photoUrl = conversation.photoUrl,
+            size = 52
+        )
+        Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = conversation.title,
                     style = MaterialTheme.typography.titleMedium,
@@ -363,11 +397,11 @@ private fun ConversationPreviewItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
+        }
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
                 Text(
                     text = conversation.updatedAtMillis.formatConversationTime(),
                     style = MaterialTheme.typography.labelMedium,
@@ -385,7 +419,6 @@ private fun ConversationPreviewItem(
                 if (conversation.hasUnreadMessages) {
                     UnreadDot()
                 }
-            }
         }
     }
 }
@@ -394,18 +427,10 @@ private fun ConversationPreviewItem(
 private fun UnreadDot() {
     Box(
         modifier = Modifier
-            .size(18.dp)
+            .size(10.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "1",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimary,
-            fontWeight = FontWeight.Bold
-        )
-    }
+            .background(MaterialTheme.colorScheme.primary)
+    )
 }
 
 @Composable
@@ -425,36 +450,6 @@ private fun SupportingText(text: String) {
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.64f)
     )
-}
-
-@Composable
-private fun TopBarAction(
-    label: String,
-    onClick: () -> Unit
-) {
-    Text(
-        modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        text = label,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold
-    )
-}
-
-@Composable
-private fun SearchSurface(content: @Composable () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Box(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {
-            content()
-        }
-    }
 }
 
 @Composable
@@ -479,11 +474,10 @@ private fun EmptyConversationState() {
 }
 
 @Composable
-private fun ContactSearch(
+private fun ChatSearch(
     newChatRequestCount: Int,
     discoveryState: ContactDiscoveryUiState,
-    onSearchQueryChanged: (String) -> Unit,
-    onDiscoveredUserSelected: (UserProfile) -> Unit
+    onSearchQueryChanged: (String) -> Unit
 ) {
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -495,31 +489,37 @@ private fun ContactSearch(
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SearchSurface {
-            OutlinedTextField(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(searchFocusRequester),
-                value = discoveryState.query,
-                onValueChange = onSearchQueryChanged,
-                singleLine = true,
-                shape = RoundedCornerShape(22.dp),
-                label = { Text(text = "Find people") },
-                placeholder = { Text(text = "Username or phone") }
-            )
-        }
-        if (discoveryState.isSearching) {
-            SupportingText(text = "Searching...")
-        }
-        discoveryState.message?.let { message ->
-            SupportingText(text = message)
-        }
-        discoveryState.results.forEach { profile ->
-            ContactRow(
-                profile = profile,
-                actionText = "Open",
-                onClick = { onDiscoveredUserSelected(profile) }
+    OutlinedTextField(
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(searchFocusRequester),
+        value = discoveryState.query,
+        onValueChange = onSearchQueryChanged,
+        singleLine = true,
+        shape = RoundedCornerShape(24.dp),
+        leadingIcon = {
+            Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+        },
+        placeholder = { Text(text = "Search chats or people") }
+    )
+}
+
+@Composable
+private fun ChatFilterRow(
+    selectedFilter: ChatListFilter,
+    onFilterSelected: (ChatListFilter) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ChatListFilter.entries.forEach { filter ->
+            FilterChip(
+                selected = selectedFilter == filter,
+                onClick = { onFilterSelected(filter) },
+                label = { Text(text = filter.label) }
             )
         }
     }
@@ -528,28 +528,23 @@ private fun ContactSearch(
 @Composable
 private fun ContactRow(
     profile: UserProfile,
-    actionText: String,
     onClick: () -> Unit
 ) {
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(18.dp),
-        tonalElevation = 1.dp
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            ContactAvatar(
-                label = profile.displayName,
-                photoUrl = profile.photoUrl,
-                size = 46
-            )
-            Column(modifier = Modifier.weight(1f)) {
+        ContactAvatar(
+            label = profile.displayName,
+            photoUrl = profile.photoUrl,
+            size = 46
+        )
+        Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = profile.displayName.ifBlank { "ContactMe User" },
                     style = MaterialTheme.typography.titleMedium,
@@ -573,19 +568,14 @@ private fun ContactRow(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-            }
-            Text(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                text = actionText,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
+}
+
+private enum class ChatListFilter(val label: String) {
+    All("All"),
+    Unread("Unread"),
+    Groups("Groups")
 }
 
 @Composable
