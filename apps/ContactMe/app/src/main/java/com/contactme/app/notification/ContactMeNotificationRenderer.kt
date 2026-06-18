@@ -23,6 +23,7 @@ class ContactMeNotificationRenderer @Inject constructor(
         if (!canShowNotifications()) return
 
         val payload = ContactMeNotificationPayload.from(message) ?: return
+        if (NotificationVisibilityTracker.shouldSuppress(payload.conversationId)) return
         val pendingIntent = PendingIntent.getActivity(
             context,
             payload.notificationId,
