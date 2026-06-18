@@ -1,3 +1,18 @@
-# Firebase Functions
+# ContactMe Firebase Functions
 
-Server-side functions for FCM notifications, call alerts, moderation triggers, and safe backend tasks.
+Trusted server-side functions for message notification fanout and later call/moderation workflows.
+
+## Local build
+
+```bash
+npm install
+npm run build
+```
+
+## Deploy
+
+```bash
+firebase deploy --only functions:sendMessageNotification
+```
+
+Deployment requires Firebase CLI authentication and a project plan that supports Cloud Functions.

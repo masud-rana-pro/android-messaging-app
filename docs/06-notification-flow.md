@@ -1,6 +1,6 @@
 # Notification Flow
 
-Notification foundation has started. The app can create channels, sync device tokens, request Android 13+ notification permission, and render incoming foreground FCM payloads. Cloud Functions fanout and deep links are still planned.
+Notification foundation now spans Android and the trusted backend. The app creates channels, syncs device tokens, requests Android 13+ notification permission, renders incoming FCM payloads, and opens the target conversation. The message fanout function is implemented and awaits Firebase project deployment.
 
 ## Current Components
 
@@ -10,11 +10,13 @@ Notification foundation has started. The app can create channels, sync device to
 - Device token storage under `user_devices/{uid}/devices/{deviceId}`.
 - Runtime `POST_NOTIFICATIONS` request.
 - Foreground notification renderer.
+- Conversation notification navigation.
+- Message-created Cloud Function with block filtering, token batching, and invalid-token cleanup.
 
 ## Planned Components
 
-- Cloud Functions for secure fanout.
-- Deep link navigation into chat/call screens.
+- Deploy and monitor the message fanout function.
+- Call-screen deep links.
 - Notification action buttons for calls.
 
 ## Device Token Flow
@@ -39,7 +41,7 @@ user_devices/{uid}/devices/{deviceId}
 5. Android shows notification in the `messages` channel.
 6. Tapping notification opens the exact conversation.
 
-Current Android client opens the app from a notification tap. Exact conversation deep-linking is still planned.
+The Android client routes message notification taps to the exact conversation using `conversationId` and safe chat header metadata.
 
 ## Call Notification Flow
 
