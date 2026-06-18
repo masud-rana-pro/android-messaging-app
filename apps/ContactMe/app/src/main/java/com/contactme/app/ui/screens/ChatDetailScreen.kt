@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -52,6 +53,7 @@ import com.contactme.app.conversation.ReadReceiptState
 import com.contactme.app.message.ChatMessage
 import com.contactme.app.message.MessageStatus
 import com.contactme.app.message.MessageType
+import com.contactme.app.notification.NotificationVisibilityTracker
 import com.contactme.app.presence.PresenceStatus
 import com.contactme.app.safety.ReportReason
 import com.contactme.app.ui.chat.ChatDetailUiState
@@ -76,6 +78,13 @@ fun ChatDetailScreen(
 
     LaunchedEffect(conversationId) {
         viewModel.openConversation(conversationId)
+    }
+
+    DisposableEffect(conversationId) {
+        NotificationVisibilityTracker.setActiveConversation(conversationId)
+        onDispose {
+            NotificationVisibilityTracker.clearActiveConversation(conversationId)
+        }
     }
 
     ChatDetailContent(
