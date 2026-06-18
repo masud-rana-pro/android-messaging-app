@@ -143,6 +143,7 @@ fun ContactMeApp(
                 onEditProfile = { currentScreen = AppScreen.ProfileSetup },
                 onSignOut = {
                     sessionViewModel.signOut {
+                        deviceTokenSyncViewModel.resetSyncState()
                         currentScreen = AppScreen.Auth
                     }
                 }
