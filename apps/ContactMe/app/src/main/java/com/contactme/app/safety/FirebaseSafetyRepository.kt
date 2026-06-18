@@ -12,12 +12,8 @@ class FirebaseSafetyRepository @Inject constructor(
         currentUserId: String,
         blockedUserId: String
     ): SafetyResult {
-        if (currentUserId.isBlank() || blockedUserId.isBlank()) {
-            return SafetyResult.Error("We could not update this setting. Please try again.")
-        }
-
-        if (currentUserId == blockedUserId) {
-            return SafetyResult.Error("You cannot block yourself.")
+        SafetyInputValidator.blockError(currentUserId, blockedUserId)?.let { message ->
+            return SafetyResult.Error(message)
         }
 
         return runCatching {
@@ -42,8 +38,8 @@ class FirebaseSafetyRepository @Inject constructor(
         currentUserId: String,
         blockedUserId: String
     ): SafetyResult {
-        if (currentUserId.isBlank() || blockedUserId.isBlank()) {
-            return SafetyResult.Error("We could not update this setting. Please try again.")
+        SafetyInputValidator.unblockError(currentUserId, blockedUserId)?.let { message ->
+            return SafetyResult.Error(message)
         }
 
         return runCatching {
@@ -65,12 +61,8 @@ class FirebaseSafetyRepository @Inject constructor(
         conversationId: String,
         reason: ReportReason
     ): SafetyResult {
-        if (reporterUserId.isBlank() || reportedUserId.isBlank()) {
-            return SafetyResult.Error("We could not send this report. Please try again.")
-        }
-
-        if (reporterUserId == reportedUserId) {
-            return SafetyResult.Error("You cannot report yourself.")
+        SafetyInputValidator.reportError(reporterUserId, reportedUserId)?.let { message ->
+            return SafetyResult.Error(message)
         }
 
         return runCatching {
