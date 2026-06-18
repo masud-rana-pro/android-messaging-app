@@ -3,6 +3,7 @@ package com.contactme.app.message
 data class ChatMessage(
     val id: String,
     val senderId: String,
+    val senderDisplayName: String = "",
     val type: MessageType = MessageType.Text,
     val text: String,
     val mediaUrl: String = "",

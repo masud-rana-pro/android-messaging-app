@@ -48,7 +48,7 @@ This document is the implementation checkpoint after the message status foundati
 | Block/report | Done foundation | Data model, rules, chat enforcement, reason selection, block/unblock UI; emulator tests and moderation tools remain. |
 | Notifications | Partial | Cloud Functions fanout, deep links, and notification actions remain. |
 | Media polish | Advanced foundation | Validation, compression, preview, retry, app-private pending files, and WorkManager background delivery exist; signed production upload remains. |
-| Groups | Foundation | Group model, creation contract, admin/member schema, preview mapping, validation, and rules exist; creation UI and group chat behavior remain. |
+| Groups | Working MVP | Creation UI, member selection, group previews, text/image messages, sender labels, notification routing, admin schema, validation, and rules exist; member/admin management and group profile editing remain. |
 | Calls | Not started | ZegoCloud, call state, notification, foreground service. |
 | Status/channels | Not started | Media/status/channel models and UI. |
 | Offline/backup | Not started | Firestore cache first, Room later if required. |

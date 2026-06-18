@@ -11,13 +11,17 @@ import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.concurrent.ConcurrentHashMap
 
 class FirebaseMessageRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val cloudinaryUploadClient: CloudinaryUploadClient,
     private val safetyRepository: SafetyRepository
 ) : MessageRepository {
+    private val senderNameCache = ConcurrentHashMap<String, String>()
+
     override fun observeMessages(conversationId: String): Flow<List<ChatMessage>> = callbackFlow {
         val registration = firestore.collection(CONVERSATIONS_COLLECTION)
             .document(conversationId)
@@ -29,22 +33,32 @@ class FirebaseMessageRepository @Inject constructor(
                     return@addSnapshotListener
                 }
 
-                val messages = snapshot?.documents.orEmpty().map { document ->
-                    ChatMessage(
-                        id = document.id,
-                        senderId = document.getString("senderId").orEmpty(),
-                        type = MessageType.fromFirestore(document.getString("type")),
-                        text = document.getString("text").orEmpty(),
-                        mediaUrl = document.getString("mediaUrl").orEmpty(),
-                        mediaProvider = document.getString("mediaProvider").orEmpty(),
-                        mediaPublicId = document.getString("mediaPublicId").orEmpty(),
-                        mimeType = document.getString("mimeType").orEmpty(),
-                        sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
-                        status = MessageStatus.fromFirestore(document.getString("status"))
-                    )
-                }
+                launch {
+                    val documents = snapshot?.documents.orEmpty()
+                    val senderIds = documents.mapNotNull { it.getString("senderId") }
+                        .filter(String::isNotBlank)
+                        .distinct()
+                    resolveSenderNames(senderIds)
 
-                trySend(messages)
+                    val messages = documents.map { document ->
+                        val senderId = document.getString("senderId").orEmpty()
+                        ChatMessage(
+                            id = document.id,
+                            senderId = senderId,
+                            senderDisplayName = senderNameCache[senderId].orEmpty(),
+                            type = MessageType.fromFirestore(document.getString("type")),
+                            text = document.getString("text").orEmpty(),
+                            mediaUrl = document.getString("mediaUrl").orEmpty(),
+                            mediaProvider = document.getString("mediaProvider").orEmpty(),
+                            mediaPublicId = document.getString("mediaPublicId").orEmpty(),
+                            mimeType = document.getString("mimeType").orEmpty(),
+                            sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
+                            status = MessageStatus.fromFirestore(document.getString("status"))
+                        )
+                    }
+
+                    trySend(messages)
+                }
             }
 
         awaitClose { registration.remove() }
@@ -157,6 +171,7 @@ class FirebaseMessageRepository @Inject constructor(
     private companion object {
         const val CONVERSATIONS_COLLECTION = "conversations"
         const val MESSAGES_COLLECTION = "messages"
+        const val USERS_COLLECTION = "users"
         const val IMAGE_FILE_NAME = "image.jpg"
         const val IMAGE_LAST_MESSAGE = "Photo"
         const val CLOUDINARY_PROVIDER = "cloudinary"
@@ -180,5 +195,17 @@ class FirebaseMessageRepository @Inject constructor(
             ?: return false
 
         return safetyRepository.hasBlockBetween(senderId, peerUserId)
+    }
+
+    private suspend fun resolveSenderNames(senderIds: List<String>) {
+        senderIds.filterNot(senderNameCache::containsKey).forEach { senderId ->
+            runCatching {
+                firestore.collection(USERS_COLLECTION).document(senderId).get().await()
+            }.getOrNull()?.let { profile ->
+                senderNameCache[senderId] = profile.getString("displayName").orEmpty()
+                    .ifBlank { profile.getString("username").orEmpty() }
+                    .ifBlank { "Group member" }
+            }
+        }
     }
 }

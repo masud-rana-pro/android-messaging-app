@@ -216,6 +216,7 @@ private fun ChatDetailContent(
                     MessageBubble(
                         message = message,
                         isMine = message.senderId == uiState.currentUserId,
+                        showSenderName = conversationType == ConversationType.Group,
                         readReceiptState = uiState.readReceiptState
                     )
                 }
@@ -558,6 +559,7 @@ private fun ChatStatusMessage(message: String) {
 private fun MessageBubble(
     message: ChatMessage,
     isMine: Boolean,
+    showSenderName: Boolean,
     readReceiptState: ReadReceiptState
 ) {
     Row(
@@ -583,6 +585,15 @@ private fun MessageBubble(
                 .padding(horizontal = 14.dp, vertical = 9.dp),
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
         ) {
+            if (showSenderName && !isMine) {
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = message.senderDisplayName.ifBlank { "Group member" },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             if (message.text.isNotBlank()) {
                 Text(
                     modifier = Modifier.fillMaxWidth(),
