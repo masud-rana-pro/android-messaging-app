@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
@@ -26,6 +27,9 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -33,6 +37,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +72,7 @@ import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
 import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -209,10 +219,17 @@ private fun ChatDetailContent(
                     }
                 }
 
-                items(
+                itemsIndexed(
                     items = messages,
-                    key = { message -> message.id }
-                ) { message ->
+                    key = { _, message -> message.id }
+                ) { index, message ->
+                    val previousMessage = messages.getOrNull(index - 1)
+                    if (previousMessage == null || !message.sentAtMillis.isSameChatDay(
+                            previousMessage.sentAtMillis
+                        )
+                    ) {
+                        ChatDateSeparator(sentAtMillis = message.sentAtMillis)
+                    }
                     MessageBubble(
                         message = message,
                         isMine = message.senderId == uiState.currentUserId,
@@ -279,11 +296,11 @@ private fun ChatActionMenu(
     var isBlockDialogVisible by remember { mutableStateOf(false) }
 
     Box {
-        TextButton(
+        IconButton(
             enabled = !uiState.isSafetyActionInProgress,
             onClick = { isExpanded = true }
         ) {
-            Text(text = "⋮")
+            Icon(imageVector = Icons.Outlined.MoreVert, contentDescription = "Chat options")
         }
         DropdownMenu(
             expanded = isExpanded,
@@ -439,16 +456,12 @@ private fun ChatHeaderTitle(
 
 @Composable
 private fun HeaderBackButton(onClick: () -> Unit) {
-    Text(
-        modifier = Modifier
-            .clip(CircleShape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        text = "<",
-        style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.Bold
-    )
+    IconButton(onClick = onClick) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+            contentDescription = "Back"
+        )
+    }
 }
 
 private fun chatSubtitle(
@@ -616,6 +629,28 @@ private fun MessageBubble(
 }
 
 @Composable
+private fun ChatDateSeparator(sentAtMillis: Long) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                text = sentAtMillis.formatChatDate(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun ImageMessageContent(message: ChatMessage) {
     if (message.mediaUrl.isBlank()) {
         Text(
@@ -738,69 +773,60 @@ private fun MessageInputBar(
     onSendMessage: () -> Unit,
     onImageClick: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(28.dp),
-        tonalElevation = 2.dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Bottom
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                modifier = Modifier.weight(1f),
-                value = text,
-                onValueChange = onMessageTextChanged,
-                enabled = enabled,
-                singleLine = true,
-                shape = RoundedCornerShape(22.dp),
-                placeholder = {
-                    Text(
-                        text = when {
-                            isChatBlocked -> "Chat unavailable"
-                            isSending -> "Sending..."
-                            hasFailedImage -> "Retry photo or choose another"
-                            enabled -> "Message"
-                            else -> "Select a chat"
-                        }
+        OutlinedTextField(
+            modifier = Modifier.weight(1f),
+            value = text,
+            onValueChange = onMessageTextChanged,
+            enabled = enabled,
+            minLines = 1,
+            maxLines = 4,
+            shape = RoundedCornerShape(24.dp),
+            trailingIcon = {
+                IconButton(
+                    enabled = enabled && !isSending,
+                    onClick = onImageClick
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AttachFile,
+                        contentDescription = "Attach photo"
                     )
                 }
-            )
-            Text(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable(enabled = enabled && !isSending, onClick = onImageClick)
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
-                text = "+",
-                color = if (enabled) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f)
-                },
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(
-                        if (enabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.16f)
-                        }
-                    )
-                    .clickable(enabled = enabled && !isSending, onClick = onSendMessage)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                text = if (isSending) "..." else ">",
-                color = if (enabled) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f)
-                },
-                fontWeight = FontWeight.Bold
-            )
+            },
+            placeholder = {
+                Text(
+                    text = when {
+                        isChatBlocked -> "Chat unavailable"
+                        isSending -> "Sending..."
+                        hasFailedImage -> "Retry photo or choose another"
+                        enabled -> "Message"
+                        else -> "Select a chat"
+                    }
+                )
+            }
+        )
+        FilledIconButton(
+            enabled = enabled && !isSending && text.isNotBlank(),
+            onClick = onSendMessage
+        ) {
+            if (isSending) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Send,
+                    contentDescription = "Send"
+                )
+            }
         }
     }
 }
@@ -823,6 +849,30 @@ private fun Long.formatChatTime(): String {
     if (this <= 0L) return "Now"
 
     return SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this))
+}
+
+private fun Long.isSameChatDay(otherMillis: Long): Boolean {
+    if (this <= 0L || otherMillis <= 0L) return false
+    val first = Calendar.getInstance().apply { timeInMillis = this@isSameChatDay }
+    val second = Calendar.getInstance().apply { timeInMillis = otherMillis }
+    return first.get(Calendar.YEAR) == second.get(Calendar.YEAR) &&
+        first.get(Calendar.DAY_OF_YEAR) == second.get(Calendar.DAY_OF_YEAR)
+}
+
+private fun Long.formatChatDate(): String {
+    if (this <= 0L) return "Today"
+    val messageDate = Calendar.getInstance().apply { timeInMillis = this@formatChatDate }
+    val today = Calendar.getInstance()
+    if (messageDate.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+        messageDate.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
+    ) return "Today"
+
+    val yesterday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+    if (messageDate.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) &&
+        messageDate.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR)
+    ) return "Yesterday"
+
+    return SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(this))
 }
 
 private fun String.profileInitials(): String {
