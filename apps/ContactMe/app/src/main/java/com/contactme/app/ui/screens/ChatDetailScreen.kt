@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +53,7 @@ import com.contactme.app.message.ChatMessage
 import com.contactme.app.message.MessageStatus
 import com.contactme.app.message.MessageType
 import com.contactme.app.presence.PresenceStatus
+import com.contactme.app.safety.ReportReason
 import com.contactme.app.ui.chat.ChatDetailUiState
 import com.contactme.app.ui.chat.ChatDetailViewModel
 import com.contactme.app.ui.theme.ContactMeSpacing
@@ -103,7 +105,7 @@ private fun ChatDetailContent(
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
     onRetryImageMessage: () -> Unit,
-    onReportChat: () -> Unit,
+    onReportChat: (ReportReason) -> Unit,
     onBlockChat: () -> Unit,
     onUnblockChat: () -> Unit,
     onImageSelected: (Uri) -> Unit
@@ -253,11 +255,12 @@ private fun ChatDetailContent(
 @Composable
 private fun ChatActionMenu(
     uiState: ChatDetailUiState,
-    onReportChat: () -> Unit,
+    onReportChat: (ReportReason) -> Unit,
     onBlockChat: () -> Unit,
     onUnblockChat: () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+    var isReportDialogVisible by remember { mutableStateOf(false) }
 
     Box {
         TextButton(
@@ -275,7 +278,7 @@ private fun ChatActionMenu(
                 enabled = !uiState.isSafetyActionInProgress,
                 onClick = {
                     isExpanded = false
-                    onReportChat()
+                    isReportDialogVisible = true
                 }
             )
             DropdownMenuItem(
@@ -294,6 +297,57 @@ private fun ChatActionMenu(
                 }
             )
         }
+    }
+
+    if (isReportDialogVisible) {
+        ReportReasonDialog(
+            onDismiss = { isReportDialogVisible = false },
+            onReasonSelected = { reason ->
+                isReportDialogVisible = false
+                onReportChat(reason)
+            }
+        )
+    }
+}
+
+@Composable
+private fun ReportReasonDialog(
+    onDismiss: () -> Unit,
+    onReasonSelected: (ReportReason) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Report user") },
+        text = {
+            Column {
+                ReportReason.entries.forEach { reason ->
+                    TextButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onReasonSelected(reason) }
+                    ) {
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = reason.displayLabel()
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "Cancel")
+            }
+        }
+    )
+}
+
+private fun ReportReason.displayLabel(): String {
+    return when (this) {
+        ReportReason.Spam -> "Spam"
+        ReportReason.Harassment -> "Harassment"
+        ReportReason.Scam -> "Scam or fraud"
+        ReportReason.Other -> "Other"
     }
 }
 
