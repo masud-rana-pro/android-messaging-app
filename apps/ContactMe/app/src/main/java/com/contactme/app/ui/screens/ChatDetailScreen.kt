@@ -261,6 +261,7 @@ private fun ChatActionMenu(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     var isReportDialogVisible by remember { mutableStateOf(false) }
+    var isBlockDialogVisible by remember { mutableStateOf(false) }
 
     Box {
         TextButton(
@@ -292,7 +293,7 @@ private fun ChatActionMenu(
                     if (uiState.canUnblockChat) {
                         onUnblockChat()
                     } else {
-                        onBlockChat()
+                        isBlockDialogVisible = true
                     }
                 }
             )
@@ -305,6 +306,29 @@ private fun ChatActionMenu(
             onReasonSelected = { reason ->
                 isReportDialogVisible = false
                 onReportChat(reason)
+            }
+        )
+    }
+
+    if (isBlockDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { isBlockDialogVisible = false },
+            title = { Text(text = "Block user?") },
+            text = { Text(text = "They will no longer be able to message you.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isBlockDialogVisible = false
+                        onBlockChat()
+                    }
+                ) {
+                    Text(text = "Block")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isBlockDialogVisible = false }) {
+                    Text(text = "Cancel")
+                }
             }
         )
     }
