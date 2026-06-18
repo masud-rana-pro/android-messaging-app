@@ -47,7 +47,7 @@ This document is the implementation checkpoint after the message status foundati
 | Privacy settings | Done foundation | Last seen/profile photo/read receipt settings exist; more hardening remains. |
 | Block/report | Done foundation | Data model, rules, chat enforcement, reason selection, block/unblock UI; emulator tests and moderation tools remain. |
 | Notifications | Partial | Cloud Functions fanout, deep links, and notification actions remain. |
-| Media polish | Partial | Upload retry/preview/validation/compression exists; background WorkManager and signed upload remain. |
+| Media polish | Advanced foundation | Validation, compression, preview, retry, app-private pending files, and WorkManager background delivery exist; signed production upload remains. |
 | Groups | Not started | Group model, members, roles, group messages. |
 | Calls | Not started | ZegoCloud, call state, notification, foreground service. |
 | Status/channels | Not started | Media/status/channel models and UI. |
@@ -59,7 +59,7 @@ This document is the implementation checkpoint after the message status foundati
 2. Phone search and profile polish.
 3. Block and report foundation. (Completed)
 4. Notification fanout and deep-link foundation.
-5. Media hardening with WorkManager and signed upload.
+5. Media hardening with WorkManager (completed) and signed upload.
 6. Group chat foundation.
 7. One-to-one calling foundation.
 8. Status/stories.
