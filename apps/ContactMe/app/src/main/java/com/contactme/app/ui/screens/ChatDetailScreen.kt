@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -34,6 +36,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -135,25 +140,12 @@ private fun ChatDetailContent(
                 },
                 actions = {
                     if (conversationId != null) {
-                        TextButton(
-                            enabled = !uiState.isSafetyActionInProgress,
-                            onClick = onReportChat
-                        ) {
-                            Text(text = "Report")
-                        }
-                        TextButton(
-                            enabled = !uiState.isSafetyActionInProgress &&
-                                (!uiState.isChatBlocked || uiState.canUnblockChat),
-                            onClick = {
-                                if (uiState.canUnblockChat) {
-                                    onUnblockChat()
-                                } else {
-                                    onBlockChat()
-                                }
-                            }
-                        ) {
-                            Text(text = if (uiState.canUnblockChat) "Unblock" else "Block")
-                        }
+                        ChatActionMenu(
+                            uiState = uiState,
+                            onReportChat = onReportChat,
+                            onBlockChat = onBlockChat,
+                            onUnblockChat = onUnblockChat
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -254,6 +246,53 @@ private fun ChatDetailContent(
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ChatActionMenu(
+    uiState: ChatDetailUiState,
+    onReportChat: () -> Unit,
+    onBlockChat: () -> Unit,
+    onUnblockChat: () -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Box {
+        TextButton(
+            enabled = !uiState.isSafetyActionInProgress,
+            onClick = { isExpanded = true }
+        ) {
+            Text(text = "⋮")
+        }
+        DropdownMenu(
+            expanded = isExpanded,
+            onDismissRequest = { isExpanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(text = "Report") },
+                enabled = !uiState.isSafetyActionInProgress,
+                onClick = {
+                    isExpanded = false
+                    onReportChat()
+                }
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(text = if (uiState.canUnblockChat) "Unblock" else "Block")
+                },
+                enabled = !uiState.isSafetyActionInProgress &&
+                    (!uiState.isChatBlocked || uiState.canUnblockChat),
+                onClick = {
+                    isExpanded = false
+                    if (uiState.canUnblockChat) {
+                        onUnblockChat()
+                    } else {
+                        onBlockChat()
+                    }
+                }
+            )
         }
     }
 }
