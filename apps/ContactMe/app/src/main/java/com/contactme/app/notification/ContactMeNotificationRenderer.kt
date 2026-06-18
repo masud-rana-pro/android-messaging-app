@@ -15,7 +15,6 @@ import com.contactme.app.navigation.NotificationNavigation
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
-import kotlin.math.abs
 
 class ContactMeNotificationRenderer @Inject constructor(
     @ApplicationContext private val context: Context
@@ -23,7 +22,7 @@ class ContactMeNotificationRenderer @Inject constructor(
     fun show(message: RemoteMessage) {
         if (!canShowNotifications()) return
 
-        val payload = ContactMeNotificationPayload.from(message)
+        val payload = ContactMeNotificationPayload.from(message) ?: return
         val pendingIntent = PendingIntent.getActivity(
             context,
             payload.notificationId,
@@ -44,6 +43,9 @@ class ContactMeNotificationRenderer @Inject constructor(
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(payload.priority)
+            .setCategory(payload.category)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setGroup(payload.groupKey)
             .build()
 
         NotificationManagerCompat.from(context).notify(
@@ -59,55 +61,5 @@ class ContactMeNotificationRenderer @Inject constructor(
             context,
             Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
-    }
-}
-
-private data class ContactMeNotificationPayload(
-    val notificationId: Int,
-    val channelId: String,
-    val conversationId: String,
-    val title: String,
-    val photoUrl: String,
-    val body: String,
-    val priority: Int
-) {
-    companion object {
-        fun from(message: RemoteMessage): ContactMeNotificationPayload {
-            val type = message.data["type"].orEmpty()
-            val conversationId = message.data["conversationId"].orEmpty()
-            val photoUrl = message.data["photoUrl"].orEmpty()
-            val title = message.data["title"]
-                ?: message.notification?.title
-                ?: DEFAULT_TITLE
-            val body = message.data["body"]
-                ?: message.notification?.body
-                ?: DEFAULT_BODY
-            val channelId = when (type) {
-                "call" -> ContactMeNotificationChannels.CALLS_CHANNEL_ID
-                "system" -> ContactMeNotificationChannels.SYSTEM_CHANNEL_ID
-                else -> ContactMeNotificationChannels.MESSAGES_CHANNEL_ID
-            }
-            val priority = when (channelId) {
-                ContactMeNotificationChannels.SYSTEM_CHANNEL_ID -> NotificationCompat.PRIORITY_DEFAULT
-                else -> NotificationCompat.PRIORITY_HIGH
-            }
-
-            return ContactMeNotificationPayload(
-                notificationId = stableNotificationId(conversationId.ifBlank { message.messageId.orEmpty() }),
-                channelId = channelId,
-                conversationId = conversationId,
-                title = title,
-                photoUrl = photoUrl,
-                body = body,
-                priority = priority
-            )
-        }
-
-        private fun stableNotificationId(key: String): Int {
-            return abs(key.ifBlank { DEFAULT_TITLE }.hashCode())
-        }
-
-        private const val DEFAULT_TITLE = "ContactMe"
-        private const val DEFAULT_BODY = "You have a new update."
     }
 }
