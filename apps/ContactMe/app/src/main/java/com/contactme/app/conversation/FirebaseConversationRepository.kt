@@ -32,15 +32,11 @@ class FirebaseConversationRepository @Inject constructor(
                 launch {
                     val previews = conversations.mapNotNull { document ->
                         val participantIds = document.get("participantIds") as? List<*> ?: return@mapNotNull null
-                        val otherUserId = participantIds
-                            .filterIsInstance<String>()
-                            .firstOrNull { userId -> userId != currentUserId }
-                            ?: return@mapNotNull null
-
-                        val otherUser = firestore.collection(USERS_COLLECTION)
-                            .document(otherUserId)
-                            .get()
-                            .await()
+                        val conversationType = ConversationType.fromFirestore(document.getString("type"))
+                        val otherUserId = participantIds.filterIsInstance<String>()
+                            .firstOrNull { userId -> userId != currentUserId }.orEmpty()
+                        val otherUser = otherUserId.takeIf { conversationType == ConversationType.Direct }
+                            ?.let { firestore.collection(USERS_COLLECTION).document(it).get().await() }
                         val updatedAtMillis = document.getTimestamp("updatedAt")?.toDate()?.time ?: 0L
                         val lastMessageSenderId = document.getString("lastMessageSenderId").orEmpty()
                         val readAtMillis = document.getTimestamp("readAtByUser.$currentUserId")
@@ -51,17 +47,26 @@ class FirebaseConversationRepository @Inject constructor(
                         ConversationPreview(
                             conversationId = document.id,
                             otherUserId = otherUserId,
-                            title = otherUser.getString("displayName").orEmpty().ifBlank {
-                                otherUser.getString("username").orEmpty().ifBlank { "ContactMe User" }
+                            title = if (conversationType == ConversationType.Group) {
+                                document.getString("title").orEmpty().ifBlank { "Group" }
+                            } else {
+                                otherUser?.getString("displayName").orEmpty().ifBlank {
+                                    otherUser?.getString("username").orEmpty().ifBlank { "ContactMe User" }
+                                }
                             },
-                            photoUrl = otherUser.visibleProfilePhotoUrlFor(currentUserId),
+                            photoUrl = if (conversationType == ConversationType.Group) {
+                                document.getString("photoUrl").orEmpty()
+                            } else {
+                                otherUser?.visibleProfilePhotoUrlFor(currentUserId).orEmpty()
+                            },
                             subtitle = document.getString("lastMessageText").orEmpty().ifBlank {
                                 "No messages yet."
                             },
                             updatedAtMillis = updatedAtMillis,
                             hasUnreadMessages = lastMessageSenderId.isNotBlank() &&
                                 lastMessageSenderId != currentUserId &&
-                                updatedAtMillis > readAtMillis
+                                updatedAtMillis > readAtMillis,
+                            type = conversationType
                         )
                     }
 
@@ -166,6 +171,37 @@ class FirebaseConversationRepository @Inject constructor(
             onFailure = {
                 ConversationResult.Error("We could not open this chat. Please try again.")
             }
+        )
+    }
+
+    override suspend fun createGroupConversation(
+        currentUserId: String,
+        title: String,
+        memberUserIds: List<String>
+    ): ConversationResult {
+        GroupConversationValidator.error(currentUserId, title, memberUserIds)?.let { message ->
+            return ConversationResult.Error(message)
+        }
+
+        val participantIds = (memberUserIds + currentUserId).distinct()
+        return runCatching {
+            val document = firestore.collection(CONVERSATIONS_COLLECTION).document()
+            document.set(
+                mapOf(
+                    "type" to ConversationType.Group.firestoreValue,
+                    "title" to title.trim(),
+                    "photoUrl" to "",
+                    "participantIds" to participantIds,
+                    "adminIds" to listOf(currentUserId),
+                    "createdBy" to currentUserId,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            document.id
+        }.fold(
+            onSuccess = { ConversationResult.Success(it) },
+            onFailure = { ConversationResult.Error("We could not create this group. Please try again.") }
         )
     }
 

@@ -52,6 +52,32 @@ class FakeConversationRepository @Inject constructor() : ConversationRepository 
         return ConversationResult.Success(conversationId)
     }
 
+    override suspend fun createGroupConversation(
+        currentUserId: String,
+        title: String,
+        memberUserIds: List<String>
+    ): ConversationResult {
+        GroupConversationValidator.error(currentUserId, title, memberUserIds)?.let { message ->
+            return ConversationResult.Error(message)
+        }
+
+        delay(250)
+        val conversationId = "group__${currentUserId}__${System.currentTimeMillis()}"
+        conversations.value = conversations.value.toMutableMap().also {
+            it[conversationId] = ConversationPreview(
+                conversationId = conversationId,
+                otherUserId = "",
+                title = title.trim(),
+                photoUrl = "",
+                subtitle = "No messages yet.",
+                updatedAtMillis = System.currentTimeMillis(),
+                hasUnreadMessages = false,
+                type = ConversationType.Group
+            )
+        }
+        return ConversationResult.Success(conversationId)
+    }
+
     override suspend fun markConversationRead(
         conversationId: String,
         userId: String
