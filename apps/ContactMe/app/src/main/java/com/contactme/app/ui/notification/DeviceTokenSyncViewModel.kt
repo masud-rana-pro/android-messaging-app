@@ -25,4 +25,8 @@ class DeviceTokenSyncViewModel @Inject constructor(
             deviceTokenRepository.syncCurrentDeviceToken(userId)
         }
     }
+
+    fun resetSyncState() {
+        lastSyncedUserId = null
+    }
 }

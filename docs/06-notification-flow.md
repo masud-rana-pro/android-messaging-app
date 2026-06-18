@@ -30,7 +30,7 @@ user_devices/{uid}/devices/{deviceId}
 ```
 
 4. Token is refreshed when FCM rotates it.
-5. Sign-out token cleanup is still planned.
+5. Sign-out removes the current device document and invalidates its local FCM token before the auth session ends.
 
 ## Message Notification Flow
 

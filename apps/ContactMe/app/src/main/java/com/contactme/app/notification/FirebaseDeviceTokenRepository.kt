@@ -52,6 +52,27 @@ class FirebaseDeviceTokenRepository @Inject constructor(
         )
     }
 
+    override suspend fun removeCurrentDeviceToken(userId: String): DeviceTokenResult {
+        if (userId.isBlank()) {
+            return DeviceTokenResult.Error("We could not update notifications for this device.")
+        }
+
+        return runCatching {
+            firestore.collection(USER_DEVICES_COLLECTION)
+                .document(userId)
+                .collection(DEVICES_COLLECTION)
+                .document(deviceId())
+                .delete()
+                .await()
+            firebaseMessaging.deleteToken().await()
+        }.fold(
+            onSuccess = { DeviceTokenResult.Success },
+            onFailure = {
+                DeviceTokenResult.Error("We could not update notifications for this device.")
+            }
+        )
+    }
+
     private suspend fun saveDeviceToken(
         userId: String,
         token: String
