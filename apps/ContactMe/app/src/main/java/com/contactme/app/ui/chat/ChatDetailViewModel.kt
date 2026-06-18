@@ -368,7 +368,7 @@ class ChatDetailViewModel @Inject constructor(
         }
     }
 
-    fun reportCurrentChat() {
+    fun reportCurrentChat(reason: ReportReason) {
         val conversationId = activeConversationId
         val userId = authRepository.currentUserId()
 
@@ -392,7 +392,7 @@ class ChatDetailViewModel @Inject constructor(
                 val result = safetyRepository.reportConversationPeer(
                     reporterUserId = userId,
                     conversationId = conversationId,
-                    reason = ReportReason.Other
+                    reason = reason
                 )
             ) {
                 SafetyResult.Success -> {
