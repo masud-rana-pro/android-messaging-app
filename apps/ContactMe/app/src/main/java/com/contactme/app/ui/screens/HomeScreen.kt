@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.contactme.app.conversation.ConversationPreview
+import com.contactme.app.conversation.ConversationType
 import com.contactme.app.navigation.HomeTab
 import com.contactme.app.profile.UserProfile
 import com.contactme.app.ui.discovery.ContactDiscoveryUiState
@@ -66,8 +67,9 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onConversationSelected: (String, String, String) -> Unit,
+    onConversationSelected: (String, String, String, ConversationType) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
+    onCreateGroupSelected: () -> Unit,
     onSettingsSelected: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(HomeTab.Chats) }
@@ -139,7 +141,8 @@ fun HomeScreen(
                 HomeTab.Chats -> ChatsTab(
                     newChatRequestCount = newChatRequestCount,
                     onConversationSelected = onConversationSelected,
-                    onDiscoveredUserSelected = onDiscoveredUserSelected
+                    onDiscoveredUserSelected = onDiscoveredUserSelected,
+                    onCreateGroupSelected = onCreateGroupSelected
                 )
                 HomeTab.Status -> PlaceholderTab(
                     title = "Status"
@@ -164,8 +167,9 @@ fun HomeScreen(
 @Composable
 private fun ChatsTab(
     newChatRequestCount: Int,
-    onConversationSelected: (String, String, String) -> Unit,
+    onConversationSelected: (String, String, String, ConversationType) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
+    onCreateGroupSelected: () -> Unit,
     discoveryViewModel: ContactDiscoveryViewModel = hiltViewModel(),
     contactListViewModel: ContactListViewModel = hiltViewModel(),
     conversationListViewModel: ConversationListViewModel = hiltViewModel()
@@ -181,7 +185,8 @@ private fun ChatsTab(
         conversationListState = conversationListState,
         onSearchQueryChanged = discoveryViewModel::onQueryChanged,
         onConversationSelected = onConversationSelected,
-        onDiscoveredUserSelected = onDiscoveredUserSelected
+        onDiscoveredUserSelected = onDiscoveredUserSelected,
+        onCreateGroupSelected = onCreateGroupSelected
     )
 }
 
@@ -192,8 +197,9 @@ private fun ChatsContent(
     contactListState: ContactListUiState,
     conversationListState: ConversationListUiState,
     onSearchQueryChanged: (String) -> Unit,
-    onConversationSelected: (String, String, String) -> Unit,
-    onDiscoveredUserSelected: (UserProfile) -> Unit
+    onConversationSelected: (String, String, String, ConversationType) -> Unit,
+    onDiscoveredUserSelected: (UserProfile) -> Unit,
+    onCreateGroupSelected: () -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -208,11 +214,18 @@ private fun ChatsContent(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = "Chats",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Chats",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                TopBarAction(label = "New group", onClick = onCreateGroupSelected)
+            }
             Text(
                 text = "Search or open a chat",
                 style = MaterialTheme.typography.bodyLarge,
@@ -269,7 +282,7 @@ private fun SavedContactsList(
 @Composable
 private fun ConversationPreviewList(
     conversationListState: ConversationListUiState,
-    onConversationSelected: (String, String, String) -> Unit
+    onConversationSelected: (String, String, String, ConversationType) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeader(title = "Recent chats")
@@ -291,7 +304,8 @@ private fun ConversationPreviewList(
                     onConversationSelected(
                         conversation.conversationId,
                         conversation.title,
-                        conversation.photoUrl
+                        conversation.photoUrl,
+                        conversation.type
                     )
                 }
             )
@@ -663,8 +677,9 @@ private fun PlaceholderTab(
 private fun HomeScreenPreview() {
     ContactMeTheme {
         HomeScreen(
-            onConversationSelected = { _, _, _ -> },
+            onConversationSelected = { _, _, _, _ -> },
             onDiscoveredUserSelected = {},
+            onCreateGroupSelected = {},
             onSettingsSelected = {}
         )
     }

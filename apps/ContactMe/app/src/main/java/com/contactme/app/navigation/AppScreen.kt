@@ -5,6 +5,7 @@ enum class AppScreen {
     Auth,
     ProfileSetup,
     Home,
+    CreateGroup,
     ChatDetail,
     Settings
 }
