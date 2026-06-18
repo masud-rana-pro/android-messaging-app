@@ -2,11 +2,13 @@ package com.contactme.app.notification
 
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.RemoteMessage
+import com.contactme.app.conversation.ConversationType
 
 internal data class ContactMeNotificationPayload(
     val notificationId: Int,
     val channelId: String,
     val conversationId: String,
+    val conversationType: ConversationType,
     val title: String,
     val photoUrl: String,
     val body: String,
@@ -47,6 +49,7 @@ internal data class ContactMeNotificationPayload(
                 notificationId = stableKey.hashCode() and Int.MAX_VALUE,
                 channelId = channelId,
                 conversationId = conversationId,
+                conversationType = ConversationType.fromFirestore(data["conversationType"]),
                 title = data["title"] ?: fallbackTitle ?: DEFAULT_TITLE,
                 photoUrl = data["photoUrl"].orEmpty(),
                 body = data["body"] ?: fallbackBody ?: DEFAULT_BODY,

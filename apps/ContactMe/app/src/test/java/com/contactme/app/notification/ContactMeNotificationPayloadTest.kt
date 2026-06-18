@@ -5,6 +5,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.contactme.app.conversation.ConversationType
 
 class ContactMeNotificationPayloadTest {
     @Test
@@ -22,6 +23,7 @@ class ContactMeNotificationPayloadTest {
             data = mapOf(
                 "type" to "message",
                 "conversationId" to "conversation-1",
+                "conversationType" to "group",
                 "title" to "Masud",
                 "body" to "Hello",
                 "photoUrl" to "https://example.com/photo.jpg"
@@ -30,6 +32,7 @@ class ContactMeNotificationPayloadTest {
 
         assertNotNull(payload)
         assertEquals("conversation-1", payload?.conversationId)
+        assertEquals(ConversationType.Group, payload?.conversationType)
         assertEquals("Masud", payload?.title)
         assertEquals("Hello", payload?.body)
         assertEquals("conversation_conversation-1", payload?.groupKey)
