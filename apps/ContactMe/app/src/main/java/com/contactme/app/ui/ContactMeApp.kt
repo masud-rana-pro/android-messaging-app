@@ -22,6 +22,7 @@ import com.contactme.app.ui.presence.PresenceViewModel
 import com.contactme.app.ui.screens.AuthScreen
 import com.contactme.app.ui.screens.ChatDetailScreen
 import com.contactme.app.ui.screens.HomeScreen
+import com.contactme.app.ui.screens.GroupCreationScreen
 import com.contactme.app.ui.screens.ProfileSetupScreen
 import com.contactme.app.ui.screens.SettingsScreen
 import com.contactme.app.ui.screens.SplashScreen
@@ -106,12 +107,13 @@ fun ContactMeApp(
             )
 
             AppScreen.Home -> HomeScreen(
-                onConversationSelected = { conversationId, chatName, photoUrl ->
+                onConversationSelected = { conversationId, chatName, photoUrl, type ->
                     openChat(
                         ChatTarget(
                             title = chatName,
                             conversationId = conversationId,
-                            photoUrl = photoUrl
+                            photoUrl = photoUrl,
+                            type = type
                         )
                     )
                 },
@@ -128,7 +130,15 @@ fun ContactMeApp(
                 },
                 onSettingsSelected = {
                     currentScreen = AppScreen.Settings
+                },
+                onCreateGroupSelected = {
+                    currentScreen = AppScreen.CreateGroup
                 }
+            )
+
+            AppScreen.CreateGroup -> GroupCreationScreen(
+                onBack = { currentScreen = AppScreen.Home },
+                onGroupCreated = { currentScreen = AppScreen.Home }
             )
 
             AppScreen.ChatDetail -> ChatDetailScreen(
