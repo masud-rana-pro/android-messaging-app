@@ -15,6 +15,12 @@ interface ConversationRepository {
         otherUserId: String
     ): ConversationResult
 
+    suspend fun createGroupConversation(
+        currentUserId: String,
+        title: String,
+        memberUserIds: List<String>
+    ): ConversationResult
+
     suspend fun markConversationRead(
         conversationId: String,
         userId: String

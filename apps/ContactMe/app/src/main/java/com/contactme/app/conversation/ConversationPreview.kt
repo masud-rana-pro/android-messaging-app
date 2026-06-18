@@ -7,5 +7,6 @@ data class ConversationPreview(
     val photoUrl: String,
     val subtitle: String,
     val updatedAtMillis: Long,
-    val hasUnreadMessages: Boolean
+    val hasUnreadMessages: Boolean,
+    val type: ConversationType = ConversationType.Direct
 )
