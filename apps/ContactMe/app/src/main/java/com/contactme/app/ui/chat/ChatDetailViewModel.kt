@@ -3,10 +3,14 @@ package com.contactme.app.ui.chat
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkInfo
 import com.contactme.app.auth.AuthRepository
 import com.contactme.app.conversation.ConversationRepository
 import com.contactme.app.message.MessageRepository
 import com.contactme.app.message.MessageResult
+import com.contactme.app.media.ImageMessageQueue
+import com.contactme.app.media.ImageQueueResult
+import com.contactme.app.media.QueuedImageMessage
 import com.contactme.app.presence.PresenceRepository
 import com.contactme.app.safety.ReportReason
 import com.contactme.app.safety.SafetyRepository
@@ -19,6 +23,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -28,7 +34,8 @@ class ChatDetailViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val typingRepository: TypingRepository,
     private val presenceRepository: PresenceRepository,
-    private val safetyRepository: SafetyRepository
+    private val safetyRepository: SafetyRepository,
+    private val imageMessageQueue: ImageMessageQueue
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         ChatDetailUiState(currentUserId = authRepository.currentUserId().orEmpty())
@@ -226,25 +233,24 @@ class ChatDetailViewModel @Inject constructor(
             }
 
             when (
-                val result = messageRepository.sendImageMessage(
+                val result = imageMessageQueue.enqueue(
                     conversationId = conversationId,
                     senderId = senderId,
                     imageUri = imageUri
                 )
             ) {
-                MessageResult.Success -> {
-                    updateTypingState(isTyping = false)
+                is ImageQueueResult.Queued -> {
                     _uiState.update {
                         it.copy(
-                            isSending = false,
-                            pendingImageUri = "",
+                            pendingImageUri = result.message.localUri,
                             failedImageUri = "",
                             errorMessage = null
                         )
                     }
+                    observeQueuedImage(result.message)
                 }
 
-                is MessageResult.Error -> {
+                is ImageQueueResult.Error -> {
                     _uiState.update {
                         it.copy(
                             isSending = false,
@@ -256,6 +262,39 @@ class ChatDetailViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private suspend fun observeQueuedImage(message: QueuedImageMessage) {
+        imageMessageQueue.observe(message.workId)
+            .filterNotNull()
+            .first { workInfo ->
+                when {
+                    workInfo.state == WorkInfo.State.SUCCEEDED -> {
+                        updateTypingState(isTyping = false)
+                        _uiState.update {
+                            it.copy(
+                                isSending = false,
+                                pendingImageUri = "",
+                                failedImageUri = "",
+                                errorMessage = null
+                            )
+                        }
+                    }
+
+                    workInfo.state.isFinished -> {
+                        _uiState.update {
+                            it.copy(
+                                isSending = false,
+                                pendingImageUri = "",
+                                failedImageUri = message.localUri,
+                                errorMessage = workInfo.outputData.getString(ImageMessageQueue.ERROR_KEY)
+                                    ?: "We could not send this photo. Please try again."
+                            )
+                        }
+                    }
+                }
+                workInfo.state.isFinished
+            }
     }
 
     fun retryFailedImageMessage() {
