@@ -54,6 +54,16 @@ class FirebaseMessageRepository @Inject constructor(
                             mimeType = document.getString("mimeType").orEmpty(),
                             fileName = document.getString("fileName").orEmpty(),
                             fileSizeBytes = document.getLong("fileSizeBytes") ?: 0L,
+                            replyTo = document.getString("replyToMessageId")
+                                ?.takeIf(String::isNotBlank)
+                                ?.let { replyMessageId ->
+                                    MessageReply(
+                                        messageId = replyMessageId,
+                                        senderName = document.getString("replyToSenderName").orEmpty(),
+                                        preview = document.getString("replyPreview").orEmpty(),
+                                        type = MessageType.fromFirestore(document.getString("replyType"))
+                                    )
+                                },
                             sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
                             status = MessageStatus.fromFirestore(document.getString("status"))
                         )
@@ -69,7 +79,8 @@ class FirebaseMessageRepository @Inject constructor(
     override suspend fun sendMessage(
         conversationId: String,
         senderId: String,
-        text: String
+        text: String,
+        replyTo: MessageReply?
     ): MessageResult {
         val trimmedText = text.trim()
 
@@ -84,13 +95,19 @@ class FirebaseMessageRepository @Inject constructor(
             return MessageResult.Error("This chat is not available.")
         }
 
-        val messageData = mapOf(
+        val messageData = mutableMapOf<String, Any>(
             "senderId" to senderId,
             "text" to trimmedText,
             "type" to MessageType.Text.firestoreValue,
             "status" to MessageStatus.Sent.firestoreValue,
             "createdAt" to FieldValue.serverTimestamp()
         )
+        replyTo?.let { reply ->
+            messageData["replyToMessageId"] = reply.messageId
+            messageData["replyToSenderName"] = reply.senderName
+            messageData["replyPreview"] = reply.preview
+            messageData["replyType"] = reply.type.firestoreValue
+        }
 
         return runCatching {
             val messageDocument = conversationDocument

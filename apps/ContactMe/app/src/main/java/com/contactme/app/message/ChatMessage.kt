@@ -12,6 +12,7 @@ data class ChatMessage(
     val mimeType: String = "",
     val fileName: String = "",
     val fileSizeBytes: Long = 0L,
+    val replyTo: MessageReply? = null,
     val sentAtMillis: Long,
     val status: MessageStatus = MessageStatus.Sent
 )
