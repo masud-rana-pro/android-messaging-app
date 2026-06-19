@@ -46,7 +46,7 @@ This document is the implementation checkpoint after the message status foundati
 | Phone search | Done foundation | Normalize and query phone identity; native contacts sync remains later. |
 | Privacy settings | Done foundation | Last seen/profile photo/read receipt settings exist; more hardening remains. |
 | Block/report | Done foundation | Data model, rules, chat enforcement, reason selection, block/unblock UI; emulator tests and moderation tools remain. |
-| Notifications | Partial | Cloud Functions fanout, deep links, and notification actions remain. |
+| Notifications | Advanced foundation | Message fanout and chat deep links exist; function deployment, real-device validation, and call actions remain. |
 | Media polish | Advanced foundation | Validation, compression, preview, retry, app-private pending files, and WorkManager background delivery exist; signed production upload remains. |
 | Groups | Working MVP | Creation UI, member selection, group previews, text/image messages, sender labels, notification routing, admin schema, validation, and rules exist; member/admin management and group profile editing remain. |
 | Calls | Not started | ZegoCloud, call state, notification, foreground service. |
