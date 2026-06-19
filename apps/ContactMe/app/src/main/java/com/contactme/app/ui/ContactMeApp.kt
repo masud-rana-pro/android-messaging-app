@@ -32,6 +32,7 @@ import com.contactme.app.ui.session.SessionViewModel
 @Composable
 fun ContactMeApp(
     notificationChatTarget: ChatTarget? = null,
+    onNotificationChatTargetConsumed: () -> Unit = {},
     sessionViewModel: SessionViewModel = hiltViewModel(),
     conversationViewModel: ConversationViewModel = hiltViewModel(),
     presenceViewModel: PresenceViewModel = hiltViewModel(),
@@ -82,6 +83,7 @@ fun ContactMeApp(
             currentScreen == AppScreen.Settings
         ) {
             openNotificationChatIfPossible(target)
+            onNotificationChatTargetConsumed()
         }
     }
 
