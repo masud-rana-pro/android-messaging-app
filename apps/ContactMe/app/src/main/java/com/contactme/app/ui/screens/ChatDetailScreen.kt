@@ -282,7 +282,9 @@ private fun ChatDetailContent(
                         message = message,
                         isMine = message.senderId == uiState.currentUserId,
                         showSenderName = conversationType == ConversationType.Group,
-                        onLongPress = { selectedMessageForActions = message },
+                        onLongPress = {
+                            if (!uiState.isSending) selectedMessageForActions = message
+                        },
                         readReceiptState = uiState.readReceiptState
                     )
                 }
@@ -333,6 +335,7 @@ private fun ChatDetailContent(
                     text = uiState.messageText,
                     enabled = conversationId != null && !uiState.isSending && !uiState.isChatBlocked,
                     isSending = uiState.isSending,
+                    attachmentsEnabled = uiState.editingMessageId == null,
                     hasFailedImage = uiState.failedImageUri.isNotBlank(),
                     isChatBlocked = uiState.isChatBlocked,
                     onMessageTextChanged = onMessageTextChanged,
@@ -1052,6 +1055,7 @@ private fun MessageInputBar(
     text: String,
     enabled: Boolean,
     isSending: Boolean,
+    attachmentsEnabled: Boolean,
     hasFailedImage: Boolean,
     isChatBlocked: Boolean,
     onMessageTextChanged: (String) -> Unit,
@@ -1078,7 +1082,7 @@ private fun MessageInputBar(
             trailingIcon = {
                 Box {
                     IconButton(
-                        enabled = enabled && !isSending,
+                        enabled = enabled && !isSending && attachmentsEnabled,
                         onClick = { attachmentMenuExpanded = true }
                     ) {
                         Icon(
