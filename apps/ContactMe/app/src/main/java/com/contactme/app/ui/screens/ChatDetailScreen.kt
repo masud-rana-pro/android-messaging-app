@@ -119,6 +119,7 @@ fun ChatDetailScreen(
         onSendMessage = viewModel::sendMessage,
         onRetryImageMessage = viewModel::retryFailedImageMessage,
         onRetryDocumentMessage = viewModel::retryFailedDocumentMessage,
+        onRetryLoadingMessages = viewModel::retryLoadingMessages,
         onReportChat = viewModel::reportCurrentChat,
         onBlockChat = viewModel::blockCurrentChat,
         onUnblockChat = viewModel::unblockCurrentChat,
@@ -145,6 +146,7 @@ private fun ChatDetailContent(
     onSendMessage: () -> Unit,
     onRetryImageMessage: () -> Unit,
     onRetryDocumentMessage: () -> Unit,
+    onRetryLoadingMessages: () -> Unit,
     onReportChat: (ReportReason) -> Unit,
     onBlockChat: () -> Unit,
     onUnblockChat: () -> Unit,
@@ -249,6 +251,15 @@ private fun ChatDetailContent(
                         ChatListStateMessage(
                             title = "Loading messages",
                             subtitle = "Syncing this conversation."
+                        )
+                    }
+                } else if (uiState.messageLoadError != null) {
+                    item {
+                        ChatListStateMessage(
+                            title = "Messages unavailable",
+                            subtitle = uiState.messageLoadError,
+                            actionLabel = "Retry",
+                            onAction = onRetryLoadingMessages
                         )
                     }
                 } else if (messages.isEmpty()) {
@@ -559,7 +570,9 @@ private fun Long.formatPresenceTime(): String {
 @Composable
 private fun ChatListStateMessage(
     title: String,
-    subtitle: String
+    subtitle: String,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
@@ -587,6 +600,9 @@ private fun ChatListStateMessage(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.68f)
             )
+            actionLabel?.let { label ->
+                TextButton(onClick = onAction) { Text(text = label) }
+            }
         }
     }
 }
