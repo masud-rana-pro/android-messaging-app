@@ -17,4 +17,13 @@ interface MessageRepository {
         senderId: String,
         imageUri: Uri
     ): MessageResult
+
+    suspend fun sendDocumentMessage(
+        conversationId: String,
+        senderId: String,
+        documentUri: Uri,
+        fileName: String,
+        mimeType: String,
+        fileSizeBytes: Long
+    ): MessageResult
 }

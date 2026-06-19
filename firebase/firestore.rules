@@ -155,6 +155,24 @@ service cloud.firestore {
               && request.resource.data.mediaUrl is string
               && request.resource.data.mediaUrl.size() > 0
               && (!("text" in request.resource.data) || request.resource.data.text is string)
+            ) ||
+            (
+              request.resource.data.type == "document"
+              && request.resource.data.mediaUrl is string
+              && request.resource.data.mediaUrl.size() > 0
+              && request.resource.data.fileName is string
+              && request.resource.data.fileName.size() > 0
+              && request.resource.data.fileName.size() <= 255
+              && request.resource.data.mimeType is string
+              && request.resource.data.mimeType in [
+                "application/pdf",
+                "text/plain",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              ]
+              && request.resource.data.fileSizeBytes is int
+              && request.resource.data.fileSizeBytes > 0
+              && request.resource.data.fileSizeBytes <= 26214400
             )
           );
         allow update, delete: if false;

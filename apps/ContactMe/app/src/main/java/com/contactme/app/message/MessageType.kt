@@ -2,7 +2,8 @@ package com.contactme.app.message
 
 enum class MessageType(val firestoreValue: String) {
     Text("text"),
-    Image("image");
+    Image("image"),
+    Document("document");
 
     companion object {
         fun fromFirestore(value: String?): MessageType {

@@ -12,6 +12,9 @@ import com.contactme.app.message.MessageResult
 import com.contactme.app.media.ImageMessageQueue
 import com.contactme.app.media.ImageQueueResult
 import com.contactme.app.media.QueuedImageMessage
+import com.contactme.app.media.DocumentMessageQueue
+import com.contactme.app.media.DocumentQueueResult
+import com.contactme.app.media.QueuedDocumentMessage
 import com.contactme.app.presence.PresenceRepository
 import com.contactme.app.safety.ReportReason
 import com.contactme.app.safety.SafetyRepository
@@ -36,7 +39,8 @@ class ChatDetailViewModel @Inject constructor(
     private val typingRepository: TypingRepository,
     private val presenceRepository: PresenceRepository,
     private val safetyRepository: SafetyRepository,
-    private val imageMessageQueue: ImageMessageQueue
+    private val imageMessageQueue: ImageMessageQueue,
+    private val documentMessageQueue: DocumentMessageQueue
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         ChatDetailUiState(currentUserId = authRepository.currentUserId().orEmpty())
@@ -240,6 +244,10 @@ class ChatDetailViewModel @Inject constructor(
                     isSending = true,
                     pendingImageUri = imageUri.toString(),
                     failedImageUri = "",
+                    pendingDocumentName = "",
+                    failedDocumentUri = "",
+                    failedDocumentName = "",
+                    failedDocumentMimeType = "",
                     errorMessage = null
                 )
             }
@@ -315,6 +323,100 @@ class ChatDetailViewModel @Inject constructor(
         if (failedImageUri.isBlank()) return
 
         sendImageMessage(Uri.parse(failedImageUri))
+    }
+
+    fun sendDocumentMessage(
+        documentUri: Uri,
+        preferredFileName: String? = null,
+        preferredMimeType: String? = null
+    ) {
+        val conversationId = activeConversationId ?: return
+        val senderId = authRepository.currentUserId() ?: return
+        if (_uiState.value.isSending || _uiState.value.isChatBlocked) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSending = true,
+                    pendingDocumentName = "Preparing document",
+                    pendingImageUri = "",
+                    failedImageUri = "",
+                    failedDocumentUri = "",
+                    failedDocumentName = "",
+                    errorMessage = null
+                )
+            }
+            when (
+                val result = documentMessageQueue.enqueue(
+                    conversationId,
+                    senderId,
+                    documentUri,
+                    preferredFileName,
+                    preferredMimeType
+                )
+            ) {
+                is DocumentQueueResult.Queued -> {
+                    _uiState.update { it.copy(pendingDocumentName = result.message.fileName) }
+                    observeQueuedDocument(result.message)
+                }
+                is DocumentQueueResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            pendingDocumentName = "",
+                            failedDocumentUri = documentUri.toString(),
+                            failedDocumentName = "Document",
+                            failedDocumentMimeType = preferredMimeType.orEmpty(),
+                            errorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun observeQueuedDocument(message: QueuedDocumentMessage) {
+        documentMessageQueue.observe(message.workId).filterNotNull().first { workInfo ->
+            when {
+                workInfo.state == WorkInfo.State.SUCCEEDED -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            pendingDocumentName = "",
+                            failedDocumentUri = "",
+                            failedDocumentName = "",
+                            failedDocumentMimeType = "",
+                            errorMessage = null
+                        )
+                    }
+                }
+                workInfo.state.isFinished -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            pendingDocumentName = "",
+                            failedDocumentUri = message.localUri,
+                            failedDocumentName = message.fileName,
+                            failedDocumentMimeType = message.mimeType,
+                            errorMessage = workInfo.outputData.getString(DocumentMessageQueue.ERROR_KEY)
+                                ?: "We could not send this document. Please try again."
+                        )
+                    }
+                }
+            }
+            workInfo.state.isFinished
+        }
+    }
+
+    fun retryFailedDocumentMessage() {
+        val state = _uiState.value
+        if (state.failedDocumentUri.isNotBlank()) {
+            sendDocumentMessage(
+                Uri.parse(state.failedDocumentUri),
+                state.failedDocumentName.takeIf(String::isNotBlank),
+                state.failedDocumentMimeType.takeIf(String::isNotBlank)
+            )
+        }
     }
 
     fun blockCurrentChat() {

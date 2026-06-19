@@ -18,6 +18,10 @@ data class ChatDetailUiState(
     val canUnblockChat: Boolean = false,
     val pendingImageUri: String = "",
     val failedImageUri: String = "",
+    val pendingDocumentName: String = "",
+    val failedDocumentUri: String = "",
+    val failedDocumentName: String = "",
+    val failedDocumentMimeType: String = "",
     val statusMessage: String? = null,
     val errorMessage: String? = null
 )

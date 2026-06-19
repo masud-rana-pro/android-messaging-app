@@ -140,6 +140,9 @@ async function deleteInvalidTokens(
 
 function notificationBody(message: Record<string, unknown>): string {
   if (stringValue(message.type) === "image") return "Photo";
+  if (stringValue(message.type) === "document") {
+    return stringValue(message.fileName) || "Document";
+  }
 
   const text = stringValue(message.text).trim();
   if (!text) return "New message";

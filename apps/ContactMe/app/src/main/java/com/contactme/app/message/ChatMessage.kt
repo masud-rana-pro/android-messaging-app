@@ -10,6 +10,8 @@ data class ChatMessage(
     val mediaProvider: String = "",
     val mediaPublicId: String = "",
     val mimeType: String = "",
+    val fileName: String = "",
+    val fileSizeBytes: Long = 0L,
     val sentAtMillis: Long,
     val status: MessageStatus = MessageStatus.Sent
 )
