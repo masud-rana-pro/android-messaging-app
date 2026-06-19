@@ -126,6 +126,8 @@ fun ChatDetailScreen(
         onDocumentSelected = { uri -> viewModel.sendDocumentMessage(uri) },
         onReplyMessage = viewModel::startReply,
         onCancelReply = viewModel::cancelReply,
+        onEditMessage = viewModel::startEdit,
+        onCancelEdit = viewModel::cancelEdit,
         onDeleteMessage = viewModel::deleteMessage
     )
 }
@@ -150,6 +152,8 @@ private fun ChatDetailContent(
     onDocumentSelected: (Uri) -> Unit,
     onReplyMessage: (ChatMessage) -> Unit,
     onCancelReply: () -> Unit,
+    onEditMessage: (ChatMessage) -> Unit,
+    onCancelEdit: () -> Unit,
     onDeleteMessage: (ChatMessage) -> Unit
 ) {
     val messages = uiState.messages
@@ -173,10 +177,15 @@ private fun ChatDetailContent(
     selectedMessageForActions?.let { selectedMessage ->
         MessageActionsDialog(
             canDelete = selectedMessage.senderId == uiState.currentUserId,
+            canEdit = selectedMessage.senderId == uiState.currentUserId && selectedMessage.type == MessageType.Text,
             onDismiss = { selectedMessageForActions = null },
             onReply = {
                 selectedMessageForActions = null
                 onReplyMessage(selectedMessage)
+            },
+            onEdit = {
+                selectedMessageForActions = null
+                onEditMessage(selectedMessage)
             },
             onDelete = {
                 selectedMessageForActions = null
@@ -279,6 +288,9 @@ private fun ChatDetailContent(
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                uiState.editingMessageId?.let {
+                    EditComposerPreview(onCancel = onCancelEdit)
+                }
                 uiState.replyingTo?.let { reply ->
                     ReplyComposerPreview(reply = reply, onCancel = onCancelReply)
                 }
@@ -626,8 +638,10 @@ private fun ChatStatusMessage(message: String) {
 @Composable
 private fun MessageActionsDialog(
     canDelete: Boolean,
+    canEdit: Boolean,
     onDismiss: () -> Unit,
     onReply: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     AlertDialog(
@@ -637,6 +651,11 @@ private fun MessageActionsDialog(
             Column {
                 TextButton(modifier = Modifier.fillMaxWidth(), onClick = onReply) {
                     Text(modifier = Modifier.fillMaxWidth(), text = "Reply")
+                }
+                if (canEdit) {
+                    TextButton(modifier = Modifier.fillMaxWidth(), onClick = onEdit) {
+                        Text(modifier = Modifier.fillMaxWidth(), text = "Edit")
+                    }
                 }
                 if (canDelete) {
                     TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDelete) {
@@ -654,6 +673,28 @@ private fun MessageActionsDialog(
             TextButton(onClick = onDismiss) { Text(text = "Cancel") }
         }
     )
+}
+
+@Composable
+private fun EditComposerPreview(onCancel: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().background(
+            MaterialTheme.colorScheme.surfaceVariant,
+            RoundedCornerShape(12.dp)
+        ).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            modifier = Modifier.weight(1f),
+            text = "Editing message",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+        IconButton(onClick = onCancel) {
+            Icon(imageVector = Icons.Outlined.Close, contentDescription = "Cancel edit")
+        }
+    }
 }
 
 @Composable
@@ -791,6 +832,7 @@ private fun MessageBubble(
             }
             MessageMetaRow(
                 sentAtMillis = message.sentAtMillis,
+                isEdited = !message.isDeleted && message.editedAtMillis > 0L,
                 status = message.status,
                 isMine = isMine,
                 isSeen = isMine && message.isSeenByPeer(readReceiptState)
@@ -969,6 +1011,7 @@ private fun PendingDocumentPreview(fileName: String, isUploading: Boolean) {
 @Composable
 private fun MessageMetaRow(
     sentAtMillis: Long,
+    isEdited: Boolean,
     status: MessageStatus,
     isMine: Boolean,
     isSeen: Boolean
@@ -978,6 +1021,13 @@ private fun MessageMetaRow(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (isEdited) {
+            Text(
+                text = "edited",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f)
+            )
+        }
         Text(
             text = sentAtMillis.formatChatTime(),
             style = MaterialTheme.typography.labelSmall,

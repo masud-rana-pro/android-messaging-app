@@ -65,6 +65,7 @@ class FirebaseMessageRepository @Inject constructor(
                                     )
                                 },
                             isDeleted = document.getBoolean("isDeleted") ?: false,
+                            editedAtMillis = document.getTimestamp("editedAt")?.toDate()?.time ?: 0L,
                             sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
                             status = MessageStatus.fromFirestore(document.getString("status"))
                         )
@@ -257,6 +258,7 @@ class FirebaseMessageRepository @Inject constructor(
             val message = conversation.collection(MESSAGES_COLLECTION).document(messageId)
             firestore.runTransaction { transaction ->
                 val messageSnapshot = transaction.get(message)
+                val conversationSnapshot = transaction.get(conversation)
                 check(messageSnapshot.getString("senderId") == currentUserId)
                 transaction.update(
                     message,
@@ -272,13 +274,49 @@ class FirebaseMessageRepository @Inject constructor(
                         "fileSizeBytes" to 0L
                     )
                 )
-                if (transaction.get(conversation).getString("lastMessageId") == messageId) {
+                if (conversationSnapshot.getString("lastMessageId") == messageId) {
                     transaction.update(conversation, "lastMessageText", DELETED_LAST_MESSAGE)
                 }
             }.await()
         }.fold(
             onSuccess = { MessageResult.Success },
             onFailure = { MessageResult.Error("We could not delete this message. Please try again.") }
+        )
+    }
+
+    override suspend fun editMessage(
+        conversationId: String,
+        messageId: String,
+        currentUserId: String,
+        text: String
+    ): MessageResult {
+        val trimmedText = text.trim()
+        if (conversationId.isBlank() || messageId.isBlank() || currentUserId.isBlank() ||
+            trimmedText.isBlank() || trimmedText.length > 4000
+        ) {
+            return MessageResult.Error("Enter a valid message.")
+        }
+
+        return runCatching {
+            val conversation = firestore.collection(CONVERSATIONS_COLLECTION).document(conversationId)
+            val message = conversation.collection(MESSAGES_COLLECTION).document(messageId)
+            firestore.runTransaction { transaction ->
+                val snapshot = transaction.get(message)
+                val conversationSnapshot = transaction.get(conversation)
+                check(snapshot.getString("senderId") == currentUserId)
+                check(snapshot.getString("type") == MessageType.Text.firestoreValue)
+                check(snapshot.getBoolean("isDeleted") != true)
+                transaction.update(
+                    message,
+                    mapOf("text" to trimmedText, "editedAt" to FieldValue.serverTimestamp())
+                )
+                if (conversationSnapshot.getString("lastMessageId") == messageId) {
+                    transaction.update(conversation, "lastMessageText", trimmedText)
+                }
+            }.await()
+        }.fold(
+            onSuccess = { MessageResult.Success },
+            onFailure = { MessageResult.Error("We could not edit this message. Please try again.") }
         )
     }
 

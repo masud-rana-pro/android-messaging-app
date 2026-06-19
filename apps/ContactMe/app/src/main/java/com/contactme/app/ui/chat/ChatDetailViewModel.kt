@@ -86,6 +86,9 @@ class ChatDetailViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 messages = emptyList(),
+                messageText = "",
+                replyingTo = null,
+                editingMessageId = null,
                 isLoadingMessages = true,
                 isOtherUserTyping = false,
                 peerPresence = com.contactme.app.presence.PresenceStatus(),
@@ -192,20 +195,27 @@ class ChatDetailViewModel @Inject constructor(
                 )
             }
 
-            when (
-                val result = messageRepository.sendMessage(
+            val result = state.editingMessageId?.let { messageId ->
+                messageRepository.editMessage(
+                    conversationId = conversationId,
+                    messageId = messageId,
+                    currentUserId = senderId,
+                    text = state.messageText
+                )
+            } ?: messageRepository.sendMessage(
                     conversationId = conversationId,
                     senderId = senderId,
                     text = state.messageText,
                     replyTo = state.replyingTo
                 )
-            ) {
+            when (result) {
                 MessageResult.Success -> {
                     updateTypingState(isTyping = false)
                     _uiState.update {
                         it.copy(
                             messageText = "",
                             replyingTo = null,
+                            editingMessageId = null,
                             isSending = false,
                             pendingImageUri = "",
                             failedImageUri = "",
@@ -250,6 +260,25 @@ class ChatDetailViewModel @Inject constructor(
         _uiState.update { it.copy(replyingTo = null) }
     }
 
+    fun startEdit(message: ChatMessage) {
+        if (message.senderId != _uiState.value.currentUserId ||
+            message.type != MessageType.Text || message.isDeleted
+        ) return
+        _uiState.update {
+            it.copy(
+                messageText = message.text,
+                replyingTo = null,
+                editingMessageId = message.id,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun cancelEdit() {
+        _uiState.update { it.copy(messageText = "", editingMessageId = null, errorMessage = null) }
+        updateTypingState(isTyping = false)
+    }
+
     fun deleteMessage(message: ChatMessage) {
         val conversationId = activeConversationId ?: return
         val currentUserId = authRepository.currentUserId() ?: return
@@ -263,6 +292,7 @@ class ChatDetailViewModel @Inject constructor(
                         it.copy(
                             isSending = false,
                             replyingTo = it.replyingTo?.takeUnless { reply -> reply.messageId == message.id },
+                            editingMessageId = it.editingMessageId?.takeUnless { id -> id == message.id },
                             statusMessage = "Message deleted."
                         )
                     }

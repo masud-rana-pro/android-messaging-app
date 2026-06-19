@@ -42,7 +42,7 @@ This document is the implementation checkpoint after the message status foundati
 
 | Area | Status | Next Need |
 | --- | --- | --- |
-| Chat UI polish | Partial | Better navigation, empty/loading/error states, retry. |
+| Chat UI polish | Advanced foundation | Polished states plus reply, sender delete, and sender text edit actions exist; forward/star/pin/reactions remain. |
 | Phone search | Done foundation | Normalize and query phone identity; native contacts sync remains later. |
 | Privacy settings | Done foundation | Last seen/profile photo/read receipt settings exist; more hardening remains. |
 | Block/report | Done foundation | Data model, rules, chat enforcement, reason selection, block/unblock UI; emulator tests and moderation tools remain. |

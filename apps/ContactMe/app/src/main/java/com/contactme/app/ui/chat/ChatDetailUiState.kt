@@ -9,6 +9,7 @@ data class ChatDetailUiState(
     val currentUserId: String = "",
     val messageText: String = "",
     val replyingTo: MessageReply? = null,
+    val editingMessageId: String? = null,
     val messages: List<ChatMessage> = emptyList(),
     val isLoadingMessages: Boolean = false,
     val isOtherUserTyping: Boolean = false,

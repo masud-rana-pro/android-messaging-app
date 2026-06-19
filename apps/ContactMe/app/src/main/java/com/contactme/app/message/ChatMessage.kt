@@ -14,6 +14,7 @@ data class ChatMessage(
     val fileSizeBytes: Long = 0L,
     val replyTo: MessageReply? = null,
     val isDeleted: Boolean = false,
+    val editedAtMillis: Long = 0L,
     val sentAtMillis: Long,
     val status: MessageStatus = MessageStatus.Sent
 )
