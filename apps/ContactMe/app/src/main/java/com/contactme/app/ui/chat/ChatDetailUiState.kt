@@ -12,6 +12,7 @@ data class ChatDetailUiState(
     val editingMessageId: String? = null,
     val messages: List<ChatMessage> = emptyList(),
     val isLoadingMessages: Boolean = false,
+    val messageLoadError: String? = null,
     val isOtherUserTyping: Boolean = false,
     val peerPresence: PresenceStatus = PresenceStatus(),
     val readReceiptState: ReadReceiptState = ReadReceiptState(),

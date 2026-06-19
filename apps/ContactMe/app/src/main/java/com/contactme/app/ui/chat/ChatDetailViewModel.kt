@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -90,6 +91,7 @@ class ChatDetailViewModel @Inject constructor(
                 replyingTo = null,
                 editingMessageId = null,
                 isLoadingMessages = true,
+                messageLoadError = null,
                 isOtherUserTyping = false,
                 peerPresence = com.contactme.app.presence.PresenceStatus(),
                 readReceiptState = com.contactme.app.conversation.ReadReceiptState(),
@@ -103,20 +105,7 @@ class ChatDetailViewModel @Inject constructor(
         if (conversationType == ConversationType.Direct) {
             loadSafetyState(conversationId)
         }
-        messagesJob = viewModelScope.launch {
-            messageRepository.observeMessages(conversationId).collect { messages ->
-                _uiState.update {
-                    it.copy(
-                        messages = messages,
-                        isLoadingMessages = false,
-                        errorMessage = null
-                    )
-                }
-                if (messages.isNotEmpty()) {
-                    markConversationRead(conversationId)
-                }
-            }
-        }
+        observeConversationMessages(conversationId)
 
         val currentUserId = authRepository.currentUserId()
         if (currentUserId != null && conversationType == ConversationType.Direct) {
@@ -155,6 +144,40 @@ class ChatDetailViewModel @Inject constructor(
         }
     }
 
+    private fun observeConversationMessages(conversationId: String) {
+        messagesJob?.cancel()
+        messagesJob = viewModelScope.launch {
+            messageRepository.observeMessages(conversationId)
+                .catch {
+                    _uiState.update {
+                        it.copy(
+                            isLoadingMessages = false,
+                            messageLoadError = "Messages could not be synced. Check your connection."
+                        )
+                    }
+                }
+                .collect { messages ->
+                    _uiState.update {
+                        it.copy(
+                            messages = messages,
+                            isLoadingMessages = false,
+                            messageLoadError = null,
+                            errorMessage = null
+                        )
+                    }
+                    if (messages.isNotEmpty()) {
+                        markConversationRead(conversationId)
+                    }
+                }
+        }
+    }
+
+    fun retryLoadingMessages() {
+        val conversationId = activeConversationId ?: return
+        _uiState.update { it.copy(isLoadingMessages = true, messageLoadError = null) }
+        observeConversationMessages(conversationId)
+    }
+
     fun onMessageTextChanged(value: String) {
         val nextMessageText = value.take(MAX_MESSAGE_LENGTH)
         _uiState.update {
@@ -185,16 +208,15 @@ class ChatDetailViewModel @Inject constructor(
             return
         }
 
+        _uiState.update {
+            it.copy(
+                isSending = true,
+                pendingImageUri = "",
+                failedImageUri = "",
+                errorMessage = null
+            )
+        }
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isSending = true,
-                    pendingImageUri = "",
-                    failedImageUri = "",
-                    errorMessage = null
-                )
-            }
-
             val result = state.editingMessageId?.let { messageId ->
                 messageRepository.editMessage(
                     conversationId = conversationId,
@@ -290,8 +312,8 @@ class ChatDetailViewModel @Inject constructor(
         val currentUserId = authRepository.currentUserId() ?: return
         if (message.senderId != currentUserId || message.isDeleted || _uiState.value.isSending) return
 
+        _uiState.update { it.copy(isSending = true, errorMessage = null) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSending = true, errorMessage = null) }
             when (messageRepository.deleteMessage(conversationId, message.id, currentUserId)) {
                 MessageResult.Success -> {
                     _uiState.update {
@@ -332,20 +354,19 @@ class ChatDetailViewModel @Inject constructor(
             return
         }
 
+        _uiState.update {
+            it.copy(
+                isSending = true,
+                pendingImageUri = imageUri.toString(),
+                failedImageUri = "",
+                pendingDocumentName = "",
+                failedDocumentUri = "",
+                failedDocumentName = "",
+                failedDocumentMimeType = "",
+                errorMessage = null
+            )
+        }
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isSending = true,
-                    pendingImageUri = imageUri.toString(),
-                    failedImageUri = "",
-                    pendingDocumentName = "",
-                    failedDocumentUri = "",
-                    failedDocumentName = "",
-                    failedDocumentMimeType = "",
-                    errorMessage = null
-                )
-            }
-
             when (
                 val result = imageMessageQueue.enqueue(
                     conversationId = conversationId,
@@ -430,18 +451,18 @@ class ChatDetailViewModel @Inject constructor(
             _uiState.value.editingMessageId != null
         ) return
 
+        _uiState.update {
+            it.copy(
+                isSending = true,
+                pendingDocumentName = "Preparing document",
+                pendingImageUri = "",
+                failedImageUri = "",
+                failedDocumentUri = "",
+                failedDocumentName = "",
+                errorMessage = null
+            )
+        }
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isSending = true,
-                    pendingDocumentName = "Preparing document",
-                    pendingImageUri = "",
-                    failedImageUri = "",
-                    failedDocumentUri = "",
-                    failedDocumentName = "",
-                    errorMessage = null
-                )
-            }
             when (
                 val result = documentMessageQueue.enqueue(
                     conversationId,
