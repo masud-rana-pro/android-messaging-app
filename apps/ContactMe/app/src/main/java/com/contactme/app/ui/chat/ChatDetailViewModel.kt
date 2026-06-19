@@ -9,6 +9,9 @@ import com.contactme.app.conversation.ConversationRepository
 import com.contactme.app.conversation.ConversationType
 import com.contactme.app.message.MessageRepository
 import com.contactme.app.message.MessageResult
+import com.contactme.app.message.ChatMessage
+import com.contactme.app.message.MessageReply
+import com.contactme.app.message.MessageType
 import com.contactme.app.media.ImageMessageQueue
 import com.contactme.app.media.ImageQueueResult
 import com.contactme.app.media.QueuedImageMessage
@@ -193,7 +196,8 @@ class ChatDetailViewModel @Inject constructor(
                 val result = messageRepository.sendMessage(
                     conversationId = conversationId,
                     senderId = senderId,
-                    text = state.messageText
+                    text = state.messageText,
+                    replyTo = state.replyingTo
                 )
             ) {
                 MessageResult.Success -> {
@@ -201,6 +205,7 @@ class ChatDetailViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             messageText = "",
+                            replyingTo = null,
                             isSending = false,
                             pendingImageUri = "",
                             failedImageUri = "",
@@ -219,6 +224,30 @@ class ChatDetailViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun startReply(message: ChatMessage) {
+        _uiState.update {
+            it.copy(
+                replyingTo = MessageReply(
+                    messageId = message.id,
+                    senderName = message.senderDisplayName.ifBlank {
+                        if (message.senderId == it.currentUserId) "You" else "ContactMe user"
+                    },
+                    preview = when (message.type) {
+                        MessageType.Text -> message.text.take(120)
+                        MessageType.Image -> "Photo"
+                        MessageType.Document -> message.fileName.ifBlank { "Document" }
+                    },
+                    type = message.type
+                ),
+                errorMessage = null
+            )
+        }
+    }
+
+    fun cancelReply() {
+        _uiState.update { it.copy(replyingTo = null) }
     }
 
     fun sendImageMessage(imageUri: Uri) {

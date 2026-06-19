@@ -7,6 +7,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -67,6 +70,7 @@ import com.contactme.app.conversation.ConversationType
 import com.contactme.app.message.ChatMessage
 import com.contactme.app.message.MessageStatus
 import com.contactme.app.message.MessageType
+import com.contactme.app.message.MessageReply
 import com.contactme.app.notification.NotificationVisibilityTracker
 import com.contactme.app.presence.PresenceStatus
 import com.contactme.app.safety.ReportReason
@@ -118,7 +122,9 @@ fun ChatDetailScreen(
         onBlockChat = viewModel::blockCurrentChat,
         onUnblockChat = viewModel::unblockCurrentChat,
         onImageSelected = viewModel::sendImageMessage,
-        onDocumentSelected = { uri -> viewModel.sendDocumentMessage(uri) }
+        onDocumentSelected = { uri -> viewModel.sendDocumentMessage(uri) },
+        onReplyMessage = viewModel::startReply,
+        onCancelReply = viewModel::cancelReply
     )
 }
 
@@ -139,7 +145,9 @@ private fun ChatDetailContent(
     onBlockChat: () -> Unit,
     onUnblockChat: () -> Unit,
     onImageSelected: (Uri) -> Unit,
-    onDocumentSelected: (Uri) -> Unit
+    onDocumentSelected: (Uri) -> Unit,
+    onReplyMessage: (ChatMessage) -> Unit,
+    onCancelReply: () -> Unit
 ) {
     val messages = uiState.messages
     val listState = rememberLazyListState()
@@ -246,11 +254,15 @@ private fun ChatDetailContent(
                         message = message,
                         isMine = message.senderId == uiState.currentUserId,
                         showSenderName = conversationType == ConversationType.Group,
+                        onReply = { onReplyMessage(message) },
                         readReceiptState = uiState.readReceiptState
                     )
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                uiState.replyingTo?.let { reply ->
+                    ReplyComposerPreview(reply = reply, onCancel = onCancelReply)
+                }
                 val imagePreviewUri = uiState.pendingImageUri.ifBlank { uiState.failedImageUri }
                 if (imagePreviewUri.isNotBlank()) {
                     PendingImagePreview(
@@ -593,10 +605,74 @@ private fun ChatStatusMessage(message: String) {
 }
 
 @Composable
+private fun ReplyComposerPreview(
+    reply: MessageReply,
+    onCancel: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Replying to ${reply.senderName}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = reply.preview,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        IconButton(onClick = onCancel) {
+            Icon(imageVector = Icons.Outlined.Close, contentDescription = "Cancel reply")
+        }
+    }
+}
+
+@Composable
+private fun MessageReplyPreview(reply: MessageReply) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp)
+            .background(
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.68f),
+                RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 10.dp, vertical = 7.dp)
+    ) {
+        Text(
+            text = reply.senderName,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = reply.preview,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 2,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
 private fun MessageBubble(
     message: ChatMessage,
     isMine: Boolean,
     showSenderName: Boolean,
+    onReply: () -> Unit,
     readReceiptState: ReadReceiptState
 ) {
     Row(
@@ -606,6 +682,9 @@ private fun MessageBubble(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.78f)
+                .pointerInput(message.id) {
+                    detectTapGestures(onLongPress = { onReply() })
+                }
                 .background(
                     color = if (isMine) {
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
@@ -622,6 +701,9 @@ private fun MessageBubble(
                 .padding(horizontal = 14.dp, vertical = 9.dp),
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
         ) {
+            message.replyTo?.let { reply ->
+                MessageReplyPreview(reply = reply)
+            }
             if (showSenderName && !isMine) {
                 Text(
                     modifier = Modifier.fillMaxWidth(),

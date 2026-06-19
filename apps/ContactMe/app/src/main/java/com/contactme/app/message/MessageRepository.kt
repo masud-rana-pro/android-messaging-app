@@ -9,7 +9,8 @@ interface MessageRepository {
     suspend fun sendMessage(
         conversationId: String,
         senderId: String,
-        text: String
+        text: String,
+        replyTo: MessageReply? = null
     ): MessageResult
 
     suspend fun sendImageMessage(
