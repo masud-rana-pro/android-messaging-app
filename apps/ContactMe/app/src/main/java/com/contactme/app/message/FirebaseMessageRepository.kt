@@ -52,6 +52,8 @@ class FirebaseMessageRepository @Inject constructor(
                             mediaProvider = document.getString("mediaProvider").orEmpty(),
                             mediaPublicId = document.getString("mediaPublicId").orEmpty(),
                             mimeType = document.getString("mimeType").orEmpty(),
+                            fileName = document.getString("fileName").orEmpty(),
+                            fileSizeBytes = document.getLong("fileSizeBytes") ?: 0L,
                             sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
                             status = MessageStatus.fromFirestore(document.getString("status"))
                         )
@@ -163,6 +165,58 @@ class FirebaseMessageRepository @Inject constructor(
                 MessageResult.Error(
                     (error as? MediaUploadException)?.userMessage
                         ?: "We could not send this photo. Please try again."
+                )
+            }
+        )
+    }
+
+    override suspend fun sendDocumentMessage(
+        conversationId: String,
+        senderId: String,
+        documentUri: Uri,
+        fileName: String,
+        mimeType: String,
+        fileSizeBytes: Long
+    ): MessageResult {
+        if (isBlockedConversation(conversationId, senderId)) {
+            return MessageResult.Error("This chat is not available.")
+        }
+
+        return runCatching {
+            val upload = cloudinaryUploadClient.uploadDocument(documentUri, fileName, mimeType)
+            val conversationDocument = firestore.collection(CONVERSATIONS_COLLECTION)
+                .document(conversationId)
+            val messageDocument = conversationDocument.collection(MESSAGES_COLLECTION).document()
+            val messageData = mapOf(
+                "senderId" to senderId,
+                "text" to "",
+                "type" to MessageType.Document.firestoreValue,
+                "mediaProvider" to CLOUDINARY_PROVIDER,
+                "mediaUrl" to upload.secureUrl,
+                "mediaPublicId" to upload.publicId,
+                "mimeType" to upload.mimeType,
+                "fileName" to fileName,
+                "fileSizeBytes" to fileSizeBytes,
+                "status" to MessageStatus.Sent.firestoreValue,
+                "createdAt" to FieldValue.serverTimestamp()
+            )
+            firestore.runBatch { batch ->
+                batch.set(messageDocument, messageData)
+                batch.update(
+                    conversationDocument,
+                    mapOf(
+                        "lastMessageText" to fileName,
+                        "lastMessageSenderId" to senderId,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                )
+            }.await()
+        }.fold(
+            onSuccess = { MessageResult.Success },
+            onFailure = { error ->
+                MessageResult.Error(
+                    (error as? MediaUploadException)?.userMessage
+                        ?: "We could not send this document. Please try again."
                 )
             }
         )

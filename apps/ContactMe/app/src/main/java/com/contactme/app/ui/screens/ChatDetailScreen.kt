@@ -1,5 +1,6 @@
 package com.contactme.app.ui.screens
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -41,6 +42,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -54,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -109,10 +113,12 @@ fun ChatDetailScreen(
         onMessageTextChanged = viewModel::onMessageTextChanged,
         onSendMessage = viewModel::sendMessage,
         onRetryImageMessage = viewModel::retryFailedImageMessage,
+        onRetryDocumentMessage = viewModel::retryFailedDocumentMessage,
         onReportChat = viewModel::reportCurrentChat,
         onBlockChat = viewModel::blockCurrentChat,
         onUnblockChat = viewModel::unblockCurrentChat,
-        onImageSelected = viewModel::sendImageMessage
+        onImageSelected = viewModel::sendImageMessage,
+        onDocumentSelected = { uri -> viewModel.sendDocumentMessage(uri) }
     )
 }
 
@@ -128,16 +134,22 @@ private fun ChatDetailContent(
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
     onRetryImageMessage: () -> Unit,
+    onRetryDocumentMessage: () -> Unit,
     onReportChat: (ReportReason) -> Unit,
     onBlockChat: () -> Unit,
     onUnblockChat: () -> Unit,
-    onImageSelected: (Uri) -> Unit
+    onImageSelected: (Uri) -> Unit,
+    onDocumentSelected: (Uri) -> Unit
 ) {
     val messages = uiState.messages
     val listState = rememberLazyListState()
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri -> uri?.let(onImageSelected) }
+    )
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri -> uri?.let(onDocumentSelected) }
     )
 
     LaunchedEffect(messages.size) {
@@ -246,18 +258,27 @@ private fun ChatDetailContent(
                         isUploading = uiState.pendingImageUri.isNotBlank() && uiState.isSending
                     )
                 }
+                if (uiState.pendingDocumentName.isNotBlank() || uiState.failedDocumentName.isNotBlank()) {
+                    PendingDocumentPreview(
+                        fileName = uiState.pendingDocumentName.ifBlank { uiState.failedDocumentName },
+                        isUploading = uiState.pendingDocumentName.isNotBlank() && uiState.isSending
+                    )
+                }
                 uiState.statusMessage?.let { message ->
                     ChatStatusMessage(message = message)
                 }
                 uiState.errorMessage?.let { message ->
                     val hasFailedImage = uiState.failedImageUri.isNotBlank()
+                    val hasFailedDocument = uiState.failedDocumentUri.isNotBlank()
                     SendErrorMessage(
                         message = message,
                         canRetry = conversationId != null && (
-                            uiState.messageText.isNotBlank() || hasFailedImage
+                            uiState.messageText.isNotBlank() || hasFailedImage || hasFailedDocument
                             ),
                         onRetry = {
-                            if (hasFailedImage) {
+                            if (hasFailedDocument) {
+                                onRetryDocumentMessage()
+                            } else if (hasFailedImage) {
                                 onRetryImageMessage()
                             } else {
                                 onSendMessage()
@@ -277,6 +298,9 @@ private fun ChatDetailContent(
                         imagePickerLauncher.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
+                    },
+                    onDocumentClick = {
+                        documentPickerLauncher.launch(DOCUMENT_MIME_TYPES)
                     }
                 )
             }
@@ -618,6 +642,9 @@ private fun MessageBubble(
             if (message.type == MessageType.Image) {
                 ImageMessageContent(message = message)
             }
+            if (message.type == MessageType.Document) {
+                DocumentMessageContent(message = message)
+            }
             MessageMetaRow(
                 sentAtMillis = message.sentAtMillis,
                 status = message.status,
@@ -671,6 +698,44 @@ private fun ImageMessageContent(message: ChatMessage) {
         contentDescription = "Photo message",
         contentScale = ContentScale.Crop
     )
+}
+
+@Composable
+private fun DocumentMessageContent(message: ChatMessage) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f))
+            .clickable(enabled = message.mediaUrl.isNotBlank()) {
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(message.mediaUrl)).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                    )
+                }
+            }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(imageVector = Icons.Outlined.Description, contentDescription = null)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = message.fileName.ifBlank { "Document" },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2
+            )
+            Text(
+                text = message.fileSizeBytes.formatFileSize(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @Composable
@@ -732,6 +797,32 @@ private fun PendingImagePreview(
 }
 
 @Composable
+private fun PendingDocumentPreview(fileName: String, isUploading: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (isUploading) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.errorContainer,
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(imageVector = Icons.Outlined.Description, contentDescription = null)
+            Text(
+                modifier = Modifier.weight(1f),
+                text = fileName,
+                maxLines = 1,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (isUploading) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        }
+    }
+}
+
+@Composable
 private fun MessageMetaRow(
     sentAtMillis: Long,
     status: MessageStatus,
@@ -771,8 +862,10 @@ private fun MessageInputBar(
     isChatBlocked: Boolean,
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
-    onImageClick: () -> Unit
+    onImageClick: () -> Unit,
+    onDocumentClick: () -> Unit
 ) {
+    var attachmentMenuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -789,14 +882,37 @@ private fun MessageInputBar(
             maxLines = 4,
             shape = RoundedCornerShape(24.dp),
             trailingIcon = {
-                IconButton(
-                    enabled = enabled && !isSending,
-                    onClick = onImageClick
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AttachFile,
-                        contentDescription = "Attach photo"
-                    )
+                Box {
+                    IconButton(
+                        enabled = enabled && !isSending,
+                        onClick = { attachmentMenuExpanded = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.AttachFile,
+                            contentDescription = "Attach"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = attachmentMenuExpanded,
+                        onDismissRequest = { attachmentMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(text = "Photo") },
+                            leadingIcon = { Icon(Icons.Outlined.Image, contentDescription = null) },
+                            onClick = {
+                                attachmentMenuExpanded = false
+                                onImageClick()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(text = "Document") },
+                            leadingIcon = { Icon(Icons.Outlined.Description, contentDescription = null) },
+                            onClick = {
+                                attachmentMenuExpanded = false
+                                onDocumentClick()
+                            }
+                        )
+                    }
                 }
             },
             placeholder = {
@@ -851,6 +967,14 @@ private fun Long.formatChatTime(): String {
     return SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this))
 }
 
+private fun Long.formatFileSize(): String {
+    return when {
+        this <= 0L -> "Document"
+        this < 1024L * 1024L -> "${(this / 1024L).coerceAtLeast(1)} KB"
+        else -> String.format(Locale.getDefault(), "%.1f MB", this / (1024.0 * 1024.0))
+    }
+}
+
 private fun Long.isSameChatDay(otherMillis: Long): Boolean {
     if (this <= 0L || otherMillis <= 0L) return false
     val first = Calendar.getInstance().apply { timeInMillis = this@isSameChatDay }
@@ -885,6 +1009,13 @@ private fun String.profileInitials(): String {
 
     return initials.ifBlank { "CM" }
 }
+
+private val DOCUMENT_MIME_TYPES = arrayOf(
+    "application/pdf",
+    "text/plain",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+)
 
 @Preview(showBackground = true)
 @Composable
