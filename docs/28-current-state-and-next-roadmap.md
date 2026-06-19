@@ -27,8 +27,8 @@ This document is the implementation checkpoint after the message status foundati
 | Direct conversation | Done foundation | Direct conversation document can be created. |
 | Text messages | Done foundation | Messages send/render from Firestore. |
 | Conversation list | Done foundation | Firestore conversation previews exist. |
-| Unread/read | Done foundation | Conversation-level read marker exists. |
-| Message status | Done foundation | `sent` status exists; delivered/read not yet real. |
+| Unread/read | Done MVP | Conversation-level unread state and privacy-aware peer read receipt exist. |
+| Message status | Done MVP | Sent state plus peer-read timestamp rendering exist; separate delivered acknowledgement remains later. |
 | Profile photo | Done MVP | Photo Picker uploads image to Cloudinary and stores `photoUrl` in Firestore. |
 | Media messages | Done MVP | Chat images upload to Cloudinary and store metadata in Firestore. |
 | Typing/presence | Done foundation | Firestore typing and Realtime Database presence foundations exist. |
@@ -42,7 +42,7 @@ This document is the implementation checkpoint after the message status foundati
 
 | Area | Status | Next Need |
 | --- | --- | --- |
-| Chat UI polish | Advanced foundation | Polished states plus reply, sender delete, and sender text edit actions exist; forward/star/pin/reactions remain. |
+| Chat UI polish | Personal-beta code complete | Core text/media chat, actions, sync retry, notification navigation, and secure read receipts exist; deployment and two-device validation remain. |
 | Phone search | Done foundation | Normalize and query phone identity; native contacts sync remains later. |
 | Privacy settings | Done foundation | Last seen/profile photo/read receipt settings exist; more hardening remains. |
 | Block/report | Done foundation | Data model, rules, chat enforcement, reason selection, block/unblock UI; emulator tests and moderation tools remain. |

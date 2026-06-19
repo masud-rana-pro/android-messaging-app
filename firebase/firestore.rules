@@ -116,6 +116,17 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
+      function isOwnReadReceiptUpdate() {
+        let oldReceipts = ("readAtByUser" in resource.data && resource.data.readAtByUser is map)
+          ? resource.data.readAtByUser
+          : {};
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(["readAtByUser"])
+          && request.resource.data.readAtByUser is map
+          && request.resource.data.readAtByUser.diff(oldReceipts)
+            .affectedKeys().hasOnly([request.auth.uid])
+          && request.resource.data.readAtByUser[request.auth.uid] == request.time;
+      }
+
       allow read: if isSignedIn()
         && request.auth.uid in resource.data.participantIds;
       allow create: if isSignedIn() &&
@@ -126,8 +137,9 @@ service cloud.firestore {
         && request.resource.data.type == resource.data.type
         && (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "lastMessageText", "lastMessageId", "lastMessageSenderId", "updatedAt", "readAtByUser"
+            "lastMessageText", "lastMessageId", "lastMessageSenderId", "updatedAt"
           ]) ||
+          isOwnReadReceiptUpdate() ||
           (
             resource.data.type == "group" &&
             request.auth.uid in resource.data.adminIds &&
