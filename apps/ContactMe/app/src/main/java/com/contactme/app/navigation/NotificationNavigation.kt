@@ -28,4 +28,11 @@ object NotificationNavigation {
             type = type
         )
     }
+
+    fun clearChatTarget(intent: Intent?) {
+        intent?.removeExtra(EXTRA_CONVERSATION_ID)
+        intent?.removeExtra(EXTRA_CHAT_TITLE)
+        intent?.removeExtra(EXTRA_CHAT_PHOTO_URL)
+        intent?.removeExtra(EXTRA_CONVERSATION_TYPE)
+    }
 }

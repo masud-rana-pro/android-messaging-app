@@ -34,7 +34,10 @@ class MainActivity : ComponentActivity() {
         requestNotificationPermissionIfNeeded()
         setContent {
             ContactMeTheme {
-                ContactMeApp(notificationChatTarget = notificationChatTarget)
+                ContactMeApp(
+                    notificationChatTarget = notificationChatTarget,
+                    onNotificationChatTargetConsumed = ::consumeNotificationChatTarget
+                )
             }
         }
     }
@@ -43,6 +46,11 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         notificationChatTarget = NotificationNavigation.chatTargetFrom(intent)
+    }
+
+    private fun consumeNotificationChatTarget() {
+        notificationChatTarget = null
+        NotificationNavigation.clearChatTarget(intent)
     }
 
     private fun requestNotificationPermissionIfNeeded() {
