@@ -250,6 +250,32 @@ class ChatDetailViewModel @Inject constructor(
         _uiState.update { it.copy(replyingTo = null) }
     }
 
+    fun deleteMessage(message: ChatMessage) {
+        val conversationId = activeConversationId ?: return
+        val currentUserId = authRepository.currentUserId() ?: return
+        if (message.senderId != currentUserId || message.isDeleted || _uiState.value.isSending) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSending = true, errorMessage = null) }
+            when (messageRepository.deleteMessage(conversationId, message.id, currentUserId)) {
+                MessageResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            replyingTo = it.replyingTo?.takeUnless { reply -> reply.messageId == message.id },
+                            statusMessage = "Message deleted."
+                        )
+                    }
+                }
+                is MessageResult.Error -> {
+                    _uiState.update {
+                        it.copy(isSending = false, errorMessage = "We could not delete this message.")
+                    }
+                }
+            }
+        }
+    }
+
     fun sendImageMessage(imageUri: Uri) {
         val conversationId = activeConversationId
 

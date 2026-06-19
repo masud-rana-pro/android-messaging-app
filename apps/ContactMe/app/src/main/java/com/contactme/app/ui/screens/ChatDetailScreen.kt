@@ -62,6 +62,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -124,7 +125,8 @@ fun ChatDetailScreen(
         onImageSelected = viewModel::sendImageMessage,
         onDocumentSelected = { uri -> viewModel.sendDocumentMessage(uri) },
         onReplyMessage = viewModel::startReply,
-        onCancelReply = viewModel::cancelReply
+        onCancelReply = viewModel::cancelReply,
+        onDeleteMessage = viewModel::deleteMessage
     )
 }
 
@@ -147,10 +149,12 @@ private fun ChatDetailContent(
     onImageSelected: (Uri) -> Unit,
     onDocumentSelected: (Uri) -> Unit,
     onReplyMessage: (ChatMessage) -> Unit,
-    onCancelReply: () -> Unit
+    onCancelReply: () -> Unit,
+    onDeleteMessage: (ChatMessage) -> Unit
 ) {
     val messages = uiState.messages
     val listState = rememberLazyListState()
+    var selectedMessageForActions by remember { mutableStateOf<ChatMessage?>(null) }
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri -> uri?.let(onImageSelected) }
@@ -164,6 +168,21 @@ private fun ChatDetailContent(
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.lastIndex)
         }
+    }
+
+    selectedMessageForActions?.let { selectedMessage ->
+        MessageActionsDialog(
+            canDelete = selectedMessage.senderId == uiState.currentUserId,
+            onDismiss = { selectedMessageForActions = null },
+            onReply = {
+                selectedMessageForActions = null
+                onReplyMessage(selectedMessage)
+            },
+            onDelete = {
+                selectedMessageForActions = null
+                onDeleteMessage(selectedMessage)
+            }
+        )
     }
 
     Scaffold(
@@ -254,7 +273,7 @@ private fun ChatDetailContent(
                         message = message,
                         isMine = message.senderId == uiState.currentUserId,
                         showSenderName = conversationType == ConversationType.Group,
-                        onReply = { onReplyMessage(message) },
+                        onLongPress = { selectedMessageForActions = message },
                         readReceiptState = uiState.readReceiptState
                     )
                 }
@@ -605,6 +624,39 @@ private fun ChatStatusMessage(message: String) {
 }
 
 @Composable
+private fun MessageActionsDialog(
+    canDelete: Boolean,
+    onDismiss: () -> Unit,
+    onReply: () -> Unit,
+    onDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Message actions") },
+        text = {
+            Column {
+                TextButton(modifier = Modifier.fillMaxWidth(), onClick = onReply) {
+                    Text(modifier = Modifier.fillMaxWidth(), text = "Reply")
+                }
+                if (canDelete) {
+                    TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDelete) {
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = "Delete",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(text = "Cancel") }
+        }
+    )
+}
+
+@Composable
 private fun ReplyComposerPreview(
     reply: MessageReply,
     onCancel: () -> Unit
@@ -672,7 +724,7 @@ private fun MessageBubble(
     message: ChatMessage,
     isMine: Boolean,
     showSenderName: Boolean,
-    onReply: () -> Unit,
+    onLongPress: () -> Unit,
     readReceiptState: ReadReceiptState
 ) {
     Row(
@@ -682,8 +734,10 @@ private fun MessageBubble(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.78f)
-                .pointerInput(message.id) {
-                    detectTapGestures(onLongPress = { onReply() })
+                .pointerInput(message.id, message.isDeleted) {
+                    if (!message.isDeleted) {
+                        detectTapGestures(onLongPress = { onLongPress() })
+                    }
                 }
                 .background(
                     color = if (isMine) {
@@ -701,9 +755,16 @@ private fun MessageBubble(
                 .padding(horizontal = 14.dp, vertical = 9.dp),
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
         ) {
-            message.replyTo?.let { reply ->
-                MessageReplyPreview(reply = reply)
-            }
+            if (message.isDeleted) {
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = "This message was deleted",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontStyle = FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                message.replyTo?.let { reply -> MessageReplyPreview(reply = reply) }
             if (showSenderName && !isMine) {
                 Text(
                     modifier = Modifier.fillMaxWidth(),
@@ -726,6 +787,7 @@ private fun MessageBubble(
             }
             if (message.type == MessageType.Document) {
                 DocumentMessageContent(message = message)
+            }
             }
             MessageMetaRow(
                 sentAtMillis = message.sentAtMillis,

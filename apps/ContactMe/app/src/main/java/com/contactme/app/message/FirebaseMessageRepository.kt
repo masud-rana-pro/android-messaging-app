@@ -64,6 +64,7 @@ class FirebaseMessageRepository @Inject constructor(
                                         type = MessageType.fromFirestore(document.getString("replyType"))
                                     )
                                 },
+                            isDeleted = document.getBoolean("isDeleted") ?: false,
                             sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
                             status = MessageStatus.fromFirestore(document.getString("status"))
                         )
@@ -120,6 +121,7 @@ class FirebaseMessageRepository @Inject constructor(
                     conversationDocument,
                     mapOf(
                         "lastMessageText" to trimmedText,
+                        "lastMessageId" to messageDocument.id,
                         "lastMessageSenderId" to senderId,
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
@@ -171,6 +173,7 @@ class FirebaseMessageRepository @Inject constructor(
                     conversationDocument,
                     mapOf(
                         "lastMessageText" to IMAGE_LAST_MESSAGE,
+                        "lastMessageId" to messageDocument.id,
                         "lastMessageSenderId" to senderId,
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
@@ -223,6 +226,7 @@ class FirebaseMessageRepository @Inject constructor(
                     conversationDocument,
                     mapOf(
                         "lastMessageText" to fileName,
+                        "lastMessageId" to messageDocument.id,
                         "lastMessageSenderId" to senderId,
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
@@ -239,6 +243,45 @@ class FirebaseMessageRepository @Inject constructor(
         )
     }
 
+    override suspend fun deleteMessage(
+        conversationId: String,
+        messageId: String,
+        currentUserId: String
+    ): MessageResult {
+        if (conversationId.isBlank() || messageId.isBlank() || currentUserId.isBlank()) {
+            return MessageResult.Error("We could not delete this message.")
+        }
+
+        return runCatching {
+            val conversation = firestore.collection(CONVERSATIONS_COLLECTION).document(conversationId)
+            val message = conversation.collection(MESSAGES_COLLECTION).document(messageId)
+            firestore.runTransaction { transaction ->
+                val messageSnapshot = transaction.get(message)
+                check(messageSnapshot.getString("senderId") == currentUserId)
+                transaction.update(
+                    message,
+                    mapOf(
+                        "isDeleted" to true,
+                        "deletedAt" to FieldValue.serverTimestamp(),
+                        "text" to "",
+                        "mediaUrl" to "",
+                        "mediaPublicId" to "",
+                        "mediaProvider" to "",
+                        "mimeType" to "",
+                        "fileName" to "",
+                        "fileSizeBytes" to 0L
+                    )
+                )
+                if (transaction.get(conversation).getString("lastMessageId") == messageId) {
+                    transaction.update(conversation, "lastMessageText", DELETED_LAST_MESSAGE)
+                }
+            }.await()
+        }.fold(
+            onSuccess = { MessageResult.Success },
+            onFailure = { MessageResult.Error("We could not delete this message. Please try again.") }
+        )
+    }
+
     private companion object {
         const val CONVERSATIONS_COLLECTION = "conversations"
         const val MESSAGES_COLLECTION = "messages"
@@ -246,6 +289,7 @@ class FirebaseMessageRepository @Inject constructor(
         const val IMAGE_FILE_NAME = "image.jpg"
         const val IMAGE_LAST_MESSAGE = "Photo"
         const val CLOUDINARY_PROVIDER = "cloudinary"
+        const val DELETED_LAST_MESSAGE = "Message deleted"
     }
 
     private suspend fun isBlockedConversation(
