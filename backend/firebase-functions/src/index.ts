@@ -65,7 +65,6 @@ export const sendMessageNotification = onDocumentCreated(
     for (const tokenChunk of chunks(tokenTargets, 500)) {
       const response = await messaging.sendEachForMulticast({
         tokens: tokenChunk.map((target) => target.token),
-        notification: {title, body},
         data: {
           type: "message",
           conversationId,
@@ -77,7 +76,7 @@ export const sendMessageNotification = onDocumentCreated(
         },
         android: {
           priority: "high",
-          notification: {channelId: "messages"},
+          ttl: 24 * 60 * 60 * 1000,
         },
       });
 
