@@ -49,7 +49,7 @@ This document is the implementation checkpoint after the message status foundati
 | Notifications | Advanced foundation | Message fanout and chat deep links exist; function deployment, real-device validation, and call actions remain. |
 | Media polish | Advanced foundation | Validation, compression, preview, retry, app-private pending files, and WorkManager background delivery exist; signed production upload remains. |
 | Groups | Working MVP | Creation UI, member selection, group previews, text/image messages, sender labels, notification routing, admin schema, validation, and rules exist; member/admin management and group profile editing remain. |
-| Calls | Not started | ZegoCloud, call state, notification, foreground service. |
+| Calls | Secure token foundation | Authenticated room-scoped ZEGOCLOUD Token04 backend exists; call session/state, RTC UI, notification, and foreground service remain. |
 | Status/channels | Not started | Media/status/channel models and UI. |
 | Offline/backup | Not started | Firestore cache first, Room later if required. |
 
