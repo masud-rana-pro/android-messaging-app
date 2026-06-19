@@ -27,4 +27,10 @@ interface MessageRepository {
         mimeType: String,
         fileSizeBytes: Long
     ): MessageResult
+
+    suspend fun deleteMessage(
+        conversationId: String,
+        messageId: String,
+        currentUserId: String
+    ): MessageResult
 }

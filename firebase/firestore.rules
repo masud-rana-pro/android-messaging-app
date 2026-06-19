@@ -126,7 +126,7 @@ service cloud.firestore {
         && request.resource.data.type == resource.data.type
         && (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "lastMessageText", "lastMessageSenderId", "updatedAt", "readAtByUser"
+            "lastMessageText", "lastMessageId", "lastMessageSenderId", "updatedAt", "readAtByUser"
           ]) ||
           (
             resource.data.type == "group" &&
@@ -175,7 +175,15 @@ service cloud.firestore {
               && request.resource.data.fileSizeBytes <= 26214400
             )
           );
-        allow update, delete: if false;
+        allow update: if isConversationParticipant(conversationId)
+          && resource.data.senderId == request.auth.uid
+          && request.resource.data.senderId == resource.data.senderId
+          && request.resource.data.isDeleted == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "isDeleted", "deletedAt", "text", "mediaUrl", "mediaPublicId",
+            "mediaProvider", "mimeType", "fileName", "fileSizeBytes"
+          ]);
+        allow delete: if false;
       }
 
       match /typing/{userId} {
