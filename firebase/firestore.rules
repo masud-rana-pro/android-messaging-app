@@ -178,11 +178,23 @@ service cloud.firestore {
         allow update: if isConversationParticipant(conversationId)
           && resource.data.senderId == request.auth.uid
           && request.resource.data.senderId == resource.data.senderId
-          && request.resource.data.isDeleted == true
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "isDeleted", "deletedAt", "text", "mediaUrl", "mediaPublicId",
-            "mediaProvider", "mimeType", "fileName", "fileSizeBytes"
-          ]);
+          && (
+            (
+              request.resource.data.isDeleted == true
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                "isDeleted", "deletedAt", "text", "mediaUrl", "mediaPublicId",
+                "mediaProvider", "mimeType", "fileName", "fileSizeBytes"
+              ])
+            ) || (
+              resource.data.type == "text"
+              && (!("isDeleted" in resource.data) || resource.data.isDeleted != true)
+              && request.resource.data.text is string
+              && request.resource.data.text.size() > 0
+              && request.resource.data.text.size() <= 4000
+              && request.resource.data.editedAt == request.time
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["text", "editedAt"])
+            )
+          );
         allow delete: if false;
       }
 

@@ -33,4 +33,11 @@ interface MessageRepository {
         messageId: String,
         currentUserId: String
     ): MessageResult
+
+    suspend fun editMessage(
+        conversationId: String,
+        messageId: String,
+        currentUserId: String,
+        text: String
+    ): MessageResult
 }
