@@ -237,8 +237,11 @@ class ChatDetailViewModel @Inject constructor(
     }
 
     fun startReply(message: ChatMessage) {
+        if (_uiState.value.isSending || message.isDeleted) return
         _uiState.update {
             it.copy(
+                messageText = "",
+                editingMessageId = null,
                 replyingTo = MessageReply(
                     messageId = message.id,
                     senderName = message.senderDisplayName.ifBlank {
@@ -254,6 +257,7 @@ class ChatDetailViewModel @Inject constructor(
                 errorMessage = null
             )
         }
+        updateTypingState(isTyping = false)
     }
 
     fun cancelReply() {
@@ -261,7 +265,8 @@ class ChatDetailViewModel @Inject constructor(
     }
 
     fun startEdit(message: ChatMessage) {
-        if (message.senderId != _uiState.value.currentUserId ||
+        if (_uiState.value.isSending ||
+            message.senderId != _uiState.value.currentUserId ||
             message.type != MessageType.Text || message.isDeleted
         ) return
         _uiState.update {
@@ -272,6 +277,7 @@ class ChatDetailViewModel @Inject constructor(
                 errorMessage = null
             )
         }
+        updateTypingState(isTyping = false)
     }
 
     fun cancelEdit() {
@@ -293,6 +299,7 @@ class ChatDetailViewModel @Inject constructor(
                             isSending = false,
                             replyingTo = it.replyingTo?.takeUnless { reply -> reply.messageId == message.id },
                             editingMessageId = it.editingMessageId?.takeUnless { id -> id == message.id },
+                            messageText = if (it.editingMessageId == message.id) "" else it.messageText,
                             statusMessage = "Message deleted."
                         )
                     }
@@ -314,7 +321,9 @@ class ChatDetailViewModel @Inject constructor(
             return
         }
 
-        if (_uiState.value.isSending || _uiState.value.isChatBlocked) return
+        if (_uiState.value.isSending || _uiState.value.isChatBlocked ||
+            _uiState.value.editingMessageId != null
+        ) return
 
         val senderId = authRepository.currentUserId()
 
@@ -417,7 +426,9 @@ class ChatDetailViewModel @Inject constructor(
     ) {
         val conversationId = activeConversationId ?: return
         val senderId = authRepository.currentUserId() ?: return
-        if (_uiState.value.isSending || _uiState.value.isChatBlocked) return
+        if (_uiState.value.isSending || _uiState.value.isChatBlocked ||
+            _uiState.value.editingMessageId != null
+        ) return
 
         viewModelScope.launch {
             _uiState.update {
