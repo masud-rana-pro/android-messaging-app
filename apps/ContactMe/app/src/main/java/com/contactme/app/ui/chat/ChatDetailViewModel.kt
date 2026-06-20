@@ -84,8 +84,15 @@ class ChatDetailViewModel @Inject constructor(
         typingJob?.cancel()
         presenceJob?.cancel()
         readReceiptJob?.cancel()
+
+        val currentUserId = authRepository.currentUserId()
+        val peerUserId = if (conversationType == ConversationType.Direct && currentUserId != null) {
+            conversationId.split("__").firstOrNull { it != currentUserId }
+        } else null
+
         _uiState.update {
             it.copy(
+                peerUserId = peerUserId,
                 messages = emptyList(),
                 messageText = "",
                 replyingTo = null,
@@ -107,7 +114,6 @@ class ChatDetailViewModel @Inject constructor(
         }
         observeConversationMessages(conversationId)
 
-        val currentUserId = authRepository.currentUserId()
         if (currentUserId != null && conversationType == ConversationType.Direct) {
             typingJob = viewModelScope.launch {
                 typingRepository.observeOtherTyping(

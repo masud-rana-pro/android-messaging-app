@@ -7,5 +7,6 @@ enum class AppScreen {
     Home,
     CreateGroup,
     ChatDetail,
-    Settings
+    Settings,
+    OutgoingCall
 }
