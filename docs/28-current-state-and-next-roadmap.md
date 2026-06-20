@@ -7,7 +7,7 @@ This document is the implementation checkpoint after the message status foundati
 - App name: ContactMe.
 - Platform: Android first.
 - Android project path: `apps/ContactMe`.
-- Backend strategy: Firebase-first for auth/data, Cloudinary for current media upload.
+- Backend strategy: Firebase Spark for auth/data, Cloudinary for current media upload, and no-card WebRTC calling.
 - Current branch: `feature/auth-build`.
 - Current release direction: personal beta APK before Play Store hardening.
 - UI direction: WhatsApp-like custom ContactMe theme, not a trademark clone.
@@ -46,10 +46,10 @@ This document is the implementation checkpoint after the message status foundati
 | Phone search | Done foundation | Normalize and query phone identity; native contacts sync remains later. |
 | Privacy settings | Done foundation | Last seen/profile photo/read receipt settings exist; more hardening remains. |
 | Block/report | Done foundation | Data model, rules, chat enforcement, reason selection, block/unblock UI; emulator tests and moderation tools remain. |
-| Notifications | Advanced foundation | Message fanout and chat deep links exist; function deployment, real-device validation, and call actions remain. |
+| Notifications | Client foundation | FCM rendering and chat deep links exist; future trusted fanout is Cloudflare Worker + FCM, not Firebase Functions. |
 | Media polish | Advanced foundation | Validation, compression, preview, retry, app-private pending files, and WorkManager background delivery exist; signed production upload remains. |
 | Groups | Working MVP | Creation UI, member selection, group previews, text/image messages, sender labels, notification routing, admin schema, validation, and rules exist; member/admin management and group profile editing remain. |
-| Calls | Secure token foundation | Authenticated room-scoped ZEGOCLOUD Token04 backend exists; call session/state, RTC UI, notification, and foreground service remain. |
+| Calls | WebRTC foundation | Firestore call/ICE signaling, strict rules, WebRTC engine, Google STUN, and optional local Metered TURN config exist; Step 89 orchestration/UI remains. |
 | Status/channels | Not started | Media/status/channel models and UI. |
 | Offline/backup | Not started | Firestore cache first, Room later if required. |
 
@@ -58,10 +58,10 @@ This document is the implementation checkpoint after the message status foundati
 1. Chat MVP finish.
 2. Phone search and profile polish.
 3. Block and report foundation. (Completed)
-4. Notification fanout and deep-link foundation.
+4. Notification deep-link foundation and future Cloudflare Worker fanout.
 5. Media hardening with WorkManager (completed) and signed upload.
 6. Group chat foundation.
-7. One-to-one calling foundation.
+7. One-to-one WebRTC calling foundation.
 8. Status/stories.
 9. Channels.
 10. Offline/cache/backup and personal beta hardening.
@@ -114,9 +114,4 @@ apps/ContactMe
 
 ## Next Recommended Step After This Documentation
 
-Resume implementation with Chat MVP finish:
-
-- Clean navigation state.
-- Improve chat loading/empty/error states.
-- Add send failure/retry foundation.
-- Then move to typing/presence or phone search depending on priority.
+Step 89: verify Firestore call session/status behavior before adding call orchestration or UI.

@@ -1,7 +1,7 @@
 package com.contactme.app.di
 
-import com.contactme.app.call.CallTokenRepository
-import com.contactme.app.call.FirebaseCallTokenRepository
+import com.contactme.app.call.CallSignalingRepository
+import com.contactme.app.call.FirebaseCallSignalingRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -13,7 +13,7 @@ import javax.inject.Singleton
 abstract class CallModule {
     @Binds
     @Singleton
-    abstract fun bindCallTokenRepository(
-        firebaseCallTokenRepository: FirebaseCallTokenRepository
-    ): CallTokenRepository
+    abstract fun bindCallSignalingRepository(
+        firebaseCallSignalingRepository: FirebaseCallSignalingRepository
+    ): CallSignalingRepository
 }

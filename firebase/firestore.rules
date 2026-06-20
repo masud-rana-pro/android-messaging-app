@@ -220,6 +220,133 @@ service cloud.firestore {
       }
     }
 
+    match /calls/{callId} {
+      function isCallParticipant() {
+        return isSignedIn()
+          && request.auth.uid in [resource.data.callerId, resource.data.receiverId];
+      }
+
+      function callIdentityIsUnchanged() {
+        return request.resource.data.callerId == resource.data.callerId
+          && request.resource.data.receiverId == resource.data.receiverId
+          && request.resource.data.type == resource.data.type
+          && request.resource.data.createdAt == resource.data.createdAt;
+      }
+
+      function isValidStatusUpdate() {
+        let before = resource.data.status;
+        let after = request.resource.data.status;
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["status", "acceptedAt", "endedAt"])
+          && (
+            (before == "ringing" && after == "accepted"
+              && request.auth.uid == resource.data.receiverId
+              && request.resource.data.acceptedAt == request.time
+              && request.resource.data.endedAt == resource.data.endedAt) ||
+            (before == "ringing" && after in ["rejected", "busy"]
+              && request.auth.uid == resource.data.receiverId
+              && request.resource.data.acceptedAt == resource.data.acceptedAt
+              && request.resource.data.endedAt == request.time) ||
+            (before == "ringing" && after == "cancelled"
+              && request.auth.uid == resource.data.callerId
+              && request.resource.data.acceptedAt == resource.data.acceptedAt
+              && request.resource.data.endedAt == request.time) ||
+            (before == "ringing" && after in ["missed", "timeout"]
+              && request.resource.data.acceptedAt == resource.data.acceptedAt
+              && request.resource.data.endedAt == request.time) ||
+            (before == "accepted" && after == "ended"
+              && request.resource.data.acceptedAt == resource.data.acceptedAt
+              && request.resource.data.endedAt == request.time)
+          );
+      }
+
+      function isValidIceCandidate() {
+        return request.resource.data.keys().hasAll([
+          "senderId", "sdpMid", "sdpMLineIndex", "candidate", "createdAt"
+        ])
+          && request.resource.data.keys().hasOnly([
+            "senderId", "sdpMid", "sdpMLineIndex", "candidate", "createdAt"
+          ])
+          && request.resource.data.senderId == request.auth.uid
+          && (request.resource.data.sdpMid == null || request.resource.data.sdpMid is string)
+          && request.resource.data.sdpMLineIndex is int
+          && request.resource.data.sdpMLineIndex >= 0
+          && request.resource.data.candidate is string
+          && request.resource.data.candidate.size() > 0
+          && request.resource.data.candidate.size() <= 4096
+          && request.resource.data.createdAt == request.time;
+      }
+
+      allow read: if isCallParticipant();
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasAll([
+          "callerId", "receiverId", "type", "status", "offer", "answer",
+          "createdAt", "acceptedAt", "endedAt"
+        ])
+        && request.resource.data.keys().hasOnly([
+          "callerId", "receiverId", "type", "status", "offer", "answer",
+          "createdAt", "acceptedAt", "endedAt"
+        ])
+        && request.resource.data.callerId == request.auth.uid
+        && request.resource.data.receiverId is string
+        && request.resource.data.receiverId != request.auth.uid
+        && exists(/databases/$(database)/documents/users/$(request.resource.data.receiverId))
+        && !exists(/databases/$(database)/documents/blocked_users/$(request.auth.uid)/items/$(request.resource.data.receiverId))
+        && !exists(/databases/$(database)/documents/blocked_users/$(request.resource.data.receiverId)/items/$(request.auth.uid))
+        && request.resource.data.type in ["audio", "video"]
+        && request.resource.data.status == "ringing"
+        && request.resource.data.offer == ""
+        && request.resource.data.answer == ""
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.acceptedAt == null
+        && request.resource.data.endedAt == null;
+      allow update: if isCallParticipant()
+        && callIdentityIsUnchanged()
+        && (
+          (
+            request.auth.uid == resource.data.callerId
+            && resource.data.status == "ringing"
+            && request.resource.data.offer is string
+            && request.resource.data.offer.size() > 0
+            && request.resource.data.offer.size() <= 65536
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["offer"])
+          ) || (
+            request.auth.uid == resource.data.receiverId
+            && resource.data.status in ["ringing", "accepted"]
+            && request.resource.data.answer is string
+            && request.resource.data.answer.size() > 0
+            && request.resource.data.answer.size() <= 65536
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["answer"])
+          ) || isValidStatusUpdate()
+        );
+      allow delete: if false;
+
+      match /callerCandidates/{candidateId} {
+        allow read: if isSignedIn()
+          && request.auth.uid in [
+            get(/databases/$(database)/documents/calls/$(callId)).data.callerId,
+            get(/databases/$(database)/documents/calls/$(callId)).data.receiverId
+          ];
+        allow create: if isSignedIn()
+          && request.auth.uid == get(/databases/$(database)/documents/calls/$(callId)).data.callerId
+          && isValidIceCandidate();
+        allow update, delete: if false;
+      }
+
+      match /receiverCandidates/{candidateId} {
+        allow read: if isSignedIn()
+          && request.auth.uid in [
+            get(/databases/$(database)/documents/calls/$(callId)).data.callerId,
+            get(/databases/$(database)/documents/calls/$(callId)).data.receiverId
+          ];
+        allow create: if isSignedIn()
+          && request.auth.uid == get(/databases/$(database)/documents/calls/$(callId)).data.receiverId
+          && isValidIceCandidate();
+        allow update, delete: if false;
+      }
+
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
