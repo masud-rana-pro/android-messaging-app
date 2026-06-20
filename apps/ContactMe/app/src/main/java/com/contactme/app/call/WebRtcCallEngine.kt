@@ -65,6 +65,42 @@ class WebRtcCallEngine @Inject constructor(
         setupAudioTrack()
     }
 
+    fun setRemoteOffer(sdp: String) {
+        val remoteSdp = SessionDescription(SessionDescription.Type.OFFER, sdp)
+        peerConnection?.setRemoteDescription(object : SdpObserver {
+            override fun onCreateSuccess(p0: SessionDescription?) {}
+            override fun onSetSuccess() {}
+            override fun onCreateFailure(p0: String?) {}
+            override fun onSetFailure(p0: String?) {}
+        }, remoteSdp)
+    }
+
+    fun createAnswer() {
+        val constraints = MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
+        }
+
+        peerConnection?.createAnswer(object : SdpObserver {
+            override fun onCreateSuccess(sdp: SessionDescription?) {
+                sdp?.let {
+                    peerConnection?.setLocalDescription(object : SdpObserver {
+                        override fun onCreateSuccess(p0: SessionDescription?) {}
+                        override fun onSetSuccess() {
+                            listener?.onLocalDescription(it.description)
+                        }
+                        override fun onCreateFailure(p0: String?) {}
+                        override fun onSetFailure(p0: String?) {}
+                    }, it)
+                }
+            }
+
+            override fun onSetSuccess() {}
+            override fun onCreateFailure(error: String?) {}
+            override fun onSetFailure(error: String?) {}
+        }, constraints)
+    }
+
     private fun setupAudioTrack() {
         val audioConstraints = MediaConstraints()
         localAudioSource = factory.peerConnectionFactory().createAudioSource(audioConstraints)

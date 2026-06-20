@@ -49,7 +49,7 @@ This document is the implementation checkpoint after the message status foundati
 | Notifications | Client foundation | FCM rendering and chat deep links exist; future trusted fanout is Cloudflare Worker + FCM, not Firebase Functions. |
 | Media polish | Advanced foundation | Validation, compression, preview, retry, app-private pending files, and WorkManager background delivery exist; signed production upload remains. |
 | Groups | Working MVP | Creation UI, member selection, group previews, text/image messages, sender labels, notification routing, admin schema, validation, and rules exist; member/admin management and group profile editing remain. |
-| Calls | Step 90 outgoing audio complete | Firestore session/state API, atomic offer/accept, role-specific ICE paths, strict rules, WebRTC engine, STUN, and optional local TURN config exist; Step 90 outgoing audio flow and UI implemented; Step 91 incoming audio-call remains. |
+| Calls | Step 91 incoming audio complete | Firestore session/state API, atomic offer/accept, role-specific ICE paths, strict rules, WebRTC engine, STUN, and optional local TURN config exist; Step 90 outgoing and Step 91 incoming audio flows implemented; Step 92 background notification remains. |
 | Status/channels | Not started | Media/status/channel models and UI. |
 | Offline/backup | Not started | Firestore cache first, Room later if required. |
 

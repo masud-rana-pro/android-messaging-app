@@ -6,6 +6,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +28,8 @@ import com.contactme.app.ui.screens.ProfileSetupScreen
 import com.contactme.app.ui.screens.SettingsScreen
 import com.contactme.app.ui.screens.SplashScreen
 import com.contactme.app.call.OutgoingCallScreen
+import com.contactme.app.call.IncomingCallScreen
+import com.contactme.app.call.IncomingCallViewModel
 import com.contactme.app.ui.conversation.ConversationViewModel
 import com.contactme.app.ui.session.SessionViewModel
 
@@ -37,10 +40,13 @@ fun ContactMeApp(
     sessionViewModel: SessionViewModel = hiltViewModel(),
     conversationViewModel: ConversationViewModel = hiltViewModel(),
     presenceViewModel: PresenceViewModel = hiltViewModel(),
-    deviceTokenSyncViewModel: DeviceTokenSyncViewModel = hiltViewModel()
+    deviceTokenSyncViewModel: DeviceTokenSyncViewModel = hiltViewModel(),
+    incomingCallViewModel: IncomingCallViewModel = hiltViewModel()
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
+    val incomingCallState by incomingCallViewModel.uiState.collectAsState()
+
     var selectedChatTarget by remember {
         mutableStateOf(ChatTarget(title = "ContactMe User", conversationId = null))
     }
@@ -79,6 +85,13 @@ fun ContactMeApp(
     LaunchedEffect(currentScreen) {
         presenceViewModel.markOnline()
         deviceTokenSyncViewModel.syncCurrentDevice()
+    }
+
+    LaunchedEffect(incomingCallState.activeCall) {
+        val call = incomingCallState.activeCall
+        if (call != null && currentScreen != AppScreen.IncomingCall) {
+            currentScreen = AppScreen.IncomingCall
+        }
     }
 
     LaunchedEffect(notificationChatTarget, currentScreen) {
@@ -161,6 +174,14 @@ fun ContactMeApp(
             AppScreen.OutgoingCall -> OutgoingCallScreen(
                 receiverId = selectedChatTarget.conversationId.orEmpty(),
                 onCallEnded = { currentScreen = AppScreen.Home }
+            )
+
+            AppScreen.IncomingCall -> IncomingCallScreen(
+                onCallDismissed = {
+                    incomingCallViewModel.onCallScreenDismissed()
+                    currentScreen = AppScreen.Home
+                },
+                viewModel = incomingCallViewModel
             )
 
             AppScreen.Settings -> SettingsScreen(
