@@ -1,7 +1,7 @@
 package com.contactme.app.call
 
 data class CallSession(
-    val id: String,
+    val callId: String,
     val callerId: String,
     val receiverId: String,
     val type: CallType,

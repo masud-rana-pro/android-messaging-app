@@ -3,32 +3,40 @@ package com.contactme.app.call
 import kotlinx.coroutines.flow.Flow
 
 interface CallSignalingRepository {
-    fun observeCall(callId: String): Flow<CallSession?>
-
-    fun observeRemoteIceCandidates(
-        callId: String,
-        currentUserId: String
-    ): Flow<List<CallIceCandidate>>
-
-    suspend fun createCall(
+    suspend fun createCallOffer(
         callerId: String,
         receiverId: String,
-        type: CallType
+        type: CallType,
+        offer: String
     ): CallResult
 
-    suspend fun setOffer(callId: String, callerId: String, offer: String): CallResult
+    fun listenForIncomingCalls(receiverId: String): Flow<List<CallSession>>
 
-    suspend fun setAnswer(callId: String, receiverId: String, answer: String): CallResult
+    fun listenToCall(callId: String): Flow<CallSession?>
 
-    suspend fun addIceCandidate(
+    suspend fun acceptCallWithAnswer(
         callId: String,
-        currentUserId: String,
+        receiverId: String,
+        answer: String
+    ): CallResult
+
+    suspend fun rejectCall(callId: String, receiverId: String): CallResult
+
+    suspend fun endCall(callId: String, currentUserId: String): CallResult
+
+    suspend fun addCallerIceCandidate(
+        callId: String,
+        callerId: String,
         candidate: CallIceCandidate
     ): CallResult
 
-    suspend fun updateStatus(
+    suspend fun addReceiverIceCandidate(
         callId: String,
-        currentUserId: String,
-        status: CallStatus
+        receiverId: String,
+        candidate: CallIceCandidate
     ): CallResult
+
+    fun listenCallerIceCandidates(callId: String): Flow<List<CallIceCandidate>>
+
+    fun listenReceiverIceCandidates(callId: String): Flow<List<CallIceCandidate>>
 }

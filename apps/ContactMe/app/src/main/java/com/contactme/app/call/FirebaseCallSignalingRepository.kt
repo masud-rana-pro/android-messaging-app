@@ -13,49 +13,15 @@ import kotlinx.coroutines.tasks.await
 class FirebaseCallSignalingRepository @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : CallSignalingRepository {
-    override fun observeCall(callId: String): Flow<CallSession?> = callbackFlow {
-        val registration = calls().document(callId).addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                close(error)
-                return@addSnapshotListener
-            }
-            trySend(snapshot?.takeIf { it.exists() }?.toCallSession())
-        }
-        awaitClose { registration.remove() }
-    }
-
-    override fun observeRemoteIceCandidates(
-        callId: String,
-        currentUserId: String
-    ): Flow<List<CallIceCandidate>> = callbackFlow {
-        val callReference = calls().document(callId)
-        val call = callReference.get().await()
-        val collection = when (currentUserId) {
-            call.getString(CALLER_ID) -> RECEIVER_CANDIDATES
-            call.getString(RECEIVER_ID) -> CALLER_CANDIDATES
-            else -> {
-                close(IllegalAccessException("User is not a call participant"))
-                return@callbackFlow
-            }
-        }
-        val registration = callReference.collection(collection)
-            .orderBy(CREATED_AT, Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                trySend(snapshot?.documents.orEmpty().map { it.toIceCandidate() })
-            }
-        awaitClose { registration.remove() }
-    }
-
-    override suspend fun createCall(
+    override suspend fun createCallOffer(
         callerId: String,
         receiverId: String,
-        type: CallType
+        type: CallType,
+        offer: String
     ): CallResult {
-        if (callerId.isBlank() || receiverId.isBlank() || callerId == receiverId) {
+        if (callerId.isBlank() || receiverId.isBlank() || callerId == receiverId ||
+            offer.isBlank() || offer.length > MAX_SDP_LENGTH
+        ) {
             return CallResult.Error("This call cannot be started.")
         }
         return runCatching {
@@ -66,7 +32,7 @@ class FirebaseCallSignalingRepository @Inject constructor(
                     RECEIVER_ID to receiverId,
                     TYPE to type.firestoreValue,
                     STATUS to CallStatus.Ringing.firestoreValue,
-                    OFFER to "",
+                    OFFER to offer,
                     ANSWER to "",
                     CREATED_AT to FieldValue.serverTimestamp(),
                     ACCEPTED_AT to null,
@@ -80,36 +46,100 @@ class FirebaseCallSignalingRepository @Inject constructor(
         )
     }
 
-    override suspend fun setOffer(
-        callId: String,
-        callerId: String,
-        offer: String
-    ): CallResult = updateField(callId, callerId, OFFER, offer)
+    override fun listenForIncomingCalls(receiverId: String): Flow<List<CallSession>> =
+        callbackFlow {
+            val registration = calls()
+                .whereEqualTo(RECEIVER_ID, receiverId)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        close(error)
+                        return@addSnapshotListener
+                    }
+                    trySend(
+                        snapshot?.documents.orEmpty()
+                            .map { it.toCallSession() }
+                            .filter { it.status == CallStatus.Ringing }
+                            .sortedByDescending(CallSession::createdAtMillis)
+                    )
+                }
+            awaitClose { registration.remove() }
+        }
 
-    override suspend fun setAnswer(
+    override fun listenToCall(callId: String): Flow<CallSession?> = callbackFlow {
+        val registration = calls().document(callId).addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            trySend(snapshot?.takeIf { it.exists() }?.toCallSession())
+        }
+        awaitClose { registration.remove() }
+    }
+
+    override suspend fun acceptCallWithAnswer(
         callId: String,
         receiverId: String,
         answer: String
-    ): CallResult = updateField(callId, receiverId, ANSWER, answer)
-
-    override suspend fun addIceCandidate(
-        callId: String,
-        currentUserId: String,
-        candidate: CallIceCandidate
     ): CallResult {
-        if (candidate.candidate.isBlank() || candidate.senderId != currentUserId) {
+        if (callId.isBlank() || receiverId.isBlank() ||
+            answer.isBlank() || answer.length > MAX_SDP_LENGTH
+        ) {
+            return CallResult.Error("This call cannot be accepted.")
+        }
+        return updateCall(
+            callId,
+            mapOf(
+                ANSWER to answer,
+                STATUS to CallStatus.Accepted.firestoreValue,
+                ACCEPTED_AT to FieldValue.serverTimestamp()
+            ),
+            "This call cannot be accepted."
+        )
+    }
+
+    override suspend fun rejectCall(callId: String, receiverId: String): CallResult {
+        if (callId.isBlank() || receiverId.isBlank()) return CallResult.Error("Invalid call.")
+        return updateTerminalStatus(callId, CallStatus.Rejected)
+    }
+
+    override suspend fun endCall(callId: String, currentUserId: String): CallResult {
+        if (callId.isBlank() || currentUserId.isBlank()) return CallResult.Error("Invalid call.")
+        return updateTerminalStatus(callId, CallStatus.Ended)
+    }
+
+    override suspend fun addCallerIceCandidate(
+        callId: String,
+        callerId: String,
+        candidate: CallIceCandidate
+    ): CallResult = addIceCandidate(callId, callerId, candidate, CALLER_CANDIDATES)
+
+    override suspend fun addReceiverIceCandidate(
+        callId: String,
+        receiverId: String,
+        candidate: CallIceCandidate
+    ): CallResult = addIceCandidate(callId, receiverId, candidate, RECEIVER_CANDIDATES)
+
+    override fun listenCallerIceCandidates(callId: String): Flow<List<CallIceCandidate>> =
+        listenIceCandidates(callId, CALLER_CANDIDATES)
+
+    override fun listenReceiverIceCandidates(callId: String): Flow<List<CallIceCandidate>> =
+        listenIceCandidates(callId, RECEIVER_CANDIDATES)
+
+    private suspend fun addIceCandidate(
+        callId: String,
+        ownerId: String,
+        candidate: CallIceCandidate,
+        collection: String
+    ): CallResult {
+        if (callId.isBlank() || ownerId.isBlank() || candidate.senderId != ownerId ||
+            candidate.candidate.isBlank()
+        ) {
             return CallResult.Error("Invalid network candidate.")
         }
         return runCatching {
-            val call = calls().document(callId).get().await()
-            val collection = when (currentUserId) {
-                call.getString(CALLER_ID) -> CALLER_CANDIDATES
-                call.getString(RECEIVER_ID) -> RECEIVER_CANDIDATES
-                else -> error("User is not a call participant")
-            }
-            call.reference.collection(collection).add(
+            calls().document(callId).collection(collection).add(
                 mapOf(
-                    SENDER_ID to currentUserId,
+                    SENDER_ID to ownerId,
                     SDP_MID to candidate.sdpMid,
                     SDP_MLINE_INDEX to candidate.sdpMLineIndex,
                     CANDIDATE to candidate.candidate,
@@ -122,40 +152,49 @@ class FirebaseCallSignalingRepository @Inject constructor(
         )
     }
 
-    override suspend fun updateStatus(
+    private fun listenIceCandidates(
         callId: String,
-        currentUserId: String,
-        status: CallStatus
-    ): CallResult {
-        if (callId.isBlank() || currentUserId.isBlank()) return CallResult.Error("Invalid call.")
-        val updates = mutableMapOf<String, Any?>(STATUS to status.firestoreValue)
-        if (status == CallStatus.Accepted) updates[ACCEPTED_AT] = FieldValue.serverTimestamp()
-        if (status.isTerminal()) updates[ENDED_AT] = FieldValue.serverTimestamp()
-        return runCatching { calls().document(callId).update(updates).await() }.fold(
-            onSuccess = { CallResult.Success },
-            onFailure = { CallResult.Error("Call status could not be updated.") }
-        )
+        collection: String
+    ): Flow<List<CallIceCandidate>> = callbackFlow {
+        val registration = calls().document(callId).collection(collection)
+            .orderBy(CREATED_AT, Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                trySend(snapshot?.documents.orEmpty().map { it.toIceCandidate() })
+            }
+        awaitClose { registration.remove() }
     }
 
-    private suspend fun updateField(
+    private suspend fun updateTerminalStatus(
         callId: String,
-        currentUserId: String,
-        field: String,
-        value: String
-    ): CallResult {
-        if (callId.isBlank() || currentUserId.isBlank() || value.isBlank()) {
-            return CallResult.Error("Invalid call signal.")
-        }
-        return runCatching { calls().document(callId).update(field, value).await() }.fold(
-            onSuccess = { CallResult.Success },
-            onFailure = { CallResult.Error("Call negotiation could not continue.") }
-        )
-    }
+        status: CallStatus
+    ): CallResult = updateCall(
+        callId,
+        mapOf(
+            STATUS to status.firestoreValue,
+            ENDED_AT to FieldValue.serverTimestamp()
+        ),
+        "Call status could not be updated."
+    )
+
+    private suspend fun updateCall(
+        callId: String,
+        updates: Map<String, Any>,
+        errorMessage: String
+    ): CallResult = runCatching {
+        calls().document(callId).update(updates).await()
+    }.fold(
+        onSuccess = { CallResult.Success },
+        onFailure = { CallResult.Error(errorMessage) }
+    )
 
     private fun calls() = firestore.collection(CALLS)
 
     private fun DocumentSnapshot.toCallSession() = CallSession(
-        id = id,
+        callId = id,
         callerId = getString(CALLER_ID).orEmpty(),
         receiverId = getString(RECEIVER_ID).orEmpty(),
         type = CallType.fromFirestore(getString(TYPE)),
@@ -176,16 +215,8 @@ class FirebaseCallSignalingRepository @Inject constructor(
         createdAtMillis = getTimestamp(CREATED_AT)?.toDate()?.time ?: 0L
     )
 
-    private fun CallStatus.isTerminal() = this in setOf(
-        CallStatus.Rejected,
-        CallStatus.Ended,
-        CallStatus.Missed,
-        CallStatus.Cancelled,
-        CallStatus.Timeout,
-        CallStatus.Busy
-    )
-
     private companion object {
+        const val MAX_SDP_LENGTH = 65_536
         const val CALLS = "calls"
         const val CALLER_CANDIDATES = "callerCandidates"
         const val RECEIVER_CANDIDATES = "receiverCandidates"
