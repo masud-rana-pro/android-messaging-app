@@ -7,6 +7,7 @@ import com.contactme.app.message.MessageReply
 
 data class ChatDetailUiState(
     val currentUserId: String = "",
+    val peerUserId: String? = null,
     val messageText: String = "",
     val replyingTo: MessageReply? = null,
     val editingMessageId: String? = null,

@@ -26,6 +26,7 @@ import com.contactme.app.ui.screens.GroupCreationScreen
 import com.contactme.app.ui.screens.ProfileSetupScreen
 import com.contactme.app.ui.screens.SettingsScreen
 import com.contactme.app.ui.screens.SplashScreen
+import com.contactme.app.call.OutgoingCallScreen
 import com.contactme.app.ui.conversation.ConversationViewModel
 import com.contactme.app.ui.session.SessionViewModel
 
@@ -47,6 +48,11 @@ fun ContactMeApp(
     fun openChat(target: ChatTarget) {
         selectedChatTarget = target
         currentScreen = AppScreen.ChatDetail
+    }
+
+    fun openOutgoingCall(receiverId: String) {
+        selectedChatTarget = ChatTarget(title = "Calling...", conversationId = receiverId)
+        currentScreen = AppScreen.OutgoingCall
     }
 
     fun openNotificationChatIfPossible(target: ChatTarget) {
@@ -148,7 +154,13 @@ fun ContactMeApp(
                 conversationId = selectedChatTarget.conversationId,
                 chatPhotoUrl = selectedChatTarget.photoUrl,
                 conversationType = selectedChatTarget.type,
-                onBack = { currentScreen = AppScreen.Home }
+                onBack = { currentScreen = AppScreen.Home },
+                onVoiceCallClick = { receiverId -> openOutgoingCall(receiverId) }
+            )
+
+            AppScreen.OutgoingCall -> OutgoingCallScreen(
+                receiverId = selectedChatTarget.conversationId.orEmpty(),
+                onCallEnded = { currentScreen = AppScreen.Home }
             )
 
             AppScreen.Settings -> SettingsScreen(

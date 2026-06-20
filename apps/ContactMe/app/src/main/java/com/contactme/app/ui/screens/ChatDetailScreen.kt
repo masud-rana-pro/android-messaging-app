@@ -46,6 +46,7 @@ import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -93,6 +94,7 @@ fun ChatDetailScreen(
     chatPhotoUrl: String = "",
     conversationType: ConversationType = ConversationType.Direct,
     onBack: () -> Unit,
+    onVoiceCallClick: (String) -> Unit,
     viewModel: ChatDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -115,6 +117,9 @@ fun ChatDetailScreen(
         conversationType = conversationType,
         uiState = uiState,
         onBack = onBack,
+        onVoiceCallClick = { 
+            uiState.peerUserId?.let(onVoiceCallClick)
+        },
         onMessageTextChanged = viewModel::onMessageTextChanged,
         onSendMessage = viewModel::sendMessage,
         onRetryImageMessage = viewModel::retryFailedImageMessage,
@@ -142,6 +147,7 @@ private fun ChatDetailContent(
     conversationType: ConversationType,
     uiState: ChatDetailUiState,
     onBack: () -> Unit,
+    onVoiceCallClick: () -> Unit,
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
     onRetryImageMessage: () -> Unit,
@@ -216,6 +222,9 @@ private fun ChatDetailContent(
                 },
                 actions = {
                     if (conversationId != null && conversationType == ConversationType.Direct) {
+                        IconButton(onClick = onVoiceCallClick) {
+                            Icon(imageVector = Icons.Outlined.Call, contentDescription = "Voice Call")
+                        }
                         ChatActionMenu(
                             uiState = uiState,
                             onReportChat = onReportChat,
@@ -1239,7 +1248,8 @@ private fun ChatDetailScreenPreview() {
             chatName = "ContactMe User",
             conversationId = null,
             chatPhotoUrl = "",
-            onBack = {}
+            onBack = {},
+            onVoiceCallClick = {}
         )
     }
 }
