@@ -8,7 +8,7 @@ Create the one-to-one audio/video call signaling boundary using Firebase Auth an
 
 - Added audio/video call types and the required call statuses.
 - Added a Firestore call session model with caller, receiver, offer, answer, and timestamps.
-- Added repository operations for creating and observing calls, offer/answer exchange, status updates, and ICE candidates.
+- Added repository operations for atomically creating a call with its offer, atomically accepting with an answer, observing incoming/current calls, terminal status updates, and role-specific ICE candidates.
 - Added caller and receiver candidate subcollections.
 - Added participant-only Firestore rules, immutable call identity, status transition ownership, SDP limits, and append-only ICE rules.
 - No media transport occurs through Firestore; WebRTC carries audio/video peer-to-peer or through TURN.

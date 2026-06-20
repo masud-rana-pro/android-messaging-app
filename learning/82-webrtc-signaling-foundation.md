@@ -8,11 +8,10 @@
 
 Audio/video Firestore দিয়ে যায় না। Firestore শুধু দুই peer-কে connection information আদান-প্রদান করায়:
 
-1. caller `calls/{callId}` তৈরি করে;
-2. caller SDP offer লেখে;
-3. receiver SDP answer লেখে;
-4. দুই পক্ষ নিজ নিজ ICE candidate subcollection-এ candidate যোগ করে;
-5. WebRTC STUN/TURN ব্যবহার করে media path তৈরি করে।
+1. caller `calls/{callId}` এবং SDP offer একই atomic write-এ তৈরি করে;
+2. receiver SDP answer, accepted status ও accepted timestamp একই atomic write-এ লেখে;
+3. দুই পক্ষ নিজ নিজ ICE candidate subcollection-এ candidate যোগ করে;
+4. WebRTC STUN/TURN ব্যবহার করে media path তৈরি করে।
 
 ## Call fields
 
