@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -9,6 +11,18 @@ plugins {
     id("com.google.gms.google-services")
 
 }
+
+val webRtcProperties = Properties().apply {
+    val localConfig = rootProject.file("webrtc.properties")
+    if (localConfig.exists()) {
+        localConfig.inputStream().use { load(it) }
+    }
+}
+
+fun webRtcConfigValue(name: String): String = webRtcProperties
+    .getProperty(name, "")
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
 
 android {
     namespace = "com.contactme.app"
@@ -22,6 +36,9 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "WEBRTC_TURN_URL", "\"${webRtcConfigValue("TURN_URL")}\"")
+        buildConfigField("String", "WEBRTC_TURN_USERNAME", "\"${webRtcConfigValue("TURN_USERNAME")}\"")
+        buildConfigField("String", "WEBRTC_TURN_PASSWORD", "\"${webRtcConfigValue("TURN_PASSWORD")}\"")
     }
 
     buildTypes {
@@ -45,6 +62,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -68,8 +86,8 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")
     implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-functions")
     implementation("com.google.firebase:firebase-messaging")
+    implementation("io.github.webrtc-sdk:android:144.7559.09")
     implementation("com.google.dagger:hilt-android:2.52")
     kapt("com.google.dagger:hilt-compiler:2.52")
     kapt("androidx.hilt:hilt-compiler:1.2.0")

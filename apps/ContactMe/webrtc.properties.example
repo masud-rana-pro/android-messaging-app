@@ -1,0 +1,5 @@
+# Copy this file to apps/ContactMe/webrtc.properties and keep the copied file local only.
+# Metered.ca example values belong here. Never commit real TURN credentials.
+TURN_URL=turn:your-metered-turn-host:443?transport=tcp
+TURN_USERNAME=your-local-username
+TURN_PASSWORD=your-local-password
