@@ -4,6 +4,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.Filter
 import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -59,6 +60,29 @@ class FirebaseCallSignalingRepository @Inject constructor(
                         snapshot?.documents.orEmpty()
                             .map { it.toCallSession() }
                             .filter { it.status == CallStatus.Ringing }
+                            .sortedByDescending(CallSession::createdAtMillis)
+                    )
+                }
+            awaitClose { registration.remove() }
+        }
+
+    override fun listenToAllCalls(userId: String): Flow<List<CallSession>> =
+        callbackFlow {
+            val registration = calls()
+                .where(
+                    Filter.or(
+                        Filter.equalTo(RECEIVER_ID, userId),
+                        Filter.equalTo(CALLER_ID, userId)
+                    )
+                )
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        trySend(emptyList())
+                        return@addSnapshotListener
+                    }
+                    trySend(
+                        snapshot?.documents.orEmpty()
+                            .map { it.toCallSession() }
                             .sortedByDescending(CallSession::createdAtMillis)
                     )
                 }

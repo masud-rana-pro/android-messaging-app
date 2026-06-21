@@ -12,6 +12,8 @@ interface CallSignalingRepository {
 
     fun listenForIncomingCalls(receiverId: String): Flow<List<CallSession>>
 
+    fun listenToAllCalls(userId: String): Flow<List<CallSession>>
+
     fun listenToCall(callId: String): Flow<CallSession?>
 
     suspend fun acceptCallWithAnswer(
