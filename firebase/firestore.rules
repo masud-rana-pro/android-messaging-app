@@ -127,8 +127,8 @@ service cloud.firestore {
           && request.resource.data.readAtByUser[request.auth.uid] == request.time;
       }
 
-      allow read: if isSignedIn()
-        && request.auth.uid in resource.data.participantIds;
+      allow get: if isSignedIn() && (resource == null || request.auth.uid in resource.data.participantIds);
+      allow list: if isSignedIn() && request.auth.uid in resource.data.participantIds;
       allow create: if isSignedIn() &&
         (isDirectConversationParticipantList() || isGroupConversationParticipantList());
       allow update: if isSignedIn()

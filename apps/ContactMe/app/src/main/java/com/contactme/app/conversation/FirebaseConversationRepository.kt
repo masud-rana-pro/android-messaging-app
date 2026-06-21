@@ -1,10 +1,12 @@
 package com.contactme.app.conversation
 
+import android.util.Log
 import com.contactme.app.profile.PrivacyVisibility
 import com.contactme.app.safety.SafetyRepository
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -19,10 +21,12 @@ class FirebaseConversationRepository @Inject constructor(
     override fun observeConversationPreviews(
         currentUserId: String
     ): Flow<List<ConversationPreview>> = callbackFlow {
+        Log.d("FirebaseConversationRepository", "observeConversationPreviews: $currentUserId")
         val registration = firestore.collection(CONVERSATIONS_COLLECTION)
             .whereArrayContains("participantIds", currentUserId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    Log.e("FirebaseConversationRepository", "observePreviews error", error)
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
@@ -137,6 +141,7 @@ class FirebaseConversationRepository @Inject constructor(
         currentUserId: String,
         otherUserId: String
     ): ConversationResult {
+        Log.d("FirebaseConversationRepository", "getOrCreateDirectConversation: $currentUserId -> $otherUserId")
         if (currentUserId == otherUserId) {
             return ConversationResult.Error("You cannot open a chat with yourself.")
         }
@@ -150,11 +155,14 @@ class FirebaseConversationRepository @Inject constructor(
         val conversationDocument = firestore.collection(CONVERSATIONS_COLLECTION)
             .document(conversationId)
 
+        Log.d("FirebaseConversationRepository", "Using conversationId: $conversationId")
+
         return runCatching {
             firestore.runTransaction { transaction ->
                 val snapshot = transaction.get(conversationDocument)
 
                 if (!snapshot.exists()) {
+                    Log.d("FirebaseConversationRepository", "Creating new conversation document")
                     val conversationData = mapOf(
                         "type" to DIRECT_TYPE,
                         "participantIds" to participantIds,
@@ -165,6 +173,7 @@ class FirebaseConversationRepository @Inject constructor(
 
                     transaction.set(conversationDocument, conversationData)
                 } else {
+                    Log.d("FirebaseConversationRepository", "Updating existing conversation document")
                     transaction.update(
                         conversationDocument,
                         "updatedAt",
@@ -175,8 +184,12 @@ class FirebaseConversationRepository @Inject constructor(
                 conversationId
             }.await()
         }.fold(
-            onSuccess = { id -> ConversationResult.Success(id) },
-            onFailure = {
+            onSuccess = { id -> 
+                Log.d("FirebaseConversationRepository", "Transaction success: $id")
+                ConversationResult.Success(id) 
+            },
+            onFailure = { error ->
+                Log.e("FirebaseConversationRepository", "Transaction failed", error)
                 ConversationResult.Error("We could not open this chat. Please try again.")
             }
         )
