@@ -37,6 +37,8 @@ import com.contactme.app.ui.session.SessionViewModel
 fun ContactMeApp(
     notificationChatTarget: ChatTarget? = null,
     onNotificationChatTargetConsumed: () -> Unit = {},
+    notificationCallId: String? = null,
+    onNotificationCallConsumed: () -> Unit = {},
     sessionViewModel: SessionViewModel = hiltViewModel(),
     conversationViewModel: ConversationViewModel = hiltViewModel(),
     presenceViewModel: PresenceViewModel = hiltViewModel(),
@@ -104,6 +106,13 @@ fun ContactMeApp(
             openNotificationChatIfPossible(target)
             onNotificationChatTargetConsumed()
         }
+    }
+
+    LaunchedEffect(notificationCallId) {
+        val callId = notificationCallId ?: return@LaunchedEffect
+        // The IncomingCallViewModel will likely detect this via Firestore, 
+        // but we consume the intent signal here.
+        onNotificationCallConsumed()
     }
 
     Surface(

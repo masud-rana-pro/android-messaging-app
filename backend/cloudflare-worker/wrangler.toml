@@ -1,0 +1,8 @@
+name = "contactme-call-notification"
+main = "src/index.js"
+compatibility_date = "2024-06-20"
+
+# Secrets must be set via `wrangler secret put`:
+# FIREBASE_PROJECT_ID
+# FIREBASE_CLIENT_EMAIL
+# FIREBASE_PRIVATE_KEY

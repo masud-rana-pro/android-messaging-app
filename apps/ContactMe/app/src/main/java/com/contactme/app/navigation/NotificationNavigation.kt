@@ -8,6 +8,8 @@ object NotificationNavigation {
     const val EXTRA_CHAT_TITLE = "contactme.extra.CHAT_TITLE"
     const val EXTRA_CHAT_PHOTO_URL = "contactme.extra.CHAT_PHOTO_URL"
     const val EXTRA_CONVERSATION_TYPE = "contactme.extra.CONVERSATION_TYPE"
+    const val EXTRA_CALL_ID = "contactme.extra.CALL_ID"
+    const val EXTRA_NOTIFICATION_TYPE = "contactme.extra.NOTIFICATION_TYPE"
 
     fun chatTargetFrom(intent: Intent?): ChatTarget? {
         val conversationId = intent?.getStringExtra(EXTRA_CONVERSATION_ID)
@@ -29,10 +31,16 @@ object NotificationNavigation {
         )
     }
 
+    fun callIdFrom(intent: Intent?): String? {
+        return intent?.getStringExtra(EXTRA_CALL_ID)?.takeIf(String::isNotBlank)
+    }
+
     fun clearChatTarget(intent: Intent?) {
         intent?.removeExtra(EXTRA_CONVERSATION_ID)
         intent?.removeExtra(EXTRA_CHAT_TITLE)
         intent?.removeExtra(EXTRA_CHAT_PHOTO_URL)
         intent?.removeExtra(EXTRA_CONVERSATION_TYPE)
+        intent?.removeExtra(EXTRA_CALL_ID)
+        intent?.removeExtra(EXTRA_NOTIFICATION_TYPE)
     }
 }

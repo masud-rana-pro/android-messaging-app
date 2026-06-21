@@ -36,6 +36,8 @@ class ContactMeNotificationRenderer @Inject constructor(
                 )
                 putExtra(NotificationNavigation.EXTRA_CHAT_TITLE, payload.title)
                 putExtra(NotificationNavigation.EXTRA_CHAT_PHOTO_URL, payload.photoUrl)
+                putExtra(NotificationNavigation.EXTRA_CALL_ID, payload.callId)
+                putExtra(NotificationNavigation.EXTRA_NOTIFICATION_TYPE, payload.type)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

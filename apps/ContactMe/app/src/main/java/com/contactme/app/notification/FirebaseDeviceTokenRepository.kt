@@ -77,6 +77,11 @@ class FirebaseDeviceTokenRepository @Inject constructor(
         userId: String,
         token: String
     ) {
+        // Mirror latest token to user profile for server-side lookup (Step 92)
+        firestore.collection(USERS_COLLECTION)
+            .document(userId)
+            .update("fcmToken", token)
+
         firestore.collection(USER_DEVICES_COLLECTION)
             .document(userId)
             .collection(DEVICES_COLLECTION)
@@ -99,6 +104,7 @@ class FirebaseDeviceTokenRepository @Inject constructor(
     }
 
     private companion object {
+        const val USERS_COLLECTION = "users"
         const val USER_DEVICES_COLLECTION = "user_devices"
         const val DEVICES_COLLECTION = "devices"
         const val ANDROID_PLATFORM = "android"
