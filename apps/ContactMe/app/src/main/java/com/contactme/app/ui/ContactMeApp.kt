@@ -1,5 +1,6 @@
 package com.contactme.app.ui
 
+import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,6 +70,7 @@ fun ContactMeApp(
     }
 
     fun openChat(target: ChatTarget) {
+        Log.d("ContactMeApp", "openChat: target=$target")
         selectedChatTarget = target
         currentScreen = AppScreen.ChatDetail
     }
@@ -197,16 +199,23 @@ fun ContactMeApp(
                 AppScreen.StartChat -> StartChatScreen(
                     onBack = { currentScreen = AppScreen.Home },
                     onUserSelected = { userProfile ->
+                        Log.d("ContactMeApp", "StartChat: onUserSelected=${userProfile.userId}")
                         conversationViewModel.openDirectConversation(userProfile) { conversationId, chatName, photoUrl ->
-                            openChat(
-                                ChatTarget(
-                                    title = chatName,
-                                    conversationId = conversationId,
-                                    photoUrl = photoUrl
+                            Log.d("ContactMeApp", "StartChat: conversation ready: $conversationId. Navigating...")
+                            try {
+                                openChat(
+                                    ChatTarget(
+                                        title = chatName,
+                                        conversationId = conversationId,
+                                        photoUrl = photoUrl
+                                    )
                                 )
-                            )
+                            } catch (e: Exception) {
+                                Log.e("ContactMeApp", "Navigation to ChatDetail failed", e)
+                            }
                         }
-                    }
+                    },
+                    conversationViewModel = conversationViewModel
                 )
 
                 AppScreen.ChatDetail -> ChatDetailScreen(

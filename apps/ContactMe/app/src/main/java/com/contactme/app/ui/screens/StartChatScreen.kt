@@ -1,6 +1,7 @@
 package com.contactme.app.ui.screens
 
 import android.Manifest
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -107,11 +108,17 @@ fun StartChatScreen(
                 }
 
                 if (openingError != null) {
-                    Text(
-                        text = openingError!!,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            text = openingError!!,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
 
                 LazyColumn(
@@ -144,31 +151,13 @@ fun StartChatScreen(
                     items(results) { user ->
                         StartChatUserRow(
                             user = user,
-                            onClick = { onUserSelected(user) }
-                        )
-                    }
-                }
-            }
-
-            if (isOpeningChat) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = Color.Black.copy(alpha = 0.3f)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                CircularProgressIndicator()
-                                Text("Opening chat...", style = MaterialTheme.typography.titleMedium)
+                            onClick = { 
+                                if (!isOpeningChat) {
+                                    Log.d("StartChatScreen", "User selected: ${user.userId}")
+                                    onUserSelected(user) 
+                                }
                             }
-                        }
+                        )
                     }
                 }
             }
@@ -181,11 +170,15 @@ private fun StartChatUserRow(
     user: UserProfile,
     onClick: () -> Unit
 ) {
+    Log.d("StartChatScreen", "Rendering StartChatUserRow for: ${user.username}")
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .clickable {
+                Log.d("StartChatScreen", "Row clicked for: ${user.userId}")
+                onClick()
+            }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)

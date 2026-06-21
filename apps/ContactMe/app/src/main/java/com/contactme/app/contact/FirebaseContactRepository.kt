@@ -1,5 +1,6 @@
 package com.contactme.app.contact
 
+import android.util.Log
 import com.contactme.app.profile.PrivacyVisibility
 import com.contactme.app.profile.UserProfile
 import com.google.firebase.firestore.DocumentSnapshot
@@ -17,11 +18,13 @@ class FirebaseContactRepository @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : ContactRepository {
     override fun observeContacts(ownerUserId: String): Flow<List<UserProfile>> = callbackFlow {
+        Log.d("FirebaseContactRepository", "observeContacts: $ownerUserId")
         val registration = firestore.collection(CONTACTS_COLLECTION)
             .document(ownerUserId)
             .collection(CONTACT_ITEMS_COLLECTION)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    Log.e("FirebaseContactRepository", "observeContacts error", error)
                     trySend(emptyList())
                     return@addSnapshotListener
                 }

@@ -1,5 +1,6 @@
 package com.contactme.app.ui.conversation
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
@@ -32,6 +33,7 @@ class ConversationViewModel @Inject constructor(
         onReady: (conversationId: String, chatName: String, photoUrl: String) -> Unit
     ) {
         val currentUserId = authRepository.currentUserId()
+        Log.d("ConversationViewModel", "openDirectConversation: currentUserId=$currentUserId, otherUserId=${otherUser.userId}")
 
         if (currentUserId == null) {
             _errorMessage.value = "Session expired. Please log in again."
@@ -44,32 +46,49 @@ class ConversationViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _isOpeningChat.value = true
-            _errorMessage.value = null
+            try {
+                _isOpeningChat.value = true
+                _errorMessage.value = null
 
-            val result = conversationRepository.getOrCreateDirectConversation(
-                currentUserId = currentUserId,
-                otherUserId = otherUser.userId
-            )
+                Log.d("ConversationViewModel", "Calling getOrCreateDirectConversation...")
+                val result = conversationRepository.getOrCreateDirectConversation(
+                    currentUserId = currentUserId,
+                    otherUserId = otherUser.userId
+                )
 
-            when (result) {
-                is ConversationResult.Success -> {
-                    contactRepository.saveContact(
-                        ownerUserId = currentUserId,
-                        contact = otherUser
-                    )
-                    _isOpeningChat.value = false
-                    onReady(
-                        result.conversationId,
-                        otherUser.displayName.ifBlank { otherUser.username },
-                        otherUser.photoUrl
-                    )
+                when (result) {
+                    is ConversationResult.Success -> {
+                        Log.d("ConversationViewModel", "Success: conversationId=${result.conversationId}")
+                        
+                        // Save contact in background, don't block navigation
+                        viewModelScope.launch {
+                            runCatching {
+                                contactRepository.saveContact(
+                                    ownerUserId = currentUserId,
+                                    contact = otherUser
+                                )
+                            }.onFailure { Log.e("ConversationViewModel", "Background saveContact failed", it) }
+                        }
+
+                        _isOpeningChat.value = false
+                        Log.d("ConversationViewModel", "Invoking onReady callback...")
+                        onReady(
+                            result.conversationId,
+                            otherUser.displayName.ifBlank { otherUser.username },
+                            otherUser.photoUrl
+                        )
+                    }
+
+                    is ConversationResult.Error -> {
+                        Log.e("ConversationViewModel", "Error Result: ${result.message}")
+                        _isOpeningChat.value = false
+                        _errorMessage.value = result.message
+                    }
                 }
-
-                is ConversationResult.Error -> {
-                    _isOpeningChat.value = false
-                    _errorMessage.value = result.message
-                }
+            } catch (e: Exception) {
+                Log.e("ConversationViewModel", "Unexpected exception in openDirectConversation", e)
+                _isOpeningChat.value = false
+                _errorMessage.value = "An unexpected error occurred. Please try again."
             }
         }
     }
