@@ -451,9 +451,7 @@ class ChatDetailViewModel @Inject constructor(
     }
 
     fun sendDocumentMessage(
-        documentUri: Uri,
-        preferredFileName: String? = null,
-        preferredMimeType: String? = null
+        documentUri: Uri
     ) {
         val conversationId = activeConversationId ?: return
         val senderId = authRepository.currentUserId() ?: return
@@ -477,9 +475,7 @@ class ChatDetailViewModel @Inject constructor(
                 val result = documentMessageQueue.enqueue(
                     conversationId,
                     senderId,
-                    documentUri,
-                    preferredFileName,
-                    preferredMimeType
+                    documentUri
                 )
             ) {
                 is DocumentQueueResult.Queued -> {
@@ -493,7 +489,7 @@ class ChatDetailViewModel @Inject constructor(
                             pendingDocumentName = "",
                             failedDocumentUri = documentUri.toString(),
                             failedDocumentName = "Document",
-                            failedDocumentMimeType = preferredMimeType.orEmpty(),
+                            failedDocumentMimeType = "",
                             errorMessage = result.message
                         )
                     }
@@ -539,9 +535,7 @@ class ChatDetailViewModel @Inject constructor(
         val state = _uiState.value
         if (state.failedDocumentUri.isNotBlank()) {
             sendDocumentMessage(
-                Uri.parse(state.failedDocumentUri),
-                state.failedDocumentName.takeIf(String::isNotBlank),
-                state.failedDocumentMimeType.takeIf(String::isNotBlank)
+                Uri.parse(state.failedDocumentUri)
             )
         }
     }

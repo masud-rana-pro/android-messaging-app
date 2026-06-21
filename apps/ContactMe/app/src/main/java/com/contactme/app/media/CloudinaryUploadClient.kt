@@ -51,7 +51,7 @@ class CloudinaryUploadClient @Inject constructor(
                 )
                 .build()
             val request = Request.Builder()
-                .url(CLOUDINARY_UPLOAD_URL)
+                .url(CLOUDINARY_UPLOAD_URL_IMAGE)
                 .post(requestBody)
                 .build()
 
@@ -94,7 +94,7 @@ class CloudinaryUploadClient @Inject constructor(
                 fileBytes.toRequestBody(mimeType.toMediaTypeOrNull())
             )
             .build()
-        val request = Request.Builder().url(CLOUDINARY_UPLOAD_URL).post(requestBody).build()
+        val request = Request.Builder().url(CLOUDINARY_UPLOAD_URL_RAW).post(requestBody).build()
 
         okHttpClient.newCall(request).execute().use { response ->
             val responseBody = response.body?.string().orEmpty()
@@ -187,7 +187,9 @@ class CloudinaryUploadClient @Inject constructor(
         const val JPEG_UPLOAD_QUALITY = 82
         const val CLOUDINARY_CLOUD_NAME = "dew95musb"
         const val CLOUDINARY_UPLOAD_PRESET = "contactme_unsigned"
-        const val CLOUDINARY_UPLOAD_URL = "https://api.cloudinary.com/v1_1/$CLOUDINARY_CLOUD_NAME/auto/upload"
+        const val CLOUDINARY_BASE_URL = "https://api.cloudinary.com/v1_1/$CLOUDINARY_CLOUD_NAME"
+        const val CLOUDINARY_UPLOAD_URL_IMAGE = "$CLOUDINARY_BASE_URL/image/upload"
+        const val CLOUDINARY_UPLOAD_URL_RAW = "$CLOUDINARY_BASE_URL/raw/upload"
         val ALLOWED_DOCUMENT_TYPES = setOf(
             "application/pdf",
             "text/plain",

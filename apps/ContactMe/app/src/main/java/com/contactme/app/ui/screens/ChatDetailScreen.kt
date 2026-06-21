@@ -172,11 +172,11 @@ private fun ChatDetailContent(
     val listState = rememberLazyListState()
     var selectedMessageForActions by remember { mutableStateOf<ChatMessage?>(null) }
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
+        contract = ActivityResultContracts.GetContent(),
         onResult = { uri -> uri?.let(onImageSelected) }
     )
     val documentPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
+        contract = ActivityResultContracts.GetContent(),
         onResult = { uri -> uri?.let(onDocumentSelected) }
     )
 
@@ -365,12 +365,10 @@ private fun ChatDetailContent(
                     onMessageTextChanged = onMessageTextChanged,
                     onSendMessage = onSendMessage,
                     onImageClick = {
-                        imagePickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
+                        imagePickerLauncher.launch("image/*")
                     },
                     onDocumentClick = {
-                        documentPickerLauncher.launch(DOCUMENT_MIME_TYPES)
+                        documentPickerLauncher.launch("*/*")
                     }
                 )
             }
