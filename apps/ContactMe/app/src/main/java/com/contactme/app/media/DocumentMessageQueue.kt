@@ -25,21 +25,22 @@ class DocumentMessageQueue @Inject constructor(
     suspend fun enqueue(
         conversationId: String,
         senderId: String,
-        documentUri: Uri,
-        preferredFileName: String? = null,
-        preferredMimeType: String? = null
+        documentUri: Uri
     ): DocumentQueueResult = runCatching {
-        val mimeType = preferredMimeType ?: context.contentResolver.getType(documentUri).orEmpty()
-        val fileName = preferredFileName ?: resolveFileName(documentUri)
+        val metadata = resolveMetadata(documentUri)
+        val mimeType = metadata.mimeType.orEmpty()
+        val fileName = metadata.displayName.orEmpty()
+        val fileSize = metadata.size ?: 0L
+
         if (mimeType !in ALLOWED_TYPES) {
-            throw MediaUploadException("Choose a PDF, text, DOC, or DOCX file.")
+            throw MediaUploadException("Choose a PDF, text, DOC, or DOCX file. (Found: $mimeType)")
         }
-        val pendingFile = pendingMediaStore.preserve(documentUri)
-        if (pendingFile.length() !in 1..MAX_SIZE_BYTES) {
-            pendingFile.delete()
+        if (fileSize > MAX_SIZE_BYTES) {
             throw MediaUploadException("Choose a document smaller than 25 MB.")
         }
 
+        val pendingFile = pendingMediaStore.preserve(documentUri)
+        
         val request = OneTimeWorkRequestBuilder<DocumentMessageWorker>()
             .setInputData(
                 workDataOf(
@@ -48,7 +49,7 @@ class DocumentMessageQueue @Inject constructor(
                     FILE_PATH_KEY to pendingFile.absolutePath,
                     FILE_NAME_KEY to fileName,
                     MIME_TYPE_KEY to mimeType,
-                    FILE_SIZE_KEY to pendingFile.length()
+                    FILE_SIZE_KEY to fileSize
                 )
             )
             .setConstraints(
@@ -78,15 +79,32 @@ class DocumentMessageQueue @Inject constructor(
 
     fun observe(workId: UUID): Flow<WorkInfo?> = workManager.getWorkInfoByIdFlow(workId)
 
-    private fun resolveFileName(uri: Uri): String {
-        return context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getString(0) else null
+    private fun resolveMetadata(uri: Uri): FileMetadata {
+        var displayName: String? = null
+        var size: Long? = null
+        val mimeType = context.contentResolver.getType(uri)
+
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (nameIndex != -1) displayName = cursor.getString(nameIndex)
+                if (sizeIndex != -1) size = cursor.getLong(sizeIndex)
             }
-            ?.take(255)
-            ?.takeIf(String::isNotBlank)
-            ?: "document"
+        }
+
+        return FileMetadata(
+            displayName = displayName?.take(255) ?: "document",
+            mimeType = mimeType,
+            size = size
+        )
     }
+
+    private data class FileMetadata(
+        val displayName: String?,
+        val mimeType: String?,
+        val size: Long?
+    )
 
     companion object {
         const val CONVERSATION_ID_KEY = "conversation_id"

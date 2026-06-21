@@ -1,6 +1,8 @@
 package com.contactme.app.media
 
+import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
@@ -9,12 +11,14 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 
 class ImageMessageQueue @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val workManager: WorkManager,
     private val pendingMediaStore: PendingMediaStore
 ) {
@@ -24,6 +28,16 @@ class ImageMessageQueue @Inject constructor(
         imageUri: Uri
     ): ImageQueueResult {
         return runCatching {
+            val mimeType = context.contentResolver.getType(imageUri) ?: "image/jpeg"
+            if (!mimeType.startsWith("image/")) {
+                throw MediaUploadException("Only image files can be uploaded here.")
+            }
+
+            val fileSize = resolveFileSize(imageUri)
+            if (fileSize > MAX_IMAGE_SIZE_BYTES) {
+                throw MediaUploadException("Choose a photo smaller than 10 MB.")
+            }
+
             val pendingFile = pendingMediaStore.preserve(imageUri)
             val request = OneTimeWorkRequestBuilder<ImageMessageWorker>()
                 .setInputData(
@@ -60,6 +74,13 @@ class ImageMessageQueue @Inject constructor(
         }
     }
 
+    private fun resolveFileSize(uri: Uri): Long {
+        return context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getLong(0) else 0L
+            } ?: 0L
+    }
+
     fun observe(workId: UUID): Flow<WorkInfo?> = workManager.getWorkInfoByIdFlow(workId)
 
     companion object {
@@ -67,6 +88,7 @@ class ImageMessageQueue @Inject constructor(
         const val SENDER_ID_KEY = "sender_id"
         const val FILE_PATH_KEY = "file_path"
         const val ERROR_KEY = "error"
+        const val MAX_IMAGE_SIZE_BYTES = 10L * 1024 * 1024
     }
 }
 
