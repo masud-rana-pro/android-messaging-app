@@ -19,7 +19,7 @@ class CloudinaryProfilePhotoRepository @Inject constructor(
         return runCatching {
             cloudinaryUploadClient.upload(
                 uri = photoUri,
-                fileName = PROFILE_PHOTO_FILE_NAME
+                fileName = "profile_$userId.jpg"
             ).secureUrl
         }.fold(
             onSuccess = { photoUrl -> ProfilePhotoResult.Success(photoUrl) },
@@ -33,6 +33,5 @@ class CloudinaryProfilePhotoRepository @Inject constructor(
     }
 
     private companion object {
-        const val PROFILE_PHOTO_FILE_NAME = "profile.jpg"
     }
 }

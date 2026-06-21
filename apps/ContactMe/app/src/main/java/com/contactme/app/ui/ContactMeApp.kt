@@ -129,7 +129,11 @@ fun ContactMeApp(
             )
 
             AppScreen.Auth -> AuthScreen(
-                onAuthSuccess = { currentScreen = AppScreen.ProfileSetup }
+                onAuthSuccess = {
+                    sessionViewModel.resolveStartScreen { startScreen ->
+                        currentScreen = startScreen
+                    }
+                }
             )
 
             AppScreen.ProfileSetup -> ProfileSetupScreen(
