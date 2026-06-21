@@ -19,10 +19,10 @@ This document is the implementation checkpoint after the message status foundati
 | --- | --- | --- |
 | Android scaffold | Done | Kotlin, Compose, Material 3, Hilt. |
 | Firebase setup | Done | Auth and Firestore are connected. |
-| Phone auth | Done foundation | Firebase Phone Auth OTP path exists. |
-| Email fallback | Done foundation | Email/password login/register path exists. |
+| Phone auth | Done foundation | Firebase Phone Auth OTP path exists; polished with test-number instructions. |
+| Email fallback | Done foundation | Email/password login/register path exists; polished as primary test path. |
 | Session restore/logout | Done | App can restore Firebase session and sign out. |
-| Profile persistence | Done foundation | Profile data saves/loads from Firestore. |
+| Profile persistence | Done foundation | Profile data saves/loads from Firestore; polished with uniqueness checks. |
 | Username uniqueness | Done foundation | Username reservation and search exist. |
 | Direct conversation | Done foundation | Direct conversation document can be created. |
 | Text messages | Done foundation | Messages send/render from Firestore. |

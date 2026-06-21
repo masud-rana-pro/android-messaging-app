@@ -7,6 +7,7 @@ import com.contactme.app.auth.AuthRepository
 import com.contactme.app.auth.AuthResult
 import com.contactme.app.auth.PhoneOtpResult
 import com.contactme.app.navigation.AuthMode
+import com.contactme.app.profile.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +18,8 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val profileRepository: ProfileRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
@@ -26,7 +28,7 @@ class AuthViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 authMode = authMode,
-                statusMessage = null,
+                statusMessage = if (authMode != AuthMode.Phone) "For emulator testing, use Email registration." else null,
                 errorMessage = null
             )
         }

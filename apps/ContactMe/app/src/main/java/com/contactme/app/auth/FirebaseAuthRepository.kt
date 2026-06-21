@@ -195,7 +195,7 @@ class FirebaseAuthRepository @Inject constructor(
             rawMessage.contains("network", ignoreCase = true) -> {
                 "Check your internet connection and try again."
             }
-            else -> "Phone verification failed. Please try again."
+            else -> "Phone verification failed. For emulator testing, use Email login or Firebase test phone numbers."
         }
     }
 
