@@ -30,47 +30,51 @@ class FirebaseConversationRepository @Inject constructor(
                 val conversations = snapshot?.documents.orEmpty()
 
                 launch {
-                    val previews = conversations.mapNotNull { document ->
-                        val participantIds = document.get("participantIds") as? List<*> ?: return@mapNotNull null
-                        val conversationType = ConversationType.fromFirestore(document.getString("type"))
-                        val otherUserId = participantIds.filterIsInstance<String>()
-                            .firstOrNull { userId -> userId != currentUserId }.orEmpty()
-                        val otherUser = otherUserId.takeIf { conversationType == ConversationType.Direct }
-                            ?.let { firestore.collection(USERS_COLLECTION).document(it).get().await() }
-                        val updatedAtMillis = document.getTimestamp("updatedAt")?.toDate()?.time ?: 0L
-                        val lastMessageSenderId = document.getString("lastMessageSenderId").orEmpty()
-                        val readAtMillis = document.getTimestamp("readAtByUser.$currentUserId")
-                            ?.toDate()
-                            ?.time
-                            ?: 0L
+                    runCatching {
+                        val previews = conversations.mapNotNull { document ->
+                            val participantIds = document.get("participantIds") as? List<*> ?: return@mapNotNull null
+                            val conversationType = ConversationType.fromFirestore(document.getString("type"))
+                            val otherUserId = participantIds.filterIsInstance<String>()
+                                .firstOrNull { userId -> userId != currentUserId }.orEmpty()
+                            val otherUser = otherUserId.takeIf { conversationType == ConversationType.Direct }
+                                ?.let { firestore.collection(USERS_COLLECTION).document(it).get().await() }
+                            val updatedAtMillis = document.getTimestamp("updatedAt")?.toDate()?.time ?: 0L
+                            val lastMessageSenderId = document.getString("lastMessageSenderId").orEmpty()
+                            val readAtMillis = document.getTimestamp("readAtByUser.$currentUserId")
+                                ?.toDate()
+                                ?.time
+                                ?: 0L
 
-                        ConversationPreview(
-                            conversationId = document.id,
-                            otherUserId = otherUserId,
-                            title = if (conversationType == ConversationType.Group) {
-                                document.getString("title").orEmpty().ifBlank { "Group" }
-                            } else {
-                                otherUser?.getString("displayName").orEmpty().ifBlank {
-                                    otherUser?.getString("username").orEmpty().ifBlank { "ContactMe User" }
-                                }
-                            },
-                            photoUrl = if (conversationType == ConversationType.Group) {
-                                document.getString("photoUrl").orEmpty()
-                            } else {
-                                otherUser?.visibleProfilePhotoUrlFor(currentUserId).orEmpty()
-                            },
-                            subtitle = document.getString("lastMessageText").orEmpty().ifBlank {
-                                "No messages yet."
-                            },
-                            updatedAtMillis = updatedAtMillis,
-                            hasUnreadMessages = lastMessageSenderId.isNotBlank() &&
-                                lastMessageSenderId != currentUserId &&
-                                updatedAtMillis > readAtMillis,
-                            type = conversationType
-                        )
+                            ConversationPreview(
+                                conversationId = document.id,
+                                otherUserId = otherUserId,
+                                title = if (conversationType == ConversationType.Group) {
+                                    document.getString("title").orEmpty().ifBlank { "Group" }
+                                } else {
+                                    otherUser?.getString("displayName").orEmpty().ifBlank {
+                                        otherUser?.getString("username").orEmpty().ifBlank { "ContactMe User" }
+                                    }
+                                },
+                                photoUrl = if (conversationType == ConversationType.Group) {
+                                    document.getString("photoUrl").orEmpty()
+                                } else {
+                                    otherUser?.visibleProfilePhotoUrlFor(currentUserId).orEmpty()
+                                },
+                                subtitle = document.getString("lastMessageText").orEmpty().ifBlank {
+                                    "No messages yet."
+                                },
+                                updatedAtMillis = updatedAtMillis,
+                                hasUnreadMessages = lastMessageSenderId.isNotBlank() &&
+                                    lastMessageSenderId != currentUserId &&
+                                    updatedAtMillis > readAtMillis,
+                                type = conversationType
+                            )
+                        }
+
+                        trySend(previews.sortedByDescending { preview -> preview.updatedAtMillis })
+                    }.onFailure {
+                        trySend(emptyList())
                     }
-
-                    trySend(previews.sortedByDescending { preview -> preview.updatedAtMillis })
                 }
             }
 
@@ -90,35 +94,39 @@ class FirebaseConversationRepository @Inject constructor(
                 }
 
                 launch {
-                    val participantIds = snapshot
-                        ?.get("participantIds") as? List<*>
-                    val peerUserId = participantIds
-                        .orEmpty()
-                        .filterIsInstance<String>()
-                        .firstOrNull { userId -> userId != currentUserId }
+                    runCatching {
+                        val participantIds = snapshot
+                            ?.get("participantIds") as? List<*>
+                        val peerUserId = participantIds
+                            .orEmpty()
+                            .filterIsInstance<String>()
+                            .firstOrNull { userId -> userId != currentUserId }
 
-                    if (peerUserId == null) {
-                        trySend(ReadReceiptState())
-                        return@launch
-                    }
+                        if (peerUserId == null) {
+                            trySend(ReadReceiptState())
+                            return@runCatching
+                        }
 
-                    val peerProfile = firestore.collection(USERS_COLLECTION)
-                        .document(peerUserId)
-                        .get()
-                        .await()
-                    val peerAllowsReadReceipts = peerProfile.getBoolean("readReceiptsEnabled") ?: true
-                    val peerReadAtMillis = snapshot
-                        ?.getTimestamp("readAtByUser.$peerUserId")
-                        ?.toDate()
-                        ?.time
-                        ?: 0L
+                        val peerProfile = firestore.collection(USERS_COLLECTION)
+                            .document(peerUserId)
+                            .get()
+                            .await()
+                        val peerAllowsReadReceipts = peerProfile.getBoolean("readReceiptsEnabled") ?: true
+                        val peerReadAtMillis = snapshot
+                            ?.getTimestamp("readAtByUser.$peerUserId")
+                            ?.toDate()
+                            ?.time
+                            ?: 0L
 
-                    trySend(
-                        ReadReceiptState(
-                            peerReadAtMillis = peerReadAtMillis,
-                            canShowPeerReadReceipt = peerAllowsReadReceipts
+                        trySend(
+                            ReadReceiptState(
+                                peerReadAtMillis = peerReadAtMillis,
+                                canShowPeerReadReceipt = peerAllowsReadReceipts
+                            )
                         )
-                    )
+                    }.onFailure {
+                        trySend(ReadReceiptState())
+                    }
                 }
             }
 
@@ -233,13 +241,15 @@ class FirebaseConversationRepository @Inject constructor(
     }
 
     private suspend fun isContact(ownerUserId: String, viewerUserId: String): Boolean {
-        return firestore.collection(CONTACTS_COLLECTION)
-            .document(ownerUserId)
-            .collection(CONTACT_ITEMS_COLLECTION)
-            .document(viewerUserId)
-            .get()
-            .await()
-            .exists()
+        return runCatching {
+            firestore.collection(CONTACTS_COLLECTION)
+                .document(ownerUserId)
+                .collection(CONTACT_ITEMS_COLLECTION)
+                .document(viewerUserId)
+                .get()
+                .await()
+                .exists()
+        }.getOrDefault(false)
     }
 
     private companion object {

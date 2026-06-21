@@ -34,44 +34,48 @@ class FirebaseMessageRepository @Inject constructor(
                 }
 
                 launch {
-                    val documents = snapshot?.documents.orEmpty()
-                    val senderIds = documents.mapNotNull { it.getString("senderId") }
-                        .filter(String::isNotBlank)
-                        .distinct()
-                    resolveSenderNames(senderIds)
+                    runCatching {
+                        val documents = snapshot?.documents.orEmpty()
+                        val senderIds = documents.mapNotNull { it.getString("senderId") }
+                            .filter(String::isNotBlank)
+                            .distinct()
+                        resolveSenderNames(senderIds)
 
-                    val messages = documents.map { document ->
-                        val senderId = document.getString("senderId").orEmpty()
-                        ChatMessage(
-                            id = document.id,
-                            senderId = senderId,
-                            senderDisplayName = senderNameCache[senderId].orEmpty(),
-                            type = MessageType.fromFirestore(document.getString("type")),
-                            text = document.getString("text").orEmpty(),
-                            mediaUrl = document.getString("mediaUrl").orEmpty(),
-                            mediaProvider = document.getString("mediaProvider").orEmpty(),
-                            mediaPublicId = document.getString("mediaPublicId").orEmpty(),
-                            mimeType = document.getString("mimeType").orEmpty(),
-                            fileName = document.getString("fileName").orEmpty(),
-                            fileSizeBytes = document.getLong("fileSizeBytes") ?: 0L,
-                            replyTo = document.getString("replyToMessageId")
-                                ?.takeIf(String::isNotBlank)
-                                ?.let { replyMessageId ->
-                                    MessageReply(
-                                        messageId = replyMessageId,
-                                        senderName = document.getString("replyToSenderName").orEmpty(),
-                                        preview = document.getString("replyPreview").orEmpty(),
-                                        type = MessageType.fromFirestore(document.getString("replyType"))
-                                    )
-                                },
-                            isDeleted = document.getBoolean("isDeleted") ?: false,
-                            editedAtMillis = document.getTimestamp("editedAt")?.toDate()?.time ?: 0L,
-                            sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
-                            status = MessageStatus.fromFirestore(document.getString("status"))
-                        )
+                        val messages = documents.map { document ->
+                            val senderId = document.getString("senderId").orEmpty()
+                            ChatMessage(
+                                id = document.id,
+                                senderId = senderId,
+                                senderDisplayName = senderNameCache[senderId].orEmpty(),
+                                type = MessageType.fromFirestore(document.getString("type")),
+                                text = document.getString("text").orEmpty(),
+                                mediaUrl = document.getString("mediaUrl").orEmpty(),
+                                mediaProvider = document.getString("mediaProvider").orEmpty(),
+                                mediaPublicId = document.getString("mediaPublicId").orEmpty(),
+                                mimeType = document.getString("mimeType").orEmpty(),
+                                fileName = document.getString("fileName").orEmpty(),
+                                fileSizeBytes = document.getLong("fileSizeBytes") ?: 0L,
+                                replyTo = document.getString("replyToMessageId")
+                                    ?.takeIf(String::isNotBlank)
+                                    ?.let { replyMessageId ->
+                                        MessageReply(
+                                            messageId = replyMessageId,
+                                            senderName = document.getString("replyToSenderName").orEmpty(),
+                                            preview = document.getString("replyPreview").orEmpty(),
+                                            type = MessageType.fromFirestore(document.getString("replyType"))
+                                        )
+                                    },
+                                isDeleted = document.getBoolean("isDeleted") ?: false,
+                                editedAtMillis = document.getTimestamp("editedAt")?.toDate()?.time ?: 0L,
+                                sentAtMillis = document.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
+                                status = MessageStatus.fromFirestore(document.getString("status"))
+                            )
+                        }
+
+                        trySend(messages)
+                    }.onFailure {
+                        trySend(emptyList())
                     }
-
-                    trySend(messages)
                 }
             }
 

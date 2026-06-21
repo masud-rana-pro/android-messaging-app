@@ -51,10 +51,10 @@ class FirebaseCallSignalingRepository @Inject constructor(
             val registration = calls()
                 .whereEqualTo(RECEIVER_ID, receiverId)
                 .addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        close(error)
-                        return@addSnapshotListener
-                    }
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
                     trySend(
                         snapshot?.documents.orEmpty()
                             .map { it.toCallSession() }
@@ -68,7 +68,7 @@ class FirebaseCallSignalingRepository @Inject constructor(
     override fun listenToCall(callId: String): Flow<CallSession?> = callbackFlow {
         val registration = calls().document(callId).addSnapshotListener { snapshot, error ->
             if (error != null) {
-                close(error)
+                trySend(null)
                 return@addSnapshotListener
             }
             trySend(snapshot?.takeIf { it.exists() }?.toCallSession())
@@ -160,7 +160,7 @@ class FirebaseCallSignalingRepository @Inject constructor(
             .orderBy(CREATED_AT, Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.documents.orEmpty().map { it.toIceCandidate() })

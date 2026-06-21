@@ -97,7 +97,7 @@ service cloud.firestore {
     }
 
     match /blocked_users/{userId}/items/{blockedUserId} {
-      allow read: if isOwner(userId);
+      allow read: if isOwner(userId) || (isSignedIn() && request.auth.uid == blockedUserId);
       allow create, update: if isOwner(userId)
         && userId != blockedUserId
         && request.resource.data.userId == blockedUserId;

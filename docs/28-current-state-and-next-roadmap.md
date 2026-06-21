@@ -36,7 +36,7 @@ This document is the implementation checkpoint after the message status foundati
 | Notification channels | Done foundation | Messages, calls, and system channels are created. |
 | Notification permission | Done foundation | Android 13+ `POST_NOTIFICATIONS` runtime request exists. |
 | Notification renderer | Done foundation | Foreground FCM payloads can render Android notifications. |
-| Firestore rules | Done MVP | Rules cover current user/profile/direct chat/device-token flows. |
+| Firestore rules | Done MVP | Rules cover current user/profile/direct chat/device-token flows; hardened to prevent crashes on permission denial. |
 
 ## Partial Or Not Started
 

@@ -7,8 +7,15 @@ This step updates the local Firestore rules draft for the currently implemented 
 ```text
 users/{uid}
 usernames/{username}
+user_devices/{uid}/devices/{deviceId}
+blocked_users/{uid}/items/{blockedUid}
+reports/{reportId}
 conversations/{conversationId}
 conversations/{conversationId}/messages/{messageId}
+conversations/{conversationId}/typing/{uid}
+calls/{callId}
+calls/{callId}/callerCandidates/{candidateId}
+calls/{callId}/receiverCandidates/{candidateId}
 ```
 
 ## Current Guarantees
@@ -21,6 +28,8 @@ conversations/{conversationId}/messages/{messageId}
 - Only conversation participants can read/create messages.
 - Message sender must be the authenticated user.
 - Text message size is capped at 4000 characters.
+- Calls and ICE candidates are restricted to participants only.
+- Users can see if they are blocked by another user.
 
 ## Deploy
 
