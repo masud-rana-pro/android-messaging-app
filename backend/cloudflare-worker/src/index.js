@@ -27,7 +27,7 @@ export default {
   }
 };
 
-async fun getReceiverFcmToken(env, receiverId) {
+async function getReceiverFcmToken(env, receiverId) {
   const url = `https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${receiverId}`;
   const response = await fetch(url);
   if (!response.ok) return null;
@@ -36,7 +36,7 @@ async fun getReceiverFcmToken(env, receiverId) {
   return data.fields?.fcmToken?.stringValue;
 }
 
-async fun sendFcmNotification(env, accessToken, fcmToken, callId, receiverId) {
+async function sendFcmNotification(env, accessToken, fcmToken, callId, receiverId) {
   const url = `https://fcm.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/messages:send`;
   const payload = {
     message: {
@@ -67,7 +67,7 @@ async fun sendFcmNotification(env, accessToken, fcmToken, callId, receiverId) {
   }
 }
 
-async fun getAccessToken(env) {
+async function getAccessToken(env) {
   const email = env.FIREBASE_CLIENT_EMAIL;
   const privateKey = env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
   const scope = "https://www.googleapis.com/auth/firebase.messaging";
