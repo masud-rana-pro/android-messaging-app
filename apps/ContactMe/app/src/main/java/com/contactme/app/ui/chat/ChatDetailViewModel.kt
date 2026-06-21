@@ -196,6 +196,10 @@ class ChatDetailViewModel @Inject constructor(
         updateTypingState(isTyping = nextMessageText.isNotBlank())
     }
 
+    fun setCallError(message: String) {
+        _uiState.update { it.copy(errorMessage = message) }
+    }
+
     fun sendMessage() {
         val conversationId = activeConversationId
         val state = _uiState.value

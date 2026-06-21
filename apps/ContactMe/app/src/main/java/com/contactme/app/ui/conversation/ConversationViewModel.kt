@@ -9,6 +9,10 @@ import com.contactme.app.conversation.ConversationResult
 import com.contactme.app.profile.UserProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -17,24 +21,44 @@ class ConversationViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
     private val conversationRepository: ConversationRepository
 ) : ViewModel() {
+    private val _isOpeningChat = MutableStateFlow(false)
+    val isOpeningChat: StateFlow<Boolean> = _isOpeningChat.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     fun openDirectConversation(
         otherUser: UserProfile,
         onReady: (conversationId: String, chatName: String, photoUrl: String) -> Unit
     ) {
-        val currentUserId = authRepository.currentUserId() ?: return
+        val currentUserId = authRepository.currentUserId()
+
+        if (currentUserId == null) {
+            _errorMessage.value = "Session expired. Please log in again."
+            return
+        }
+
+        if (currentUserId == otherUser.userId) {
+            _errorMessage.value = "You cannot chat with yourself."
+            return
+        }
 
         viewModelScope.launch {
-            when (
-                val result = conversationRepository.getOrCreateDirectConversation(
-                    currentUserId = currentUserId,
-                    otherUserId = otherUser.userId
-                )
-            ) {
+            _isOpeningChat.value = true
+            _errorMessage.value = null
+
+            val result = conversationRepository.getOrCreateDirectConversation(
+                currentUserId = currentUserId,
+                otherUserId = otherUser.userId
+            )
+
+            when (result) {
                 is ConversationResult.Success -> {
                     contactRepository.saveContact(
                         ownerUserId = currentUserId,
                         contact = otherUser
                     )
+                    _isOpeningChat.value = false
                     onReady(
                         result.conversationId,
                         otherUser.displayName.ifBlank { otherUser.username },
@@ -42,8 +66,15 @@ class ConversationViewModel @Inject constructor(
                     )
                 }
 
-                is ConversationResult.Error -> Unit
+                is ConversationResult.Error -> {
+                    _isOpeningChat.value = false
+                    _errorMessage.value = result.message
+                }
             }
         }
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 }

@@ -91,6 +91,7 @@ import java.util.Locale
 fun HomeScreen(
     onConversationSelected: (String, String, String, ConversationType) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
+    onStartChatSelected: () -> Unit,
     onCreateGroupSelected: () -> Unit,
     onSettingsSelected: () -> Unit
 ) {
@@ -128,10 +129,7 @@ fun HomeScreen(
         floatingActionButton = {
             if (selectedTab == HomeTab.Chats) {
                 FloatingActionButton(
-                    onClick = {
-                        selectedTab = HomeTab.Chats
-                        newChatRequestCount += 1
-                    },
+                    onClick = onStartChatSelected,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = RoundedCornerShape(18.dp)
@@ -180,9 +178,7 @@ fun HomeScreen(
                     newChatRequestCount = newChatRequestCount,
                     onConversationSelected = onConversationSelected,
                     onDiscoveredUserSelected = onDiscoveredUserSelected,
-                    onStartChatClick = {
-                        newChatRequestCount += 1
-                    }
+                    onStartChatClick = onStartChatSelected
                 )
                 HomeTab.Status -> PlaceholderTab(
                     title = "Status"
@@ -828,6 +824,7 @@ private fun HomeScreenPreview() {
         HomeScreen(
             onConversationSelected = { _, _, _, _ -> },
             onDiscoveredUserSelected = {},
+            onStartChatSelected = {},
             onCreateGroupSelected = {},
             onSettingsSelected = {}
         )

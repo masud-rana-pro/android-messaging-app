@@ -117,8 +117,12 @@ fun ChatDetailScreen(
         conversationType = conversationType,
         uiState = uiState,
         onBack = onBack,
-        onVoiceCallClick = { 
-            uiState.peerUserId?.let(onVoiceCallClick)
+        onVoiceCallClick = {
+            if (uiState.peerUserId != null) {
+                onVoiceCallClick(uiState.peerUserId!!)
+            } else {
+                viewModel.setCallError("Call failed: Peer user not found.")
+            }
         },
         onMessageTextChanged = viewModel::onMessageTextChanged,
         onSendMessage = viewModel::sendMessage,
