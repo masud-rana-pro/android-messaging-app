@@ -1,5 +1,7 @@
 package com.contactme.app.call
 
+import android.content.Context
+import android.media.AudioManager
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
 import org.webrtc.IceCandidate
@@ -8,11 +10,14 @@ import org.webrtc.MediaStream
 import org.webrtc.PeerConnection
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 class WebRtcCallEngine @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val factory: WebRtcEngineFactory
 ) {
+    private val audioManager by lazy { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     private var peerConnection: PeerConnection? = null
     private var localAudioTrack: AudioTrack? = null
     private var localAudioSource: AudioSource? = null
@@ -150,7 +155,18 @@ class WebRtcCallEngine @Inject constructor(
         )
     }
 
+    fun setMuted(isMuted: Boolean) {
+        localAudioTrack?.setEnabled(!isMuted)
+    }
+
+    fun setSpeakerEnabled(enabled: Boolean) {
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isSpeakerphoneOn = enabled
+    }
+
     fun release() {
+        audioManager.mode = AudioManager.MODE_NORMAL
+        audioManager.isSpeakerphoneOn = false
         peerConnection?.close()
         peerConnection = null
         localAudioTrack?.dispose()
