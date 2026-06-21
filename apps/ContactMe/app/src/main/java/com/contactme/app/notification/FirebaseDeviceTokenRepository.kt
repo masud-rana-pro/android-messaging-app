@@ -81,6 +81,7 @@ class FirebaseDeviceTokenRepository @Inject constructor(
         firestore.collection(USERS_COLLECTION)
             .document(userId)
             .update("fcmToken", token)
+            .await()
 
         firestore.collection(USER_DEVICES_COLLECTION)
             .document(userId)

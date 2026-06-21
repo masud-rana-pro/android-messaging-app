@@ -201,16 +201,18 @@ class FirebaseSafetyRepository @Inject constructor(
         currentUserId: String,
         conversationId: String
     ): String? {
-        val participantIds = firestore.collection(CONVERSATIONS_COLLECTION)
-            .document(conversationId)
-            .get()
-            .await()
-            .get("participantIds") as? List<*>
+        return runCatching {
+            val participantIds = firestore.collection(CONVERSATIONS_COLLECTION)
+                .document(conversationId)
+                .get()
+                .await()
+                .get("participantIds") as? List<*>
 
-        return participantIds
-            .orEmpty()
-            .filterIsInstance<String>()
-            .firstOrNull { userId -> userId != currentUserId }
+            participantIds
+                .orEmpty()
+                .filterIsInstance<String>()
+                .firstOrNull { userId -> userId != currentUserId }
+        }.getOrNull()
     }
 
     private suspend fun hasCurrentUserBlocked(
