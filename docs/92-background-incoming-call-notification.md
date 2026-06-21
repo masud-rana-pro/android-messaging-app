@@ -10,6 +10,7 @@ Implemented the background/killed-app notification path for incoming calls using
     *   Authenticates with Google OAuth using Firebase Service Account secrets (stored in Cloudflare).
     *   Reads the receiver's FCM token from Firestore.
     *   Sends a high-priority data-only FCM message to the receiver.
+    *   Deployment: Successfully deployed to https://contactme-call-notification.masud-jee68.workers.dev
 4.  **Android Handling**:
     *   `ContactMeMessagingService` receives the `incoming_call` data payload.
     *   `ContactMeNotificationRenderer` creates a high-priority notification with a deep-link to the `IncomingCallScreen`.
