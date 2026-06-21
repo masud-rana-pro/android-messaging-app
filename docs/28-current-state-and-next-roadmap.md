@@ -42,7 +42,7 @@ This document is the implementation checkpoint after the message status foundati
 
 | Area | Status | Next Need |
 | --- | --- | --- |
-| Chat UI polish | Personal-beta code complete | Core text/media chat, actions, sync retry, notification navigation, and secure read receipts exist; deployment and two-device validation remain. |
+| Chat UI polish | Personal-beta code complete | Core text/media chat, actions, sync retry, notification navigation, secure read receipts, and custom doodle wallpaper integration exist. |
 | Phone search | Done foundation | Normalize and query phone identity; polished with local contacts matching and dedicated Start Chat screen. |
 | Privacy settings | Done foundation | Last seen/profile photo/read receipt settings exist; more hardening remains. |
 | Block/report | Done foundation | Data model, rules, chat enforcement, reason selection, block/unblock UI; emulator tests and moderation tools remain. |

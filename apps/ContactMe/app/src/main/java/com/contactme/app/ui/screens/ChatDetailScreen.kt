@@ -331,12 +331,13 @@ private fun ChatDetailContent(
 @Composable
 private fun ChatWallpaper() {
     val isDark = isSystemInDarkTheme()
+    val wallpaperRes = if (isDark) R.drawable.chat_bg_dark else R.drawable.chat_bg_light
     Image(
-        painter = painterResource(id = R.drawable.chat_bg),
+        painter = painterResource(id = wallpaperRes),
         contentDescription = null,
         modifier = Modifier.fillMaxSize(),
         contentScale = ContentScale.Crop,
-        alpha = if (isDark) 0.15f else 0.12f,
+        alpha = if (isDark) 0.35f else 0.45f,
         colorFilter = if (isDark) ColorFilter.tint(Color.Black, BlendMode.Darken) else null
     )
 }
