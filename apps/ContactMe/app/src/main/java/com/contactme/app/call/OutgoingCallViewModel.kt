@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,6 +12,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import org.webrtc.PeerConnection
 import javax.inject.Inject
 
@@ -18,7 +25,8 @@ import javax.inject.Inject
 class OutgoingCallViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val callRepository: CallSignalingRepository,
-    private val webRtcEngine: WebRtcCallEngine
+    private val webRtcEngine: WebRtcCallEngine,
+    private val okHttpClient: OkHttpClient
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OutgoingCallUiState())
@@ -40,6 +48,7 @@ class OutgoingCallViewModel @Inject constructor(
                     val result = callRepository.createCallOffer(callerId, receiverId, type, sdp)
                     if (result is CallResult.Created) {
                         currentCallId = result.callId
+                        triggerCallNotification(result.callId, receiverId)
                         observeCall(result.callId)
                         observeIceCandidates(result.callId)
                     } else if (result is CallResult.Error) {
@@ -106,6 +115,28 @@ class OutgoingCallViewModel @Inject constructor(
         }
     }
 
+    private fun triggerCallNotification(callId: String, receiverId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val payload = JSONObject().apply {
+                    put("callId", callId)
+                    put("receiverId", receiverId)
+                }.toString()
+
+                val request = Request.Builder()
+                    .url(WORKER_URL)
+                    .post(payload.toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                okHttpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        // Log failure safely (Step 92)
+                    }
+                }
+            }
+        }
+    }
+
     fun cancelCall() {
         val callId = currentCallId ?: return
         val userId = authRepository.currentUserId() ?: return
@@ -125,6 +156,10 @@ class OutgoingCallViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         cleanup()
+    }
+
+    private companion object {
+        const val WORKER_URL = "https://contactme-call-notification.masud-jee68.workers.dev"
     }
 }
 

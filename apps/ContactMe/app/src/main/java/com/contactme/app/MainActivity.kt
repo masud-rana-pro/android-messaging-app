@@ -21,6 +21,7 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private var notificationChatTarget by mutableStateOf<ChatTarget?>(null)
+    private var notificationCallId by mutableStateOf<String?>(null)
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -31,12 +32,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         notificationChatTarget = NotificationNavigation.chatTargetFrom(intent)
+        notificationCallId = NotificationNavigation.callIdFrom(intent)
         requestNotificationPermissionIfNeeded()
         setContent {
             ContactMeTheme {
                 ContactMeApp(
                     notificationChatTarget = notificationChatTarget,
-                    onNotificationChatTargetConsumed = ::consumeNotificationChatTarget
+                    onNotificationChatTargetConsumed = ::consumeNotificationChatTarget,
+                    notificationCallId = notificationCallId,
+                    onNotificationCallConsumed = ::consumeNotificationCall
                 )
             }
         }
@@ -46,10 +50,16 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         notificationChatTarget = NotificationNavigation.chatTargetFrom(intent)
+        notificationCallId = NotificationNavigation.callIdFrom(intent)
     }
 
     private fun consumeNotificationChatTarget() {
         notificationChatTarget = null
+        NotificationNavigation.clearChatTarget(intent)
+    }
+
+    private fun consumeNotificationCall() {
+        notificationCallId = null
         NotificationNavigation.clearChatTarget(intent)
     }
 
