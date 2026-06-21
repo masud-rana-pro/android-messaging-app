@@ -2,6 +2,8 @@ package com.contactme.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
@@ -29,8 +31,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Call
@@ -39,6 +43,8 @@ import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.GroupAdd
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.CallReceived
+import androidx.compose.material.icons.outlined.CallMade
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -69,6 +75,10 @@ import com.contactme.app.ui.conversation.ConversationListUiState
 import com.contactme.app.ui.conversation.ConversationListViewModel
 import com.contactme.app.ui.contact.ContactListUiState
 import com.contactme.app.ui.contact.ContactListViewModel
+import com.contactme.app.ui.call.CallsViewModel
+import com.contactme.app.ui.call.CallListUiState
+import com.contactme.app.call.CallSession
+import com.contactme.app.call.CallStatus
 import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
 import java.text.SimpleDateFormat
@@ -169,15 +179,16 @@ fun HomeScreen(
                 HomeTab.Chats -> ChatsTab(
                     newChatRequestCount = newChatRequestCount,
                     onConversationSelected = onConversationSelected,
-                    onDiscoveredUserSelected = onDiscoveredUserSelected
+                    onDiscoveredUserSelected = onDiscoveredUserSelected,
+                    onStartChatClick = {
+                        newChatRequestCount += 1
+                    }
                 )
                 HomeTab.Status -> PlaceholderTab(
                     title = "Status"
                 )
 
-                HomeTab.Calls -> PlaceholderTab(
-                    title = "Calls"
-                )
+                HomeTab.Calls -> CallsTab()
 
                 HomeTab.Communities -> PlaceholderTab(
                     title = "Communities"
@@ -196,6 +207,7 @@ private fun ChatsTab(
     newChatRequestCount: Int,
     onConversationSelected: (String, String, String, ConversationType) -> Unit,
     onDiscoveredUserSelected: (UserProfile) -> Unit,
+    onStartChatClick: () -> Unit,
     discoveryViewModel: ContactDiscoveryViewModel = hiltViewModel(),
     contactListViewModel: ContactListViewModel = hiltViewModel(),
     conversationListViewModel: ConversationListViewModel = hiltViewModel()
@@ -211,7 +223,8 @@ private fun ChatsTab(
         conversationListState = conversationListState,
         onSearchQueryChanged = discoveryViewModel::onQueryChanged,
         onConversationSelected = onConversationSelected,
-        onDiscoveredUserSelected = onDiscoveredUserSelected
+        onDiscoveredUserSelected = onDiscoveredUserSelected,
+        onStartChatClick = onStartChatClick
     )
 }
 
@@ -223,7 +236,8 @@ private fun ChatsContent(
     conversationListState: ConversationListUiState,
     onSearchQueryChanged: (String) -> Unit,
     onConversationSelected: (String, String, String, ConversationType) -> Unit,
-    onDiscoveredUserSelected: (UserProfile) -> Unit
+    onDiscoveredUserSelected: (UserProfile) -> Unit,
+    onStartChatClick: () -> Unit
 ) {
     val scrollState = rememberScrollState()
     var selectedFilter by remember { mutableStateOf(ChatListFilter.All) }
@@ -251,7 +265,8 @@ private fun ChatsContent(
             conversationListState = conversationListState,
             query = discoveryState.query,
             filter = selectedFilter,
-            onConversationSelected = onConversationSelected
+            onConversationSelected = onConversationSelected,
+            onStartChatClick = onStartChatClick
         )
         if (discoveryState.query.isNotBlank()) {
             PeopleSearchResults(
@@ -304,7 +319,8 @@ private fun ConversationPreviewList(
     conversationListState: ConversationListUiState,
     query: String,
     filter: ChatListFilter,
-    onConversationSelected: (String, String, String, ConversationType) -> Unit
+    onConversationSelected: (String, String, String, ConversationType) -> Unit,
+    onStartChatClick: () -> Unit
 ) {
     val normalizedQuery = query.trim().lowercase()
     val visibleConversations = conversationListState.conversations.filter { conversation ->
@@ -330,7 +346,7 @@ private fun ConversationPreviewList(
         }
         if (!conversationListState.isLoading && visibleConversations.isEmpty() && query.isBlank()) {
             when (filter) {
-                ChatListFilter.All -> EmptyConversationState()
+                ChatListFilter.All -> EmptyConversationState(onStartChatClick = onStartChatClick)
                 ChatListFilter.Unread -> SupportingText(text = "No unread chats")
                 ChatListFilter.Groups -> SupportingText(text = "No groups")
             }
@@ -453,7 +469,7 @@ private fun SupportingText(text: String) {
 }
 
 @Composable
-private fun EmptyConversationState() {
+private fun EmptyConversationState(onStartChatClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
@@ -461,14 +477,22 @@ private fun EmptyConversationState() {
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "No chats yet",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            SupportingText(text = "Search by username or phone number, then open a real chat.")
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "No chats yet",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                SupportingText(text = "Search a username or phone number to start a conversation.")
+            }
+            Button(
+                onClick = onStartChatClick,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(text = "Start a chat")
+            }
         }
     }
 }
@@ -642,6 +666,141 @@ private fun Calendar.isYesterday(today: Calendar): Boolean {
     val yesterday = today.clone() as Calendar
     yesterday.add(Calendar.DAY_OF_YEAR, -1)
     return isSameDay(yesterday)
+}
+
+@Composable
+private fun CallsTab(
+    viewModel: CallsViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = "Calls",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        if (uiState.isLoading) {
+            SupportingText(text = "Loading calls...")
+        } else if (uiState.calls.isEmpty()) {
+            EmptyCallsState(message = uiState.message ?: "No calls yet")
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(uiState.calls) { call ->
+                    CallRow(call = call, currentUserId = uiState.currentUserId)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyCallsState(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "No calls yet",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            SupportingText(text = "Open a chat and tap Call to start an audio call.")
+        }
+    }
+}
+
+@Composable
+private fun CallRow(
+    call: CallSession,
+    currentUserId: String
+) {
+    val isOutgoing = call.callerId == currentUserId
+    val otherPartyLabel = if (isOutgoing) "Outgoing Call" else "Incoming Call"
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(
+                    if (call.status == CallStatus.Missed || call.status == CallStatus.Rejected) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isOutgoing) Icons.Outlined.CallMade else Icons.Outlined.CallReceived,
+                contentDescription = null,
+                tint = if (call.status == CallStatus.Missed || call.status == CallStatus.Rejected) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = otherPartyLabel,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = call.status.displayLabel(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (call.status == CallStatus.Missed || call.status == CallStatus.Rejected) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.66f)
+                    }
+                )
+                Text(
+                    text = "•",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.44f)
+                )
+                Text(
+                    text = call.createdAtMillis.formatConversationTime(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.44f)
+                )
+            }
+        }
+    }
+}
+
+private fun CallStatus.displayLabel(): String {
+    return when (this) {
+        CallStatus.Ringing -> "Ringing"
+        CallStatus.Accepted -> "Ongoing"
+        CallStatus.Rejected -> "Rejected"
+        CallStatus.Ended -> "Ended"
+        CallStatus.Cancelled -> "Cancelled"
+        CallStatus.Busy -> "Busy"
+        CallStatus.Timeout -> "Timed out"
+        CallStatus.Missed -> "Missed"
+    }
 }
 
 @Composable
