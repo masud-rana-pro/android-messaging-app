@@ -1,8 +1,10 @@
 package com.contactme.app.call
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +18,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class IncomingCallViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val authRepository: AuthRepository,
     private val callRepository: CallSignalingRepository,
     private val webRtcEngine: WebRtcCallEngine
@@ -50,6 +53,8 @@ class IncomingCallViewModel @Inject constructor(
         val call = _uiState.value.activeCall ?: return
         val currentUserId = authRepository.currentUserId() ?: return
 
+        CallForegroundService.start(context, call.callId)
+
         webRtcEngine.initialize(currentUserId, object : WebRtcCallEngine.Listener {
             override fun onLocalDescription(sdp: String) {
                 viewModelScope.launch {
@@ -81,6 +86,18 @@ class IncomingCallViewModel @Inject constructor(
             callRepository.rejectCall(call.callId, currentUserId)
             clearActiveCall()
         }
+    }
+
+    fun toggleMute() {
+        val newState = !uiState.value.isMuted
+        webRtcEngine.setMuted(newState)
+        _uiState.update { it.copy(isMuted = newState) }
+    }
+
+    fun toggleSpeaker() {
+        val newState = !uiState.value.isSpeakerEnabled
+        webRtcEngine.setSpeakerEnabled(newState)
+        _uiState.update { it.copy(isSpeakerEnabled = newState) }
     }
 
     private fun observeCall(callId: String) {
@@ -120,6 +137,7 @@ class IncomingCallViewModel @Inject constructor(
     }
 
     private fun clearActiveCall() {
+        CallForegroundService.stop(context)
         webRtcEngine.release()
         signalingJob?.cancel()
         iceCandidateJob?.cancel()
@@ -140,5 +158,7 @@ class IncomingCallViewModel @Inject constructor(
 data class IncomingCallUiState(
     val activeCall: CallSession? = null,
     val status: CallStatus = CallStatus.Ended,
+    val isMuted: Boolean = false,
+    val isSpeakerEnabled: Boolean = false,
     val connectionState: PeerConnection.PeerConnectionState = PeerConnection.PeerConnectionState.NEW
 )

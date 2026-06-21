@@ -1,8 +1,10 @@
 package com.contactme.app.call
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,6 +25,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class OutgoingCallViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val authRepository: AuthRepository,
     private val callRepository: CallSignalingRepository,
     private val webRtcEngine: WebRtcCallEngine,
@@ -48,6 +51,7 @@ class OutgoingCallViewModel @Inject constructor(
                     val result = callRepository.createCallOffer(callerId, receiverId, type, sdp)
                     if (result is CallResult.Created) {
                         currentCallId = result.callId
+                        CallForegroundService.start(context, result.callId)
                         triggerCallNotification(result.callId, receiverId)
                         observeCall(result.callId)
                         observeIceCandidates(result.callId)
@@ -146,7 +150,20 @@ class OutgoingCallViewModel @Inject constructor(
         }
     }
 
+    fun toggleMute() {
+        val newState = !uiState.value.isMuted
+        webRtcEngine.setMuted(newState)
+        _uiState.update { it.copy(isMuted = newState) }
+    }
+
+    fun toggleSpeaker() {
+        val newState = !uiState.value.isSpeakerEnabled
+        webRtcEngine.setSpeakerEnabled(newState)
+        _uiState.update { it.copy(isSpeakerEnabled = newState) }
+    }
+
     private fun cleanup() {
+        CallForegroundService.stop(context)
         webRtcEngine.release()
         signalingJob?.cancel()
         iceCandidateJob?.cancel()
@@ -166,5 +183,7 @@ class OutgoingCallViewModel @Inject constructor(
 data class OutgoingCallUiState(
     val status: CallStatus = CallStatus.Ringing,
     val receiverId: String = "",
+    val isMuted: Boolean = false,
+    val isSpeakerEnabled: Boolean = false,
     val connectionState: PeerConnection.PeerConnectionState = PeerConnection.PeerConnectionState.NEW
 )
