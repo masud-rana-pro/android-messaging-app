@@ -1,6 +1,7 @@
 package com.contactme.app.message
 
 import android.net.Uri
+import android.util.Log
 import com.contactme.app.media.CloudinaryUploadClient
 import com.contactme.app.media.MediaUploadException
 import com.contactme.app.safety.SafetyRepository
@@ -55,6 +56,7 @@ class FirebaseMessageRepository @Inject constructor(
                                 mimeType = document.getString("mimeType").orEmpty(),
                                 fileName = document.getString("fileName").orEmpty(),
                                 fileSizeBytes = document.getLong("fileSizeBytes") ?: 0L,
+                                durationMillis = document.getLong("durationMillis") ?: 0L,
                                 replyTo = document.getString("replyToMessageId")
                                     ?.takeIf(String::isNotBlank)
                                     ?.let { replyMessageId ->
@@ -145,6 +147,7 @@ class FirebaseMessageRepository @Inject constructor(
         senderId: String,
         imageUri: Uri
     ): MessageResult {
+        Log.d(TAG, "sendImageMessage start for conversation: $conversationId")
         val conversationDocument = firestore.collection(CONVERSATIONS_COLLECTION)
             .document(conversationId)
         val messageDocument = conversationDocument
@@ -152,14 +155,18 @@ class FirebaseMessageRepository @Inject constructor(
             .document()
 
         if (isBlockedConversation(conversationId, senderId)) {
+            Log.w(TAG, "sendImageMessage failed: blocked conversation")
             return MessageResult.Error("This chat is not available.")
         }
 
         return runCatching {
+            Log.d(TAG, "Uploading image to Cloudinary...")
             val uploadResult = cloudinaryUploadClient.upload(
                 uri = imageUri,
                 fileName = IMAGE_FILE_NAME
             )
+            Log.d(TAG, "Image upload successful. URL: ${uploadResult.secureUrl}")
+
             val messageData = mapOf(
                 "senderId" to senderId,
                 "text" to "",
@@ -172,6 +179,7 @@ class FirebaseMessageRepository @Inject constructor(
                 "createdAt" to FieldValue.serverTimestamp()
             )
 
+            Log.d(TAG, "Creating Firestore message...")
             firestore.runBatch { batch ->
                 batch.set(messageDocument, messageData)
                 batch.update(
@@ -184,9 +192,11 @@ class FirebaseMessageRepository @Inject constructor(
                     )
                 )
             }.await()
+            Log.d(TAG, "Firestore message created successfully")
         }.fold(
             onSuccess = { MessageResult.Success },
             onFailure = { error ->
+                Log.e(TAG, "sendImageMessage failed", error)
                 MessageResult.Error(
                     (error as? MediaUploadException)?.userMessage
                         ?: "We could not send this photo. Please try again."
@@ -203,12 +213,15 @@ class FirebaseMessageRepository @Inject constructor(
         mimeType: String,
         fileSizeBytes: Long
     ): MessageResult {
+        Log.d(TAG, "sendDocumentMessage start for: $fileName")
         if (isBlockedConversation(conversationId, senderId)) {
             return MessageResult.Error("This chat is not available.")
         }
 
         return runCatching {
+            Log.d(TAG, "Uploading document to Cloudinary...")
             val upload = cloudinaryUploadClient.uploadDocument(documentUri, fileName, mimeType)
+            Log.d(TAG, "Document upload successful")
             val conversationDocument = firestore.collection(CONVERSATIONS_COLLECTION)
                 .document(conversationId)
             val messageDocument = conversationDocument.collection(MESSAGES_COLLECTION).document()
@@ -225,6 +238,7 @@ class FirebaseMessageRepository @Inject constructor(
                 "status" to MessageStatus.Sent.firestoreValue,
                 "createdAt" to FieldValue.serverTimestamp()
             )
+            Log.d(TAG, "Creating Firestore document message...")
             firestore.runBatch { batch ->
                 batch.set(messageDocument, messageData)
                 batch.update(
@@ -237,9 +251,11 @@ class FirebaseMessageRepository @Inject constructor(
                     )
                 )
             }.await()
+            Log.d(TAG, "Firestore document message created")
         }.fold(
             onSuccess = { MessageResult.Success },
             onFailure = { error ->
+                Log.e(TAG, "sendDocumentMessage failed", error)
                 MessageResult.Error(
                     (error as? MediaUploadException)?.userMessage
                         ?: "We could not send this document. Please try again."
@@ -255,13 +271,17 @@ class FirebaseMessageRepository @Inject constructor(
         durationMillis: Long,
         fileSizeBytes: Long
     ): MessageResult {
+        Log.d(TAG, "sendVoiceMessage start for conversation: $conversationId")
         if (isBlockedConversation(conversationId, senderId)) {
             return MessageResult.Error("This chat is not available.")
         }
 
         return runCatching {
             val fileName = "voice_message.m4a"
+            Log.d(TAG, "Uploading voice message to Cloudinary...")
             val upload = cloudinaryUploadClient.uploadDocument(audioUri, fileName, "audio/mp4")
+            Log.d(TAG, "Voice upload successful")
+
             val conversationDocument = firestore.collection(CONVERSATIONS_COLLECTION)
                 .document(conversationId)
             val messageDocument = conversationDocument.collection(MESSAGES_COLLECTION).document()
@@ -279,6 +299,7 @@ class FirebaseMessageRepository @Inject constructor(
                 "status" to MessageStatus.Sent.firestoreValue,
                 "createdAt" to FieldValue.serverTimestamp()
             )
+            Log.d(TAG, "Creating Firestore voice message...")
             firestore.runBatch { batch ->
                 batch.set(messageDocument, messageData)
                 batch.update(
@@ -291,9 +312,11 @@ class FirebaseMessageRepository @Inject constructor(
                     )
                 )
             }.await()
+            Log.d(TAG, "Firestore voice message created")
         }.fold(
             onSuccess = { MessageResult.Success },
             onFailure = { error ->
+                Log.e(TAG, "sendVoiceMessage failed", error)
                 MessageResult.Error(
                     (error as? MediaUploadException)?.userMessage
                         ?: "We could not send this voice message. Please try again."
@@ -329,7 +352,8 @@ class FirebaseMessageRepository @Inject constructor(
                         "mediaProvider" to "",
                         "mimeType" to "",
                         "fileName" to "",
-                        "fileSizeBytes" to 0L
+                        "fileSizeBytes" to 0L,
+                        "durationMillis" to 0L
                     )
                 )
                 if (conversationSnapshot.getString("lastMessageId") == messageId) {
@@ -379,6 +403,7 @@ class FirebaseMessageRepository @Inject constructor(
     }
 
     private companion object {
+        const val TAG = "FirebaseMessageRepo"
         const val CONVERSATIONS_COLLECTION = "conversations"
         const val MESSAGES_COLLECTION = "messages"
         const val USERS_COLLECTION = "users"

@@ -1,5 +1,6 @@
 package com.contactme.app.media
 
+import android.util.Log
 import android.net.Uri
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
@@ -24,7 +25,10 @@ class VoiceMessageQueue @Inject constructor(
         audioUri: Uri,
         durationMillis: Long
     ): VoiceQueueResult = runCatching {
+        Log.d(TAG, "Enqueuing voice message for conversation: $conversationId, URI: $audioUri, duration: $durationMillis ms")
+        Log.d(TAG, "Preserving voice media in PendingMediaStore...")
         val pendingFile = pendingMediaStore.preserve(audioUri)
+        Log.d(TAG, "Voice media preserved at: ${pendingFile.absolutePath}, exists: ${pendingFile.exists()}, size: ${pendingFile.length()} bytes")
         
         val request = OneTimeWorkRequestBuilder<VoiceMessageWorker>()
             .setInputData(
@@ -40,6 +44,7 @@ class VoiceMessageQueue @Inject constructor(
             )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
             .build()
+        Log.d(TAG, "Enqueuing unique work: voice-message-${request.id}")
         workManager.enqueueUniqueWork(
             "voice-message-${request.id}",
             ExistingWorkPolicy.KEEP,
@@ -53,6 +58,7 @@ class VoiceMessageQueue @Inject constructor(
             )
         )
     }.getOrElse { error ->
+        Log.e(TAG, "Failed to enqueue voice message", error)
         VoiceQueueResult.Error(
             (error as? MediaUploadException)?.userMessage
                 ?: "We could not prepare this voice message. Please try again."
@@ -62,6 +68,7 @@ class VoiceMessageQueue @Inject constructor(
     fun observe(workId: UUID): Flow<WorkInfo?> = workManager.getWorkInfoByIdFlow(workId)
 
     companion object {
+        const val TAG = "VoiceMessageQueue"
         const val CONVERSATION_ID_KEY = "conversation_id"
         const val SENDER_ID_KEY = "sender_id"
         const val FILE_PATH_KEY = "file_path"

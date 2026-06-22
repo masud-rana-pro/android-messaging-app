@@ -1,5 +1,6 @@
 package com.contactme.app.media
 
+import android.util.Log
 import android.content.Context
 import android.media.MediaRecorder
 import android.os.Build
@@ -14,6 +15,7 @@ class VoiceRecorder @Inject constructor(
     private var currentFile: File? = null
 
     fun start(outputFile: File) {
+        Log.d("VoiceRecorder", "Starting recording to: ${outputFile.absolutePath}")
         currentFile = outputFile
         recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             MediaRecorder(context)
@@ -30,8 +32,14 @@ class VoiceRecorder @Inject constructor(
     }
 
     fun stop(): File? {
+        Log.d("VoiceRecorder", "Stopping recording")
         recorder?.apply {
-            stop()
+            runCatching {
+                stop()
+                Log.d("VoiceRecorder", "Recording stopped successfully")
+            }.onFailure {
+                Log.e("VoiceRecorder", "Failed to stop recorder", it)
+            }
             release()
         }
         recorder = null
@@ -39,8 +47,9 @@ class VoiceRecorder @Inject constructor(
     }
 
     fun cancel() {
+        Log.d("VoiceRecorder", "Cancelling recording")
         recorder?.apply {
-            stop()
+            runCatching { stop() }
             release()
         }
         recorder = null
