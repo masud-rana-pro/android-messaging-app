@@ -1,5 +1,6 @@
 package com.contactme.app.ui.screens
 
+import android.util.Log
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -168,17 +170,27 @@ private fun ChatDetailContent(
     val context = LocalContext.current
     val cacheDir = context.cacheDir
     
-    var cameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraPhotoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture(),
         onResult = { success ->
-            if (success) cameraPhotoUri?.let(onCameraPhotoCaptured)
+            Log.d("ChatDetailScreen", "Camera TakePicture result: $success")
+            if (success) {
+                cameraPhotoUri?.let { uri ->
+                    Log.d("ChatDetailScreen", "Captured URI: $uri")
+                    onCameraPhotoCaptured(uri)
+                } ?: Log.e("ChatDetailScreen", "Camera success but cameraPhotoUri is null!")
+            } else {
+                Log.e("ChatDetailScreen", "Camera TakePicture failed")
+            }
         }
     )
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-        onResult = { /* Handled in UI calls */ }
+        onResult = { granted ->
+            Log.d("ChatDetailScreen", "Permission result: $granted")
+        }
     )
 
     fun startCamera() {
@@ -186,8 +198,10 @@ private fun ChatDetailContent(
             val file = File(cacheDir, "camera_photo_${System.currentTimeMillis()}.jpg")
             val uri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
             cameraPhotoUri = uri
+            Log.d("ChatDetailScreen", "Launching camera with URI: $uri")
             cameraLauncher.launch(uri)
         } else {
+            Log.d("ChatDetailScreen", "Requesting camera permission")
             permissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
@@ -196,6 +210,7 @@ private fun ChatDetailContent(
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             onStartRecording(cacheDir)
         } else {
+            Log.d("ChatDetailScreen", "Requesting audio permission")
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -656,9 +671,12 @@ private fun VoiceMessageContent(message: ChatMessage, isMine: Boolean, isPlaying
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text("Voice message", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                // Assuming durationMillis is stored in message map or similar. Since ChatMessage model doesn't have it explicitly yet, we fallback.
-                // We'll update ChatMessage model if needed, but for now let's show size.
-                Text(message.fileSizeBytes.formatFileSize(), style = MaterialTheme.typography.bodySmall)
+                val durationStr = if (message.durationMillis > 0) {
+                    val seconds = (message.durationMillis / 1000) % 60
+                    val minutes = (message.durationMillis / 1000) / 60
+                    String.format(Locale.getDefault(), "%02d:%02d • ", minutes, seconds)
+                } else ""
+                Text("$durationStr${message.fileSizeBytes.formatFileSize()}", style = MaterialTheme.typography.bodySmall)
             }
         }
     }

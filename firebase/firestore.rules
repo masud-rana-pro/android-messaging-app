@@ -185,6 +185,19 @@ service cloud.firestore {
               && request.resource.data.fileSizeBytes is int
               && request.resource.data.fileSizeBytes > 0
               && request.resource.data.fileSizeBytes <= 26214400
+            ) ||
+            (
+              request.resource.data.type == "voice"
+              && request.resource.data.mediaUrl is string
+              && request.resource.data.mediaUrl.size() > 0
+              && request.resource.data.fileName is string
+              && request.resource.data.fileName.size() > 0
+              && request.resource.data.mimeType is string
+              && request.resource.data.mimeType in ["audio/mp4", "audio/aac", "audio/mpeg", "audio/3gpp", "audio/ogg", "audio/wav", "audio/webm"]
+              && request.resource.data.fileSizeBytes is int
+              && request.resource.data.fileSizeBytes > 0
+              && request.resource.data.fileSizeBytes <= 10485760
+              && (!("durationMillis" in request.resource.data) || request.resource.data.durationMillis is number)
             )
           );
         allow update: if isConversationParticipant(conversationId)

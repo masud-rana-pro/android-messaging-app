@@ -1,5 +1,6 @@
 package com.contactme.app.media
 
+import android.util.Log
 import android.content.Context
 import android.net.Uri
 import androidx.hilt.work.HiltWorker
@@ -24,11 +25,14 @@ class VoiceMessageWorker @AssistedInject constructor(
         val filePath = inputData.getString(VoiceMessageQueue.FILE_PATH_KEY).orEmpty()
         val duration = inputData.getLong(VoiceMessageQueue.DURATION_KEY, 0L)
         
+        Log.d(TAG, "doWork start. conversationId: $conversationId, filePath: $filePath")
         val pendingFile = File(filePath)
         if (conversationId.isBlank() || senderId.isBlank() || !pendingFile.exists()) {
+            Log.e(TAG, "Validation failed: file exists=${pendingFile.exists()}")
             return Result.failure(workDataOf(VoiceMessageQueue.ERROR_KEY to "This voice message is no longer available."))
         }
 
+        Log.d(TAG, "Calling messageRepository.sendVoiceMessage...")
         return when (
             val result = messageRepository.sendVoiceMessage(
                 conversationId,
@@ -39,13 +43,26 @@ class VoiceMessageWorker @AssistedInject constructor(
             )
         ) {
             MessageResult.Success -> {
+                Log.d(TAG, "Voice message sent successfully. Deleting temp file.")
                 pendingFile.delete()
                 Result.success()
             }
             is MessageResult.Error -> {
-                if (runAttemptCount < 2) Result.retry()
-                else Result.failure(workDataOf(VoiceMessageQueue.ERROR_KEY to result.message))
+                Log.e(TAG, "sendVoiceMessage failed: ${result.message}")
+                if (runAttemptCount < 2) {
+                    Log.d(TAG, "Retrying work...")
+                    Result.retry()
+                } else {
+                    Log.e(TAG, "Max retries reached. Failing work.")
+                    Result.failure(
+                        workDataOf(VoiceMessageQueue.ERROR_KEY to (result.message.ifBlank { "Unknown upload error." }))
+                    )
+                }
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "VoiceMessageWorker"
     }
 }

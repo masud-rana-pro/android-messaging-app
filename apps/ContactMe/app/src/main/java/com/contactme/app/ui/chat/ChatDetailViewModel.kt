@@ -1,5 +1,6 @@
 package com.contactme.app.ui.chat
 
+import android.util.Log
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -238,15 +239,20 @@ class ChatDetailViewModel @Inject constructor(
     }
 
     fun stopRecording() {
+        Log.d(TAG, "stopRecording called")
         recordingJob?.cancel()
         val file = voiceRecorder.stop()
         _uiState.update { it.copy(isRecording = false) }
         if (file != null && file.exists()) {
+            Log.d(TAG, "Voice recording stopped. File: ${file.absolutePath}, size: ${file.length()}")
             sendVoiceMessage(Uri.fromFile(file), _uiState.value.recordingDurationMillis)
+        } else {
+            Log.e(TAG, "Voice recording stopped but file is null or does not exist")
         }
     }
 
     fun cancelRecording() {
+        Log.d(TAG, "cancelRecording called")
         recordingJob?.cancel()
         voiceRecorder.cancel()
         _uiState.update { it.copy(isRecording = false, recordingDurationMillis = 0L) }
@@ -256,21 +262,45 @@ class ChatDetailViewModel @Inject constructor(
         val conversationId = activeConversationId ?: return
         val senderId = authRepository.currentUserId() ?: return
         
+        Log.d(TAG, "sendVoiceMessage internal. URI: $uri")
         viewModelScope.launch {
+            _uiState.update { it.copy(isSending = true, errorMessage = null) }
             when (val result = voiceMessageQueue.enqueue(conversationId, senderId, uri, duration)) {
-                is VoiceQueueResult.Queued -> observeQueuedVoice(result.message)
-                is VoiceQueueResult.Error -> _uiState.update { it.copy(errorMessage = result.message) }
+                is VoiceQueueResult.Queued -> {
+                    Log.d(TAG, "Voice message enqueued: ${result.message.workId}")
+                    observeQueuedVoice(result.message)
+                }
+                is VoiceQueueResult.Error -> {
+                    Log.e(TAG, "Voice message enqueue failed: ${result.message}")
+                    _uiState.update { it.copy(errorMessage = result.message) }
+                }
             }
+            _uiState.update { it.copy(isSending = false) }
         }
     }
 
     private suspend fun observeQueuedVoice(message: QueuedVoiceMessage) {
+        Log.d(TAG, "Observing queued voice: ${message.workId}")
         voiceMessageQueue.observe(message.workId)
             .filterNotNull()
-            .first { it.state.isFinished }
+            .first { workInfo ->
+                Log.d(TAG, "Voice message workInfo state: ${workInfo.state}")
+                if (workInfo.state.isFinished) {
+                    if (workInfo.state != WorkInfo.State.SUCCEEDED) {
+                        val error = workInfo.outputData.getString(VoiceMessageQueue.ERROR_KEY)
+                            ?: "We could not send this voice message. Please try again."
+                        Log.e(TAG, "Voice message worker failed: $error")
+                        _uiState.update { it.copy(errorMessage = error) }
+                    } else {
+                        Log.d(TAG, "Voice message worker succeeded")
+                    }
+                    true
+                } else false
+            }
     }
 
     fun onCameraPhotoCaptured(uri: Uri) {
+        Log.d(TAG, "onCameraPhotoCaptured: $uri")
         sendImageMessages(listOf(uri))
     }
 
@@ -423,6 +453,7 @@ class ChatDetailViewModel @Inject constructor(
 
     fun sendImageMessages(imageUris: List<Uri>) {
         val conversationId = activeConversationId
+        Log.d(TAG, "sendImageMessages called. conversationId: $conversationId, uris: ${imageUris.size}")
         if (conversationId == null) {
             _uiState.update { it.copy(errorMessage = "Select a chat first.") }
             return
@@ -430,6 +461,7 @@ class ChatDetailViewModel @Inject constructor(
 
         val senderId = authRepository.currentUserId()
         if (senderId == null) {
+            Log.e(TAG, "senderId is null")
             _uiState.update { it.copy(errorMessage = "Session expired. Please log in again.") }
             return
         }
@@ -437,9 +469,13 @@ class ChatDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSending = true, errorMessage = null) }
             imageUris.forEach { uri ->
+                Log.d(TAG, "Enqueuing image: $uri")
                 when (val result = imageMessageQueue.enqueue(conversationId, senderId, uri)) {
                     is ImageQueueResult.Queued -> observeQueuedImage(result.message)
-                    is ImageQueueResult.Error -> _uiState.update { it.copy(errorMessage = result.message) }
+                    is ImageQueueResult.Error -> {
+                        Log.e(TAG, "Image enqueue failed: ${result.message}")
+                        _uiState.update { it.copy(errorMessage = result.message) }
+                    }
                 }
             }
             _uiState.update { it.copy(isSending = false) }
@@ -447,17 +483,23 @@ class ChatDetailViewModel @Inject constructor(
     }
 
     private suspend fun observeQueuedImage(message: QueuedImageMessage) {
+        Log.d(TAG, "Observing queued image: ${message.workId}")
         imageMessageQueue.observe(message.workId)
             .filterNotNull()
             .first { workInfo ->
+                Log.d(TAG, "Image message workInfo state: ${workInfo.state}")
                 if (workInfo.state.isFinished) {
                     if (workInfo.state != WorkInfo.State.SUCCEEDED) {
+                        val error = workInfo.outputData.getString(ImageMessageQueue.ERROR_KEY)
+                            ?: "We could not send this photo. Please try again."
+                        Log.e(TAG, "Image message worker failed: $error")
                         _uiState.update {
                             it.copy(
-                                errorMessage = workInfo.outputData.getString(ImageMessageQueue.ERROR_KEY)
-                                    ?: "We could not send this photo. Please try again."
+                                errorMessage = error
                             )
                         }
+                    } else {
+                        Log.d(TAG, "Image message worker succeeded")
                     }
                     true
                 } else false
@@ -687,6 +729,7 @@ class ChatDetailViewModel @Inject constructor(
     }
 
     private companion object {
+        const val TAG = "ChatDetailViewModel"
         const val MAX_MESSAGE_LENGTH = 4000
     }
 

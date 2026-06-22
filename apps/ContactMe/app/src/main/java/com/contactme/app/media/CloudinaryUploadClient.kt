@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
@@ -26,11 +27,20 @@ class CloudinaryUploadClient @Inject constructor(
         fileName: String
     ): CloudinaryUpload {
         return withContext(Dispatchers.IO) {
+            Log.d(TAG, "Starting image upload for: $uri")
             val mimeType = context.contentResolver.getType(uri) ?: DEFAULT_IMAGE_MIME_TYPE
-            val fileBytes = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                inputStream.readBytes()
-            } ?: throw MediaUploadException("This photo is unavailable. Please choose another one.")
+            
+            val fileBytes = runCatching {
+                if (uri.scheme == "file") {
+                    uri.path?.let { java.io.File(it).readBytes() }
+                } else {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        inputStream.readBytes()
+                    }
+                }
+            }.getOrNull() ?: throw MediaUploadException("This photo is unavailable. Please choose another one.")
 
+            Log.d(TAG, "Image size: ${fileBytes.size}, MIME: $mimeType")
             validateImageUpload(
                 mimeType = mimeType,
                 fileSizeBytes = fileBytes.size
@@ -57,11 +67,14 @@ class CloudinaryUploadClient @Inject constructor(
 
             okHttpClient.newCall(request).execute().use { response ->
                 val responseBody = response.body?.string().orEmpty()
+                Log.d(TAG, "Cloudinary image upload response code: ${response.code}")
                 if (!response.isSuccessful) {
+                    Log.e(TAG, "Cloudinary image upload failed: $responseBody")
                     throw MediaUploadException("We could not upload this photo. Please try again.")
                 }
 
                 val json = JSONObject(responseBody)
+                Log.d(TAG, "Cloudinary image upload successful")
                 CloudinaryUpload(
                     secureUrl = json.getString("secure_url"),
                     publicId = json.getString("public_id"),
@@ -76,13 +89,26 @@ class CloudinaryUploadClient @Inject constructor(
         fileName: String,
         mimeType: String
     ): CloudinaryUpload = withContext(Dispatchers.IO) {
-        val fileBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: throw MediaUploadException("This document is unavailable. Please choose another one.")
-        if (fileBytes.size > MAX_DOCUMENT_SIZE_BYTES) {
-            throw MediaUploadException("Choose a document smaller than 25 MB.")
+        Log.d(TAG, "Starting document/raw upload for: $uri, MIME: $mimeType")
+        
+        val fileBytes = runCatching {
+            if (uri.scheme == "file") {
+                uri.path?.let { java.io.File(it).readBytes() }
+            } else {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            }
+        }.getOrNull() ?: throw MediaUploadException("This file is unavailable. Please choose another one.")
+        
+        Log.d(TAG, "File size: ${fileBytes.size}")
+        if (fileBytes.isEmpty()) {
+            throw MediaUploadException("This file is empty. Please try again.")
         }
-        if (mimeType !in ALLOWED_DOCUMENT_TYPES) {
-            throw MediaUploadException("Choose a PDF, text, DOC, or DOCX file.")
+        if (fileBytes.size > MAX_DOCUMENT_SIZE_BYTES) {
+            throw MediaUploadException("Choose a file smaller than 25 MB.")
+        }
+        if (mimeType !in ALLOWED_TYPES) {
+            Log.e(TAG, "Unsupported MIME type: $mimeType")
+            throw MediaUploadException("This file type is not supported.")
         }
 
         val requestBody = MultipartBody.Builder()
@@ -98,10 +124,13 @@ class CloudinaryUploadClient @Inject constructor(
 
         okHttpClient.newCall(request).execute().use { response ->
             val responseBody = response.body?.string().orEmpty()
+            Log.d(TAG, "Cloudinary raw upload response code: ${response.code}")
             if (!response.isSuccessful) {
-                throw MediaUploadException("We could not upload this document. Please try again.")
+                Log.e(TAG, "Cloudinary raw upload failed: $responseBody")
+                throw MediaUploadException("We could not upload this file. Please try again.")
             }
             val json = JSONObject(responseBody)
+            Log.d(TAG, "Cloudinary raw upload successful")
             CloudinaryUpload(
                 secureUrl = json.getString("secure_url"),
                 publicId = json.getString("public_id"),
@@ -116,6 +145,10 @@ class CloudinaryUploadClient @Inject constructor(
     ) {
         if (!mimeType.startsWith(IMAGE_MIME_PREFIX)) {
             throw MediaUploadException("Only image files can be uploaded here.")
+        }
+
+        if (fileSizeBytes == 0) {
+            throw MediaUploadException("This photo is empty. Please try again.")
         }
 
         if (fileSizeBytes > MAX_IMAGE_SIZE_BYTES) {
@@ -179,6 +212,7 @@ class CloudinaryUploadClient @Inject constructor(
     )
 
     private companion object {
+        const val TAG = "CloudinaryUploadClient"
         const val DEFAULT_IMAGE_MIME_TYPE = "image/jpeg"
         const val IMAGE_MIME_PREFIX = "image/"
         const val MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
@@ -190,11 +224,18 @@ class CloudinaryUploadClient @Inject constructor(
         const val CLOUDINARY_BASE_URL = "https://api.cloudinary.com/v1_1/$CLOUDINARY_CLOUD_NAME"
         const val CLOUDINARY_UPLOAD_URL_IMAGE = "$CLOUDINARY_BASE_URL/image/upload"
         const val CLOUDINARY_UPLOAD_URL_RAW = "$CLOUDINARY_BASE_URL/raw/upload"
-        val ALLOWED_DOCUMENT_TYPES = setOf(
+        val ALLOWED_TYPES = setOf(
             "application/pdf",
             "text/plain",
             "application/msword",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "audio/mp4",
+            "audio/aac",
+            "audio/mpeg",
+            "audio/3gpp",
+            "audio/ogg",
+            "audio/wav",
+            "audio/webm"
         )
     }
 }
