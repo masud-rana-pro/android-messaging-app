@@ -210,9 +210,11 @@ class WebRtcCallEngine @Inject constructor(
 
     fun release() {
         Log.d(TAG, "Releasing WebRtcCallEngine")
-        audioManager.mode = AudioManager.MODE_NORMAL
-        audioManager.isSpeakerphoneOn = false
-        peerConnection?.close()
+        runCatching {
+            audioManager.mode = AudioManager.MODE_NORMAL
+            audioManager.isSpeakerphoneOn = false
+            peerConnection?.close()
+        }.onFailure { Log.e(TAG, "Error during release", it) }
         peerConnection = null
         localAudioTrack?.dispose()
         localAudioTrack = null

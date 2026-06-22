@@ -42,8 +42,12 @@ class OutgoingCallViewModel @Inject constructor(
     private val processedIceCandidateIds = mutableSetOf<String>()
 
     fun startCall(receiverId: String, type: CallType) {
+        if (receiverId.isBlank()) {
+            Log.e(TAG, "startCall failed: receiverId is blank")
+            return
+        }
         val callerId = authRepository.currentUserId() ?: return
-        Log.d(TAG, "Starting $type call to $receiverId")
+        Log.d(TAG, "Starting $type call to $receiverId from $callerId")
         
         viewModelScope.launch {
             val receiverProfile = profileRepository.getProfile(receiverId)

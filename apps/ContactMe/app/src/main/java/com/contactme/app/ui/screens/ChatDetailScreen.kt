@@ -99,13 +99,7 @@ fun ChatDetailScreen(
         conversationType = conversationType,
         uiState = uiState,
         onBack = onBack,
-        onVoiceCallClick = {
-            if (uiState.peerUserId != null) {
-                onVoiceCallClick(uiState.peerUserId!!)
-            } else {
-                viewModel.setCallError("Call failed: Peer user not found.")
-            }
-        },
+        onVoiceCallClick = { onVoiceCallClick(uiState.peerUserId ?: "") },
         onMessageTextChanged = viewModel::onMessageTextChanged,
         onSendMessage = viewModel::sendMessage,
         onRetryImageMessage = viewModel::retryFailedImageMessage,
@@ -194,6 +188,7 @@ private fun ChatDetailContent(
     )
 
     fun startCamera() {
+        Log.d("ChatDetailScreen", "startCamera called")
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             val file = File(cacheDir, "camera_photo_${System.currentTimeMillis()}.jpg")
             val uri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
@@ -207,10 +202,25 @@ private fun ChatDetailContent(
     }
 
     fun startVoiceRecording() {
+        Log.d("ChatDetailScreen", "startVoiceRecording called")
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             onStartRecording(cacheDir)
         } else {
             Log.d("ChatDetailScreen", "Requesting audio permission")
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    fun startVoiceCall() {
+        Log.d("ChatDetailScreen", "startVoiceCall called for peer: ${uiState.peerUserId}")
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            if (uiState.peerUserId != null) {
+                onVoiceCallClick()
+            } else {
+                Log.e("ChatDetailScreen", "startVoiceCall failed: peerUserId is null")
+            }
+        } else {
+            Log.d("ChatDetailScreen", "Requesting audio permission for call")
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -274,7 +284,7 @@ private fun ChatDetailContent(
                         IconButton(enabled = false, onClick = { /* Video Call Coming Soon */ }) {
                             Icon(imageVector = Icons.Outlined.Videocam, contentDescription = "Video Call")
                         }
-                        IconButton(onClick = onVoiceCallClick) {
+                        IconButton(onClick = { startVoiceCall() }) {
                             Icon(imageVector = Icons.Outlined.Call, contentDescription = "Voice Call")
                         }
                         ChatActionMenu(
