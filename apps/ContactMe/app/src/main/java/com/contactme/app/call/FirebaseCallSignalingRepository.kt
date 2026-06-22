@@ -128,7 +128,27 @@ class FirebaseCallSignalingRepository @Inject constructor(
 
     override suspend fun endCall(callId: String, currentUserId: String): CallResult {
         if (callId.isBlank() || currentUserId.isBlank()) return CallResult.Error("Invalid call.")
-        return updateTerminalStatus(callId, CallStatus.Ended)
+        
+        return runCatching {
+            val doc = calls().document(callId).get().await()
+            val status = CallStatus.fromFirestore(doc.getString(STATUS))
+            val callerId = doc.getString(CALLER_ID)
+            
+            val terminalStatus = if (status == CallStatus.Ringing) {
+                if (currentUserId == callerId) CallStatus.Cancelled else CallStatus.Rejected
+            } else {
+                CallStatus.Ended
+            }
+            
+            updateTerminalStatus(callId, terminalStatus)
+        }.getOrElse { 
+            updateTerminalStatus(callId, CallStatus.Ended)
+        }
+    }
+
+    override suspend fun updateCallStatus(callId: String, status: CallStatus): CallResult {
+        if (callId.isBlank()) return CallResult.Error("Invalid call.")
+        return updateCall(callId, mapOf(STATUS to status.firestoreValue), "Could not update call status.")
     }
 
     override suspend fun addCallerIceCandidate(
