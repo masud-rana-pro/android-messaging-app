@@ -248,6 +248,60 @@ class FirebaseMessageRepository @Inject constructor(
         )
     }
 
+    override suspend fun sendVoiceMessage(
+        conversationId: String,
+        senderId: String,
+        audioUri: Uri,
+        durationMillis: Long,
+        fileSizeBytes: Long
+    ): MessageResult {
+        if (isBlockedConversation(conversationId, senderId)) {
+            return MessageResult.Error("This chat is not available.")
+        }
+
+        return runCatching {
+            val fileName = "voice_message.m4a"
+            val upload = cloudinaryUploadClient.uploadDocument(audioUri, fileName, "audio/mp4")
+            val conversationDocument = firestore.collection(CONVERSATIONS_COLLECTION)
+                .document(conversationId)
+            val messageDocument = conversationDocument.collection(MESSAGES_COLLECTION).document()
+            val messageData = mapOf(
+                "senderId" to senderId,
+                "text" to "",
+                "type" to MessageType.Voice.firestoreValue,
+                "mediaProvider" to CLOUDINARY_PROVIDER,
+                "mediaUrl" to upload.secureUrl,
+                "mediaPublicId" to upload.publicId,
+                "mimeType" to upload.mimeType,
+                "fileName" to fileName,
+                "fileSizeBytes" to fileSizeBytes,
+                "durationMillis" to durationMillis,
+                "status" to MessageStatus.Sent.firestoreValue,
+                "createdAt" to FieldValue.serverTimestamp()
+            )
+            firestore.runBatch { batch ->
+                batch.set(messageDocument, messageData)
+                batch.update(
+                    conversationDocument,
+                    mapOf(
+                        "lastMessageText" to "Voice message",
+                        "lastMessageId" to messageDocument.id,
+                        "lastMessageSenderId" to senderId,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                )
+            }.await()
+        }.fold(
+            onSuccess = { MessageResult.Success },
+            onFailure = { error ->
+                MessageResult.Error(
+                    (error as? MediaUploadException)?.userMessage
+                        ?: "We could not send this voice message. Please try again."
+                )
+            }
+        )
+    }
+
     override suspend fun deleteMessage(
         conversationId: String,
         messageId: String,

@@ -18,6 +18,11 @@ import com.contactme.app.media.QueuedImageMessage
 import com.contactme.app.media.DocumentMessageQueue
 import com.contactme.app.media.DocumentQueueResult
 import com.contactme.app.media.QueuedDocumentMessage
+import com.contactme.app.media.VoiceMessageQueue
+import com.contactme.app.media.VoiceQueueResult
+import com.contactme.app.media.QueuedVoiceMessage
+import com.contactme.app.media.VoiceRecorder
+import com.contactme.app.media.VoicePlayer
 import com.contactme.app.presence.PresenceRepository
 import com.contactme.app.safety.ReportReason
 import com.contactme.app.safety.SafetyRepository
@@ -44,7 +49,10 @@ class ChatDetailViewModel @Inject constructor(
     private val presenceRepository: PresenceRepository,
     private val safetyRepository: SafetyRepository,
     private val imageMessageQueue: ImageMessageQueue,
-    private val documentMessageQueue: DocumentMessageQueue
+    private val documentMessageQueue: DocumentMessageQueue,
+    private val voiceMessageQueue: VoiceMessageQueue,
+    private val voiceRecorder: VoiceRecorder,
+    private val voicePlayer: VoicePlayer
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         ChatDetailUiState(currentUserId = authRepository.currentUserId().orEmpty())
@@ -57,6 +65,7 @@ class ChatDetailViewModel @Inject constructor(
     private var typingJob: Job? = null
     private var presenceJob: Job? = null
     private var readReceiptJob: Job? = null
+    private var recordingJob: Job? = null
     private var lastTypingValue = false
 
     fun openConversation(
@@ -196,8 +205,73 @@ class ChatDetailViewModel @Inject constructor(
         updateTypingState(isTyping = nextMessageText.isNotBlank())
     }
 
+    fun onEmojiSelected(emoji: String) {
+        _uiState.update {
+            it.copy(
+                messageText = it.messageText + emoji,
+                errorMessage = null
+            )
+        }
+        updateTypingState(isTyping = true)
+    }
+
     fun setCallError(message: String) {
         _uiState.update { it.copy(errorMessage = message) }
+    }
+
+    fun startRecording(cacheDir: java.io.File) {
+        val outputFile = java.io.File(cacheDir, "voice_rec_${System.currentTimeMillis()}.m4a")
+        runCatching {
+            voiceRecorder.start(outputFile)
+            _uiState.update { it.copy(isRecording = true, recordingDurationMillis = 0L) }
+            recordingJob?.cancel()
+            recordingJob = viewModelScope.launch {
+                val start = System.currentTimeMillis()
+                while (true) {
+                    kotlinx.coroutines.delay(100)
+                    _uiState.update { it.copy(recordingDurationMillis = System.currentTimeMillis() - start) }
+                }
+            }
+        }.onFailure {
+            _uiState.update { it.copy(errorMessage = "Could not start recording.") }
+        }
+    }
+
+    fun stopRecording() {
+        recordingJob?.cancel()
+        val file = voiceRecorder.stop()
+        _uiState.update { it.copy(isRecording = false) }
+        if (file != null && file.exists()) {
+            sendVoiceMessage(Uri.fromFile(file), _uiState.value.recordingDurationMillis)
+        }
+    }
+
+    fun cancelRecording() {
+        recordingJob?.cancel()
+        voiceRecorder.cancel()
+        _uiState.update { it.copy(isRecording = false, recordingDurationMillis = 0L) }
+    }
+
+    private fun sendVoiceMessage(uri: Uri, duration: Long) {
+        val conversationId = activeConversationId ?: return
+        val senderId = authRepository.currentUserId() ?: return
+        
+        viewModelScope.launch {
+            when (val result = voiceMessageQueue.enqueue(conversationId, senderId, uri, duration)) {
+                is VoiceQueueResult.Queued -> observeQueuedVoice(result.message)
+                is VoiceQueueResult.Error -> _uiState.update { it.copy(errorMessage = result.message) }
+            }
+        }
+    }
+
+    private suspend fun observeQueuedVoice(message: QueuedVoiceMessage) {
+        voiceMessageQueue.observe(message.workId)
+            .filterNotNull()
+            .first { it.state.isFinished }
+    }
+
+    fun onCameraPhotoCaptured(uri: Uri) {
+        sendImageMessages(listOf(uri))
     }
 
     fun sendMessage() {
@@ -284,6 +358,7 @@ class ChatDetailViewModel @Inject constructor(
                         MessageType.Image -> "Photo"
                         MessageType.Document -> message.fileName.ifBlank { "Document" }
                         MessageType.Call -> "Voice call"
+                        MessageType.Voice -> "Voice message"
                     },
                     type = message.type
                 ),
@@ -585,7 +660,22 @@ class ChatDetailViewModel @Inject constructor(
         }
     }
 
+    fun toggleVoiceMessagePlayback(message: ChatMessage) {
+        if (message.mediaUrl.isBlank()) return
+        
+        if (_uiState.value.voiceMessagePlayingId == message.id) {
+            voicePlayer.stop()
+            _uiState.update { it.copy(voiceMessagePlayingId = null) }
+        } else {
+            voicePlayer.play(message.id, message.mediaUrl) {
+                _uiState.update { it.copy(voiceMessagePlayingId = null) }
+            }
+            _uiState.update { it.copy(voiceMessagePlayingId = message.id) }
+        }
+    }
+
     override fun onCleared() {
+        voicePlayer.stop()
         activeConversationId?.takeIf { activeConversationType == ConversationType.Direct }
             ?.let { conversationId ->
             updateTypingState(
