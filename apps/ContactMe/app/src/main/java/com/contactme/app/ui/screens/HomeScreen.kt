@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,17 +35,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Button
+import androidx.compose.ui.graphics.Color
+import com.contactme.app.ui.theme.ContactMeGreen
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AddComment
-import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.Chat
-import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.GroupAdd
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.CallReceived
-import androidx.compose.material.icons.outlined.CallMade
+import androidx.compose.material.icons.automirrored.outlined.CallReceived
+import androidx.compose.material.icons.automirrored.outlined.CallMade
+import androidx.compose.material.icons.filled.CallMade
+import androidx.compose.material.icons.filled.CallReceived
+import androidx.compose.material.icons.filled.CallMissed
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,6 +62,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import com.contactme.app.ui.theme.ContactMeGreen
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -666,26 +669,36 @@ private fun Calendar.isYesterday(today: Calendar): Boolean {
 
 @Composable
 private fun CallsTab(
-    viewModel: CallsViewModel = hiltViewModel()
+    viewModel: com.contactme.app.ui.call.CallsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        CallsQuickActions()
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
         Text(
-            text = "Calls",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
+            text = "Recent",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+
         if (uiState.isLoading) {
-            SupportingText(text = "Loading calls...")
+            Box(modifier = Modifier.padding(16.dp)) {
+                SupportingText(text = "Loading calls...")
+            }
         } else if (uiState.calls.isEmpty()) {
             EmptyCallsState(message = uiState.message ?: "No calls yet")
         } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(uiState.calls) { call ->
-                    CallRow(call = call, currentUserId = uiState.currentUserId)
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(uiState.calls) { session ->
+                    CallRow(
+                        session = session,
+                        currentUserId = uiState.currentUserId,
+                        peerProfile = uiState.profiles[if (session.callerId == uiState.currentUserId) session.receiverId else session.callerId]
+                    )
                 }
             }
         }
@@ -693,95 +706,93 @@ private fun CallsTab(
 }
 
 @Composable
-private fun EmptyCallsState(message: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-        shape = RoundedCornerShape(18.dp)
+private fun CallsQuickActions() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        QuickActionItem(icon = Icons.Outlined.Call, label = "Call")
+        QuickActionItem(icon = Icons.Outlined.CalendarMonth, label = "Schedule")
+        QuickActionItem(icon = Icons.Outlined.Dialpad, label = "Keypad")
+        QuickActionItem(icon = Icons.Outlined.FavoriteBorder, label = "Favorites")
+    }
+}
+
+@Composable
+private fun QuickActionItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(
+            modifier = Modifier.size(56.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            tonalElevation = 2.dp
         ) {
-            Text(
-                text = "No calls yet",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            SupportingText(text = "Open a chat and tap Call to start an audio call.")
+            Box(contentAlignment = Alignment.Center) {
+                Icon(imageVector = icon, contentDescription = label)
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = label, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun EmptyCallsState(message: String) {
+    Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Outlined.Call, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+            Text(text = message, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
     }
 }
 
 @Composable
 private fun CallRow(
-    call: CallSession,
-    currentUserId: String
+    session: com.contactme.app.call.CallSession,
+    currentUserId: String,
+    peerProfile: com.contactme.app.profile.UserProfile?
 ) {
-    val isOutgoing = call.callerId == currentUserId
-    val otherPartyLabel = if (isOutgoing) "Outgoing Call" else "Incoming Call"
+    val isOutgoing = session.callerId == currentUserId
+    val peerName = peerProfile?.displayName ?: "ContactMe User"
+    val icon = when {
+        session.status == com.contactme.app.call.CallStatus.Missed -> Icons.Default.CallMissed
+        isOutgoing -> Icons.Default.CallMade
+        else -> Icons.Default.CallReceived
+    }
+    val iconColor = when {
+        session.status == com.contactme.app.call.CallStatus.Missed -> Color.Red
+        isOutgoing -> ContactMeGreen
+        else -> ContactMeGreen
+    }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxWidth().clickable { /* TODO: Call Details */ }.padding(16.dp, 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(
-                    if (call.status == CallStatus.Missed || call.status == CallStatus.Rejected) {
-                        MaterialTheme.colorScheme.errorContainer
-                    } else {
-                        MaterialTheme.colorScheme.primaryContainer
-                    }
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isOutgoing) Icons.Outlined.CallMade else Icons.Outlined.CallReceived,
-                contentDescription = null,
-                tint = if (call.status == CallStatus.Missed || call.status == CallStatus.Rejected) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.primary
-                }
-            )
-        }
+        ContactAvatar(photoUrl = peerProfile?.photoUrl ?: "", label = peerName, size = 48)
+
+        Spacer(modifier = Modifier.width(16.dp))
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = otherPartyLabel,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                text = peerName,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = if (session.status == com.contactme.app.call.CallStatus.Missed) Color.Red else MaterialTheme.colorScheme.onSurface
             )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(14.dp), tint = iconColor)
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = call.status.displayLabel(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (call.status == CallStatus.Missed || call.status == CallStatus.Rejected) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.66f)
-                    }
-                )
-                Text(
-                    text = "•",
+                    text = "${session.status.displayLabel()} • ${session.createdAtMillis.formatConversationTime()}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.44f)
-                )
-                Text(
-                    text = call.createdAtMillis.formatConversationTime(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.44f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+
+        IconButton(onClick = { /* TODO: Re-call */ }) {
+            Icon(imageVector = Icons.Outlined.Call, contentDescription = "Call Back", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -789,7 +800,9 @@ private fun CallRow(
 private fun CallStatus.displayLabel(): String {
     return when (this) {
         CallStatus.Ringing -> "Ringing"
+        CallStatus.Connecting -> "Connecting"
         CallStatus.Accepted -> "Ongoing"
+        CallStatus.Connected -> "Connected"
         CallStatus.Rejected -> "Rejected"
         CallStatus.Ended -> "Ended"
         CallStatus.Cancelled -> "Cancelled"

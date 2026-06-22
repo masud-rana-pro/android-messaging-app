@@ -1,20 +1,19 @@
 package com.contactme.app.call
 
+import android.util.Log
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
+import com.contactme.app.profile.ProfileRepository
+import com.contactme.app.profile.UserProfile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -27,6 +26,7 @@ import javax.inject.Inject
 class OutgoingCallViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val authRepository: AuthRepository,
+    private val profileRepository: ProfileRepository,
     private val callRepository: CallSignalingRepository,
     private val webRtcEngine: WebRtcCallEngine,
     private val okHttpClient: OkHttpClient
@@ -38,24 +38,32 @@ class OutgoingCallViewModel @Inject constructor(
     private var currentCallId: String? = null
     private var signalingJob: Job? = null
     private var iceCandidateJob: Job? = null
+    private var timerJob: Job? = null
     private val processedIceCandidateIds = mutableSetOf<String>()
 
     fun startCall(receiverId: String, type: CallType) {
         val callerId = authRepository.currentUserId() ?: return
+        Log.d(TAG, "Starting $type call to $receiverId")
         
-        _uiState.update { it.copy(status = CallStatus.Ringing, receiverId = receiverId) }
+        viewModelScope.launch {
+            val receiverProfile = profileRepository.getProfile(receiverId)
+            _uiState.update { it.copy(status = CallStatus.Ringing, receiverId = receiverId, receiverProfile = receiverProfile) }
+        }
 
         webRtcEngine.initialize(callerId, object : WebRtcCallEngine.Listener {
             override fun onLocalDescription(sdp: String) {
+                Log.d(TAG, "Local description created")
                 viewModelScope.launch {
                     val result = callRepository.createCallOffer(callerId, receiverId, type, sdp)
                     if (result is CallResult.Created) {
+                        Log.d(TAG, "Call offer created in Firestore: ${result.callId}")
                         currentCallId = result.callId
                         CallForegroundService.start(context, result.callId)
                         triggerCallNotification(result.callId, receiverId)
                         observeCall(result.callId)
                         observeIceCandidates(result.callId)
                     } else if (result is CallResult.Error) {
+                        Log.e(TAG, "Failed to create call offer: ${result.message}")
                         _uiState.update { it.copy(status = CallStatus.Ended) }
                     }
                 }
@@ -70,9 +78,28 @@ class OutgoingCallViewModel @Inject constructor(
             }
 
             override fun onConnectionStateChange(state: PeerConnection.PeerConnectionState) {
+                Log.d(TAG, "PeerConnection state changed: $state")
                 _uiState.update { 
                     it.copy(connectionState = state)
                 }
+                if (state == PeerConnection.PeerConnectionState.CONNECTED) {
+                    startTimer()
+                    currentCallId?.let { id ->
+                        viewModelScope.launch {
+                            callRepository.updateCallStatus(id, CallStatus.Connected)
+                        }
+                    }
+                } else if (state == PeerConnection.PeerConnectionState.CONNECTING) {
+                    currentCallId?.let { id ->
+                        viewModelScope.launch {
+                            callRepository.updateCallStatus(id, CallStatus.Connecting)
+                        }
+                    }
+                }
+            }
+
+            override fun onAudioTrackAdded() {
+                Log.d(TAG, "Remote audio track added")
             }
         })
 
@@ -84,13 +111,16 @@ class OutgoingCallViewModel @Inject constructor(
         signalingJob = viewModelScope.launch {
             callRepository.listenToCall(callId).collectLatest { session ->
                 if (session == null) {
+                    Log.d(TAG, "Call session is null, ending call")
                     _uiState.update { it.copy(status = CallStatus.Ended) }
                     return@collectLatest
                 }
 
+                Log.d(TAG, "Call status updated: ${session.status}")
                 _uiState.update { it.copy(status = session.status) }
 
                 if (session.status == CallStatus.Accepted && session.answer.isNotBlank()) {
+                    Log.d(TAG, "Call accepted, setting remote description")
                     webRtcEngine.setRemoteDescription(session.answer)
                 }
 
@@ -99,6 +129,7 @@ class OutgoingCallViewModel @Inject constructor(
                     session.status == CallStatus.Cancelled ||
                     session.status == CallStatus.Busy ||
                     session.status == CallStatus.Timeout) {
+                    Log.d(TAG, "Call reached terminal status: ${session.status}, cleaning up")
                     cleanup()
                 }
             }
@@ -134,16 +165,31 @@ class OutgoingCallViewModel @Inject constructor(
 
                 okHttpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        // Log failure safely (Step 92)
+                        Log.e(TAG, "Failed to trigger call notification: ${response.code}")
+                    } else {
+                        Log.d(TAG, "Call notification triggered successfully")
                     }
                 }
             }
         }
     }
 
-    fun cancelCall() {
+    private fun startTimer() {
+        if (timerJob != null) return
+        timerJob = viewModelScope.launch {
+            var seconds = 0L
+            while (true) {
+                delay(1000)
+                seconds++
+                _uiState.update { it.copy(durationSeconds = seconds) }
+            }
+        }
+    }
+
+    fun endCall() {
         val callId = currentCallId ?: return
         val userId = authRepository.currentUserId() ?: return
+        Log.d(TAG, "Ending call: $callId")
         viewModelScope.launch {
             callRepository.endCall(callId, userId)
             cleanup()
@@ -163,11 +209,12 @@ class OutgoingCallViewModel @Inject constructor(
     }
 
     private fun cleanup() {
+        Log.d(TAG, "Cleaning up outgoing call")
         CallForegroundService.stop(context)
         webRtcEngine.release()
         signalingJob?.cancel()
         iceCandidateJob?.cancel()
-        // We don't necessarily want to set status to ENDED if it's already REJECTED/CANCELLED in UI state
+        timerJob?.cancel()
     }
 
     override fun onCleared() {
@@ -176,6 +223,7 @@ class OutgoingCallViewModel @Inject constructor(
     }
 
     private companion object {
+        const val TAG = "OutgoingCallViewModel"
         const val WORKER_URL = "https://contactme-call-notification.masud-jee68.workers.dev"
     }
 }
@@ -183,7 +231,9 @@ class OutgoingCallViewModel @Inject constructor(
 data class OutgoingCallUiState(
     val status: CallStatus = CallStatus.Ringing,
     val receiverId: String = "",
+    val receiverProfile: UserProfile? = null,
     val isMuted: Boolean = false,
     val isSpeakerEnabled: Boolean = false,
-    val connectionState: PeerConnection.PeerConnectionState = PeerConnection.PeerConnectionState.NEW
+    val connectionState: PeerConnection.PeerConnectionState = PeerConnection.PeerConnectionState.NEW,
+    val durationSeconds: Long = 0L
 )

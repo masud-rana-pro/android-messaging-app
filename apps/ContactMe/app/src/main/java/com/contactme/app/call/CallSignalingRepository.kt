@@ -26,6 +26,8 @@ interface CallSignalingRepository {
 
     suspend fun endCall(callId: String, currentUserId: String): CallResult
 
+    suspend fun updateCallStatus(callId: String, status: CallStatus): CallResult
+
     suspend fun addCallerIceCandidate(
         callId: String,
         callerId: String,

@@ -1,43 +1,31 @@
 package com.contactme.app.call
 
 import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import org.webrtc.PeerConnection
+import com.contactme.app.ui.theme.ContactMeGreen
+import java.util.Locale
 
 @Composable
 fun IncomingCallScreen(
@@ -45,69 +33,101 @@ fun IncomingCallScreen(
     viewModel: IncomingCallViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var hasMicrophonePermission by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        hasMicrophonePermission = isGranted
         if (isGranted) {
             viewModel.acceptCall()
         }
     }
 
-    LaunchedEffect(uiState.activeCall) {
-        if (uiState.activeCall == null) {
+    LaunchedEffect(uiState.activeCall, uiState.status) {
+        if (uiState.activeCall == null && uiState.status == CallStatus.Ended) {
             onCallDismissed()
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = "Incoming Call", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "Caller: ${uiState.activeCall?.callerId ?: "Unknown"}")
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "Status: ${uiState.status.name}")
-        Text(text = "Connection: ${uiState.connectionState.name}")
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        if (uiState.status == CallStatus.Accepted) {
-            CallControlBar(
-                isMuted = uiState.isMuted,
-                isSpeakerEnabled = uiState.isSpeakerEnabled,
-                onToggleMute = viewModel::toggleMute,
-                onToggleSpeaker = viewModel::toggleSpeaker,
-                onEndCall = {
-                    viewModel.rejectCall()
-                    onCallDismissed()
-                }
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(48.dp))
+
+            CallPeerInfo(
+                displayName = uiState.callerProfile?.displayName ?: "ContactMe User",
+                phoneNumber = uiState.callerProfile?.phoneNumber,
+                photoUrl = uiState.callerProfile?.photoUrl,
+                statusLabel = if (uiState.status == CallStatus.Ringing) "Incoming voice call" else getCallStatusLabel(uiState.status, uiState.connectionState),
+                durationSeconds = uiState.durationSeconds
             )
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(
-                    onClick = { viewModel.rejectCall() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Reject")
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Button(
-                    onClick = { 
-                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Accept")
-                }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            if (uiState.status == CallStatus.Accepted || uiState.status == CallStatus.Connected || uiState.status == CallStatus.Connecting) {
+                CallControlBar(
+                    isMuted = uiState.isMuted,
+                    isSpeakerEnabled = uiState.isSpeakerEnabled,
+                    onToggleMute = viewModel::toggleMute,
+                    onToggleSpeaker = viewModel::toggleSpeaker,
+                    onEndCall = viewModel::endCall
+                )
+            } else {
+                IncomingCallActions(
+                    onReject = viewModel::rejectCall,
+                    onAccept = {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                            viewModel.acceptCall()
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+                )
             }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+fun IncomingCallActions(
+    onReject: () -> Unit,
+    onAccept: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            FloatingActionButton(
+                onClick = onReject,
+                containerColor = Color.Red,
+                contentColor = Color.White,
+                shape = CircleShape,
+                modifier = Modifier.size(64.dp)
+            ) {
+                Icon(imageVector = Icons.Default.CallEnd, contentDescription = "Reject")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = "Reject", style = MaterialTheme.typography.labelSmall)
+        }
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            FloatingActionButton(
+                onClick = onAccept,
+                containerColor = ContactMeGreen,
+                contentColor = Color.White,
+                shape = CircleShape,
+                modifier = Modifier.size(64.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Call, contentDescription = "Accept")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = "Accept", style = MaterialTheme.typography.labelSmall)
         }
     }
 }
