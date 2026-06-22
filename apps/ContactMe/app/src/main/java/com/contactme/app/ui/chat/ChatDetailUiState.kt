@@ -28,5 +28,8 @@ data class ChatDetailUiState(
     val failedDocumentName: String = "",
     val failedDocumentMimeType: String = "",
     val statusMessage: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isRecording: Boolean = false,
+    val recordingDurationMillis: Long = 0L,
+    val voiceMessagePlayingId: String? = null
 )

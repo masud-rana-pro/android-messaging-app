@@ -48,6 +48,13 @@ import com.contactme.app.message.ChatMessage
 import com.contactme.app.message.MessageReply
 import com.contactme.app.message.MessageStatus
 import com.contactme.app.message.MessageType
+import androidx.core.content.FileProvider
+import com.contactme.app.BuildConfig
+import java.io.File
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+
 import com.contactme.app.notification.NotificationVisibilityTracker
 import com.contactme.app.presence.PresenceStatus
 import com.contactme.app.safety.ReportReason
@@ -111,7 +118,13 @@ fun ChatDetailScreen(
         onCancelReply = viewModel::cancelReply,
         onEditMessage = viewModel::startEdit,
         onCancelEdit = viewModel::cancelEdit,
-        onDeleteMessage = viewModel::deleteMessage
+        onDeleteMessage = viewModel::deleteMessage,
+        onEmojiSelected = viewModel::onEmojiSelected,
+        onCameraPhotoCaptured = viewModel::onCameraPhotoCaptured,
+        onStartRecording = { viewModel.startRecording(it) },
+        onStopRecording = viewModel::stopRecording,
+        onCancelRecording = viewModel::cancelRecording,
+        onVoiceMessageToggle = viewModel::toggleVoiceMessagePlayback
     )
 }
 
@@ -139,12 +152,54 @@ private fun ChatDetailContent(
     onCancelReply: () -> Unit,
     onEditMessage: (ChatMessage) -> Unit,
     onCancelEdit: () -> Unit,
-    onDeleteMessage: (ChatMessage) -> Unit
+    onDeleteMessage: (ChatMessage) -> Unit,
+    onEmojiSelected: (String) -> Unit,
+    onCameraPhotoCaptured: (Uri) -> Unit,
+    onStartRecording: (File) -> Unit,
+    onStopRecording: () -> Unit,
+    onCancelRecording: () -> Unit,
+    onVoiceMessageToggle: (ChatMessage) -> Unit
 ) {
     val messages = uiState.messages
     val listState = rememberLazyListState()
     var selectedMessageForActions by remember { mutableStateOf<ChatMessage?>(null) }
+    var isEmojiPanelVisible by remember { mutableStateOf(false) }
     
+    val context = LocalContext.current
+    val cacheDir = context.cacheDir
+    
+    var cameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+        onResult = { success ->
+            if (success) cameraPhotoUri?.let(onCameraPhotoCaptured)
+        }
+    )
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { /* Handled in UI calls */ }
+    )
+
+    fun startCamera() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            val file = File(cacheDir, "camera_photo_${System.currentTimeMillis()}.jpg")
+            val uri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
+            cameraPhotoUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    fun startVoiceRecording() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            onStartRecording(cacheDir)
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(),
         onResult = { uris -> if (uris.isNotEmpty()) onImageSelected(uris) }
@@ -270,58 +325,78 @@ private fun ChatDetailContent(
                             isMine = message.senderId == uiState.currentUserId,
                             showSenderName = conversationType == ConversationType.Group,
                             onLongPress = { if (!uiState.isSending) selectedMessageForActions = message },
-                            readReceiptState = uiState.readReceiptState
+                            readReceiptState = uiState.readReceiptState,
+                            isPlaying = uiState.voiceMessagePlayingId == message.id,
+                            onVoiceToggle = { onVoiceMessageToggle(message) }
                         )
                     }
                 }
                 
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-                    uiState.editingMessageId?.let { EditComposerPreview(onCancel = onCancelEdit) }
-                    uiState.replyingTo?.let { reply -> ReplyComposerPreview(reply = reply, onCancel = onCancelReply) }
-                    
-                    val imagePreviewUri = uiState.pendingImageUri.ifBlank { uiState.failedImageUri }
-                    if (imagePreviewUri.isNotBlank()) {
-                        PendingImagePreview(
-                            imageUri = imagePreviewUri,
-                            isUploading = uiState.pendingImageUri.isNotBlank() && uiState.isSending
+                    if (uiState.isRecording) {
+                        RecordingBar(
+                            durationMillis = uiState.recordingDurationMillis,
+                            onStop = onStopRecording,
+                            onCancel = onCancelRecording
                         )
-                    }
-                    if (uiState.pendingDocumentName.isNotBlank() || uiState.failedDocumentName.isNotBlank()) {
-                        PendingDocumentPreview(
-                            fileName = uiState.pendingDocumentName.ifBlank { uiState.failedDocumentName },
-                            isUploading = uiState.pendingDocumentName.isNotBlank() && uiState.isSending
-                        )
-                    }
-                    
-                    uiState.statusMessage?.let { ChatStatusMessage(message = it) }
-                    uiState.errorMessage?.let { msg ->
-                        SendErrorMessage(
-                            message = msg,
-                            canRetry = conversationId != null,
-                            onRetry = {
-                                if (uiState.failedDocumentUri.isNotBlank()) onRetryDocumentMessage()
-                                else if (uiState.failedImageUri.isNotBlank()) onRetryImageMessage()
-                                else onSendMessage()
-                            }
-                        )
-                    }
-
-                    MessageInputBar(
-                        text = uiState.messageText,
-                        enabled = conversationId != null && !uiState.isSending && !uiState.isChatBlocked,
-                        isSending = uiState.isSending,
-                        attachmentsEnabled = uiState.editingMessageId == null,
-                        hasFailedImage = uiState.failedImageUri.isNotBlank(),
-                        isChatBlocked = uiState.isChatBlocked,
-                        onMessageTextChanged = onMessageTextChanged,
-                        onSendMessage = onSendMessage,
-                        onImageClick = {
-                            imagePickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        },
-                        onDocumentClick = {
-                            documentPickerLauncher.launch(arrayOf("*/*"))
+                    } else {
+                        uiState.editingMessageId?.let { EditComposerPreview(onCancel = onCancelEdit) }
+                        uiState.replyingTo?.let { reply -> ReplyComposerPreview(reply = reply, onCancel = onCancelReply) }
+                        
+                        val imagePreviewUri = uiState.pendingImageUri.ifBlank { uiState.failedImageUri }
+                        if (imagePreviewUri.isNotBlank()) {
+                            PendingImagePreview(
+                                imageUri = imagePreviewUri,
+                                isUploading = uiState.pendingImageUri.isNotBlank() && uiState.isSending
+                            )
                         }
-                    )
+                        if (uiState.pendingDocumentName.isNotBlank() || uiState.failedDocumentName.isNotBlank()) {
+                            PendingDocumentPreview(
+                                fileName = uiState.pendingDocumentName.ifBlank { uiState.failedDocumentName },
+                                isUploading = uiState.pendingDocumentName.isNotBlank() && uiState.isSending
+                            )
+                        }
+                        
+                        uiState.statusMessage?.let { ChatStatusMessage(message = it) }
+                        uiState.errorMessage?.let { msg ->
+                            SendErrorMessage(
+                                message = msg,
+                                canRetry = conversationId != null,
+                                onRetry = {
+                                    if (uiState.failedDocumentUri.isNotBlank()) onRetryDocumentMessage()
+                                    else if (uiState.failedImageUri.isNotBlank()) onRetryImageMessage()
+                                    else onSendMessage()
+                                }
+                            )
+                        }
+
+                        MessageInputBar(
+                            text = uiState.messageText,
+                            enabled = conversationId != null && !uiState.isSending && !uiState.isChatBlocked,
+                            isSending = uiState.isSending,
+                            attachmentsEnabled = uiState.editingMessageId == null,
+                            hasFailedImage = uiState.failedImageUri.isNotBlank(),
+                            isChatBlocked = uiState.isChatBlocked,
+                            onMessageTextChanged = onMessageTextChanged,
+                            onSendMessage = onSendMessage,
+                            onImageClick = {
+                                imagePickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },
+                            onDocumentClick = {
+                                documentPickerLauncher.launch(arrayOf("*/*"))
+                            },
+                            onEmojiClick = { isEmojiPanelVisible = !isEmojiPanelVisible },
+                            onCameraClick = { startCamera() },
+                            onMicClick = { startVoiceRecording() }
+                        )
+
+                        if (isEmojiPanelVisible) {
+                            EmojiPicker(onEmojiSelected = { 
+                                onEmojiSelected(it)
+                                isEmojiPanelVisible = false
+                            })
+                        }
+                    }
                 }
             }
         }
@@ -396,7 +471,7 @@ private fun Long.formatPresenceTime(): String {
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessage, isMine: Boolean, showSenderName: Boolean, onLongPress: () -> Unit, readReceiptState: ReadReceiptState) {
+private fun MessageBubble(message: ChatMessage, isMine: Boolean, showSenderName: Boolean, onLongPress: () -> Unit, readReceiptState: ReadReceiptState, isPlaying: Boolean = false, onVoiceToggle: () -> Unit = {}) {
     val bubbleColor = if (isMine) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.98f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
     val shape = RoundedCornerShape(
         topStart = if (isMine) 16.dp else 2.dp,
@@ -425,6 +500,7 @@ private fun MessageBubble(message: ChatMessage, isMine: Boolean, showSenderName:
                     MessageType.Image -> ImageMessageContent(message)
                     MessageType.Document -> DocumentMessageContent(message)
                     MessageType.Call -> CallLogContent(message, isMine)
+                    MessageType.Voice -> VoiceMessageContent(message, isMine, isPlaying, onVoiceToggle)
                 }
             }
             Row(modifier = Modifier.align(Alignment.End), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -441,12 +517,26 @@ private fun MessageBubble(message: ChatMessage, isMine: Boolean, showSenderName:
 }
 
 @Composable
-private fun MessageInputBar(text: String, enabled: Boolean, isSending: Boolean, attachmentsEnabled: Boolean, hasFailedImage: Boolean, isChatBlocked: Boolean, onMessageTextChanged: (String) -> Unit, onSendMessage: () -> Unit, onImageClick: () -> Unit, onDocumentClick: () -> Unit) {
+private fun MessageInputBar(
+    text: String,
+    enabled: Boolean,
+    isSending: Boolean,
+    attachmentsEnabled: Boolean,
+    hasFailedImage: Boolean,
+    isChatBlocked: Boolean,
+    onMessageTextChanged: (String) -> Unit,
+    onSendMessage: () -> Unit,
+    onImageClick: () -> Unit,
+    onDocumentClick: () -> Unit,
+    onEmojiClick: () -> Unit,
+    onCameraClick: () -> Unit,
+    onMicClick: () -> Unit
+) {
     var menuExpanded by remember { mutableStateOf(false) }
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
-                IconButton(onClick = { /* TODO Emoji */ }) { Icon(Icons.Outlined.EmojiEmotions, contentDescription = null) }
+                IconButton(onClick = onEmojiClick) { Icon(Icons.Outlined.EmojiEmotions, contentDescription = null) }
                 OutlinedTextField(
                     value = text, onValueChange = onMessageTextChanged, modifier = Modifier.weight(1f), enabled = enabled,
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent, disabledBorderColor = Color.Transparent),
@@ -460,12 +550,12 @@ private fun MessageInputBar(text: String, enabled: Boolean, isSending: Boolean, 
                     }
                 }
                 if (text.isBlank()) {
-                    IconButton(onClick = { /* TODO Camera */ }) { Icon(Icons.Outlined.PhotoCamera, null) }
+                    IconButton(onClick = onCameraClick) { Icon(Icons.Outlined.PhotoCamera, null) }
                 }
             }
         }
         FloatingActionButton(
-            onClick = { if (text.isNotBlank()) onSendMessage() else /* TODO Mic */ Unit },
+            onClick = { if (text.isNotBlank()) onSendMessage() else onMicClick() },
             containerColor = ContactMeGreen, contentColor = Color.White, shape = CircleShape, modifier = Modifier.size(48.dp),
             elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
         ) {
@@ -483,6 +573,92 @@ private fun CallLogContent(message: ChatMessage, isMine: Boolean) {
             Column {
                 Text("Voice call", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 Text(message.text.ifBlank { "No answer" }, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmojiPicker(onEmojiSelected: (String) -> Unit) {
+    val emojis = listOf("😀", "😁", "😂", "😊", "😍", "😎", "😢", "😡", "👍", "👎", "❤️", "🤲", "✅", "❌", "🎉", "📷", "🎤", "📄")
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(200.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Emojis", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(minSize = 40.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(emojis.size) { index ->
+                    Text(
+                        text = emojis[index],
+                        modifier = Modifier.clickable { onEmojiSelected(emojis[index]) }.padding(8.dp),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordingBar(durationMillis: Long, onStop: () -> Unit, onCancel: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(Icons.Outlined.Mic, contentDescription = null, tint = Color.Red)
+            Text(
+                text = String.format(Locale.getDefault(), "%02d:%02d", (durationMillis / 1000) / 60, (durationMillis / 1000) % 60),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onCancel) { Text("Cancel", color = MaterialTheme.colorScheme.error) }
+            IconButton(onClick = onStop) {
+                Surface(shape = CircleShape, color = ContactMeGreen) {
+                    Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.padding(8.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceMessageContent(message: ChatMessage, isMine: Boolean, isPlaying: Boolean, onToggle: () -> Unit) {
+    Surface(
+        color = Color.Black.copy(alpha = 0.05f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onToggle() }
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Outlined.PauseCircle else Icons.Outlined.PlayCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Voice message", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                // Assuming durationMillis is stored in message map or similar. Since ChatMessage model doesn't have it explicitly yet, we fallback.
+                // We'll update ChatMessage model if needed, but for now let's show size.
+                Text(message.fileSizeBytes.formatFileSize(), style = MaterialTheme.typography.bodySmall)
             }
         }
     }

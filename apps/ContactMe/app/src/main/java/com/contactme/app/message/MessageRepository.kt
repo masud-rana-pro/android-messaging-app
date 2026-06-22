@@ -28,6 +28,14 @@ interface MessageRepository {
         fileSizeBytes: Long
     ): MessageResult
 
+    suspend fun sendVoiceMessage(
+        conversationId: String,
+        senderId: String,
+        audioUri: Uri,
+        durationMillis: Long,
+        fileSizeBytes: Long
+    ): MessageResult
+
     suspend fun deleteMessage(
         conversationId: String,
         messageId: String,
