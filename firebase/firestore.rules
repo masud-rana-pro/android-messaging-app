@@ -260,19 +260,7 @@ service cloud.firestore {
               && request.resource.data.endedAt == resource.data.endedAt
               && request.resource.data.diff(resource.data).affectedKeys()
                 .hasOnly(["status", "answer", "acceptedAt"])) ||
-            (before == "ringing" && after in ["rejected", "busy"]
-              && request.auth.uid == resource.data.receiverId
-              && request.resource.data.acceptedAt == resource.data.acceptedAt
-              && request.resource.data.endedAt == request.time
-              && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(["status", "endedAt"])) ||
-            (before == "ringing" && after == "cancelled"
-              && request.auth.uid == resource.data.callerId
-              && request.resource.data.acceptedAt == resource.data.acceptedAt
-              && request.resource.data.endedAt == request.time
-              && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(["status", "endedAt"])) ||
-            (before == "ringing" && after in ["missed", "timeout"]
+            (before == "ringing" && after in ["rejected", "busy", "cancelled", "missed", "timeout"]
               && request.resource.data.acceptedAt == resource.data.acceptedAt
               && request.resource.data.endedAt == request.time
               && request.resource.data.diff(resource.data).affectedKeys()
@@ -281,7 +269,14 @@ service cloud.firestore {
               && request.resource.data.acceptedAt == resource.data.acceptedAt
               && request.resource.data.endedAt == request.time
               && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(["status", "endedAt"]))
+                .hasOnly(["status", "endedAt"])) ||
+            (before == "accepted" && after == "connecting"
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"])) ||
+            (before == "connecting" && after == "connected"
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"])) ||
+            (before in ["connecting", "connected"] && after == "ended"
+              && request.resource.data.endedAt == request.time
+              && request.resource.data.diff(resource.data).affectedKeys().hasAll(["status", "endedAt"]))
           );
       }
 

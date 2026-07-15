@@ -1,26 +1,15 @@
 package com.contactme.app.ui.screens
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,7 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -71,6 +62,9 @@ private fun SettingsContent(
     onProfilePhotoClick: () -> Unit,
     onReadReceiptsClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -96,6 +90,7 @@ private fun SettingsContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(scrollState)
                 .padding(
                     horizontal = ContactMeSpacing.screenHorizontal,
                     vertical = ContactMeSpacing.contentGap
@@ -137,11 +132,7 @@ private fun SettingsContent(
                     }
                     Column {
                         Text(
-                            text = if (uiState.isLoadingProfile) {
-                                "Loading..."
-                            } else {
-                                uiState.displayName
-                            },
+                            text = if (uiState.isLoadingProfile) "Loading..." else uiState.displayName,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -153,24 +144,28 @@ private fun SettingsContent(
                     }
                 }
             }
-            uiState.errorMessage?.let { message ->
+            
+            if (uiState.errorMessage != null) {
                 Text(
-                    text = message,
+                    text = uiState.errorMessage,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error
                 )
             }
+            
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onEditProfile
             ) {
                 Text(text = "Edit profile")
             }
+            
             Text(
                 text = "Privacy",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
+            
             PrivacyChoiceItem(
                 title = "Last seen",
                 value = uiState.privacySettings.lastSeenVisibility.toDisplayText(),
@@ -189,6 +184,39 @@ private fun SettingsContent(
                 enabled = !uiState.isSavingPrivacy,
                 onClick = onReadReceiptsClick
             )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            Text(
+                text = "Calling Optimization",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
+                    }
+                    context.startActivity(intent)
+                }
+            ) {
+                Text("Open Notification Settings")
+            }
+
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    runCatching { context.startActivity(intent) }
+                }
+            ) {
+                Text("Optimize Battery for Calls")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onSignOut

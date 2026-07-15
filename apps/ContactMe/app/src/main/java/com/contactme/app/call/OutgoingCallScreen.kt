@@ -22,6 +22,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import org.webrtc.PeerConnection
 import java.util.Locale
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
+import androidx.compose.ui.text.style.TextAlign
 import com.contactme.app.ui.theme.ContactMeGreen
 
 @Composable
@@ -30,6 +34,7 @@ fun OutgoingCallScreen(
     onCallEnded: () -> Unit,
     viewModel: OutgoingCallViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var hasMicrophonePermission by remember { mutableStateOf(false) }
 
@@ -43,7 +48,13 @@ fun OutgoingCallScreen(
     }
 
     LaunchedEffect(Unit) {
-        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        val permissionState = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+        if (permissionState == PackageManager.PERMISSION_GRANTED) {
+            hasMicrophonePermission = true
+            viewModel.startCall(receiverId, CallType.Audio)
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     LaunchedEffect(uiState.status) {

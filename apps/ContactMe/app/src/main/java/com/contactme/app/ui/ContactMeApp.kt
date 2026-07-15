@@ -30,6 +30,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.os.Build
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import com.contactme.app.navigation.AppScreen
 import com.contactme.app.navigation.ChatTarget
 import com.contactme.app.ui.notification.DeviceTokenSyncViewModel
@@ -62,8 +71,23 @@ fun ContactMeApp(
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var currentScreen by remember { mutableStateOf(AppScreen.Splash) }
+    var previousScreen by remember { mutableStateOf(AppScreen.Home) }
     val incomingCallState by incomingCallViewModel.uiState.collectAsState()
     val isOpeningChat by conversationViewModel.isOpeningChat.collectAsState()
+    val context = LocalContext.current
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            Log.d("ContactMeApp", "Notification permission granted: $isGranted")
+        }
+    )
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     var selectedChatTarget by remember {
         mutableStateOf(ChatTarget(title = "ContactMe User", conversationId = null))
@@ -72,11 +96,19 @@ fun ContactMeApp(
     fun openChat(target: ChatTarget) {
         Log.d("ContactMeApp", "openChat: target=$target")
         selectedChatTarget = target
+        previousScreen = currentScreen
         currentScreen = AppScreen.ChatDetail
     }
 
     fun openOutgoingCall(receiverId: String) {
-        selectedChatTarget = ChatTarget(title = "Calling...", conversationId = receiverId)
+        Log.d("ContactMeApp", "openOutgoingCall: receiverId=$receiverId")
+        selectedChatTarget = ChatTarget(
+            title = selectedChatTarget.title,
+            conversationId = receiverId,
+            photoUrl = selectedChatTarget.photoUrl,
+            type = selectedChatTarget.type
+        )
+        previousScreen = currentScreen
         currentScreen = AppScreen.OutgoingCall
     }
 
@@ -229,13 +261,13 @@ fun ContactMeApp(
 
                 AppScreen.OutgoingCall -> OutgoingCallScreen(
                     receiverId = selectedChatTarget.conversationId.orEmpty(),
-                    onCallEnded = { currentScreen = AppScreen.Home }
+                    onCallEnded = { currentScreen = previousScreen }
                 )
 
                 AppScreen.IncomingCall -> IncomingCallScreen(
                     onCallDismissed = {
                         incomingCallViewModel.onCallScreenDismissed()
-                        currentScreen = AppScreen.Home
+                        currentScreen = previousScreen
                     },
                     viewModel = incomingCallViewModel
                 )

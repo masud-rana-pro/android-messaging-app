@@ -6,6 +6,7 @@ import com.contactme.app.auth.AuthRepository
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.firestore.SetOptions
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.tasks.await
@@ -80,7 +81,7 @@ class FirebaseDeviceTokenRepository @Inject constructor(
         // Mirror latest token to user profile for server-side lookup (Step 92)
         firestore.collection(USERS_COLLECTION)
             .document(userId)
-            .update("fcmToken", token)
+            .set(mapOf("fcmToken" to token), SetOptions.merge())
             .await()
 
         firestore.collection(USER_DEVICES_COLLECTION)

@@ -46,17 +46,24 @@ class OutgoingCallViewModel @Inject constructor(
             Log.e(TAG, "startCall failed: receiverId is blank")
             return
         }
+        if (currentCallId != null && uiState.value.status != CallStatus.Ended) {
+            Log.w(TAG, "startCall: Call already in progress, ID: $currentCallId")
+            return
+        }
         val callerId = authRepository.currentUserId() ?: return
         Log.d(TAG, "Starting $type call to $receiverId from $callerId")
         
         viewModelScope.launch {
             val receiverProfile = profileRepository.getProfile(receiverId)
+            Log.d(TAG, "Resolved receiver profile: ${receiverProfile?.displayName}, FCM: ${receiverProfile?.userId}")
+            // Note: receiverProfile doesn't have fcmToken in our UserProfile model, but it is in Firestore.
+            // We should ensure the receiver has a token.
             _uiState.update { it.copy(status = CallStatus.Ringing, receiverId = receiverId, receiverProfile = receiverProfile) }
         }
 
         webRtcEngine.initialize(callerId, object : WebRtcCallEngine.Listener {
             override fun onLocalDescription(sdp: String) {
-                Log.d(TAG, "Local description created")
+                Log.d(TAG, "Local description created, sending offer...")
                 viewModelScope.launch {
                     val result = callRepository.createCallOffer(callerId, receiverId, type, sdp)
                     if (result is CallResult.Created) {
