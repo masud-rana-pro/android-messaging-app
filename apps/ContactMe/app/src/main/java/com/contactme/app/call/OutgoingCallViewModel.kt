@@ -22,6 +22,9 @@ import org.json.JSONObject
 import org.webrtc.PeerConnection
 import javax.inject.Inject
 
+import org.webrtc.VideoTrack
+import org.webrtc.SurfaceViewRenderer
+
 @HiltViewModel
 class OutgoingCallViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -56,12 +59,10 @@ class OutgoingCallViewModel @Inject constructor(
         viewModelScope.launch {
             val receiverProfile = profileRepository.getProfile(receiverId)
             Log.d(TAG, "Resolved receiver profile: ${receiverProfile?.displayName}, FCM: ${receiverProfile?.userId}")
-            // Note: receiverProfile doesn't have fcmToken in our UserProfile model, but it is in Firestore.
-            // We should ensure the receiver has a token.
-            _uiState.update { it.copy(status = CallStatus.Ringing, receiverId = receiverId, receiverProfile = receiverProfile) }
+            _uiState.update { it.copy(status = CallStatus.Ringing, receiverId = receiverId, receiverProfile = receiverProfile, callType = type) }
         }
 
-        webRtcEngine.initialize(callerId, object : WebRtcCallEngine.Listener {
+        webRtcEngine.initialize(callerId, type, object : WebRtcCallEngine.Listener {
             override fun onLocalDescription(sdp: String) {
                 Log.d(TAG, "Local description created, sending offer...")
                 viewModelScope.launch {
@@ -111,6 +112,11 @@ class OutgoingCallViewModel @Inject constructor(
 
             override fun onAudioTrackAdded() {
                 Log.d(TAG, "Remote audio track added")
+            }
+
+            override fun onVideoTrackAdded(track: VideoTrack) {
+                Log.d(TAG, "Remote video track added")
+                _uiState.update { it.copy(remoteVideoTrack = track) }
             }
         })
 
@@ -219,6 +225,19 @@ class OutgoingCallViewModel @Inject constructor(
         _uiState.update { it.copy(isSpeakerEnabled = newState) }
     }
 
+    fun setupLocalVideo(renderer: SurfaceViewRenderer) {
+        webRtcEngine.setupLocalVideo(renderer)
+    }
+
+    fun setupRemoteVideo(renderer: SurfaceViewRenderer) {
+        val track = uiState.value.remoteVideoTrack ?: return
+        webRtcEngine.setupRemoteVideo(track, renderer)
+    }
+
+    fun switchCamera() {
+        webRtcEngine.switchCamera()
+    }
+
     private fun cleanup() {
         Log.d(TAG, "Cleaning up outgoing call")
         CallForegroundService.stop(context)
@@ -241,10 +260,12 @@ class OutgoingCallViewModel @Inject constructor(
 
 data class OutgoingCallUiState(
     val status: CallStatus = CallStatus.Ringing,
+    val callType: CallType = CallType.Audio,
     val receiverId: String = "",
     val receiverProfile: UserProfile? = null,
     val isMuted: Boolean = false,
     val isSpeakerEnabled: Boolean = false,
     val connectionState: PeerConnection.PeerConnectionState = PeerConnection.PeerConnectionState.NEW,
-    val durationSeconds: Long = 0L
+    val durationSeconds: Long = 0L,
+    val remoteVideoTrack: VideoTrack? = null
 )

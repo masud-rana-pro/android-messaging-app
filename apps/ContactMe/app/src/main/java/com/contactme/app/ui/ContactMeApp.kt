@@ -39,6 +39,7 @@ import android.content.Intent
 import android.provider.Settings
 import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
+import com.contactme.app.call.CallType
 import com.contactme.app.navigation.AppScreen
 import com.contactme.app.navigation.ChatTarget
 import com.contactme.app.ui.notification.DeviceTokenSyncViewModel
@@ -100,10 +101,10 @@ fun ContactMeApp(
         currentScreen = AppScreen.ChatDetail
     }
 
-    fun openOutgoingCall(receiverId: String) {
-        Log.d("ContactMeApp", "openOutgoingCall: receiverId=$receiverId")
+    fun openOutgoingCall(receiverId: String, type: CallType = CallType.Audio) {
+        Log.d("ContactMeApp", "openOutgoingCall: receiverId=$receiverId, type=$type")
         selectedChatTarget = ChatTarget(
-            title = selectedChatTarget.title,
+            title = if (type == CallType.Video) "Video Calling..." else "Calling...",
             conversationId = receiverId,
             photoUrl = selectedChatTarget.photoUrl,
             type = selectedChatTarget.type
@@ -256,11 +257,13 @@ fun ContactMeApp(
                     chatPhotoUrl = selectedChatTarget.photoUrl,
                     conversationType = selectedChatTarget.type,
                     onBack = { currentScreen = AppScreen.Home },
-                    onVoiceCallClick = { receiverId -> openOutgoingCall(receiverId) }
+                    onVoiceCallClick = { receiverId -> openOutgoingCall(receiverId, CallType.Audio) },
+                    onVideoCallClick = { receiverId -> openOutgoingCall(receiverId, CallType.Video) }
                 )
 
                 AppScreen.OutgoingCall -> OutgoingCallScreen(
                     receiverId = selectedChatTarget.conversationId.orEmpty(),
+                    callType = if (selectedChatTarget.title == "Video Calling...") CallType.Video else CallType.Audio,
                     onCallEnded = { currentScreen = previousScreen }
                 )
 
