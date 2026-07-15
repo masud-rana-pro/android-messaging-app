@@ -77,6 +77,7 @@ fun ChatDetailScreen(
     conversationType: ConversationType = ConversationType.Direct,
     onBack: () -> Unit,
     onVoiceCallClick: (String) -> Unit,
+    onVideoCallClick: (String) -> Unit,
     viewModel: ChatDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -100,6 +101,7 @@ fun ChatDetailScreen(
         uiState = uiState,
         onBack = onBack,
         onVoiceCallClick = { onVoiceCallClick(uiState.peerUserId ?: "") },
+        onVideoCallClick = { onVideoCallClick(uiState.peerUserId ?: "") },
         onMessageTextChanged = viewModel::onMessageTextChanged,
         onSendMessage = viewModel::sendMessage,
         onRetryImageMessage = viewModel::retryFailedImageMessage,
@@ -134,6 +136,7 @@ private fun ChatDetailContent(
     uiState: ChatDetailUiState,
     onBack: () -> Unit,
     onVoiceCallClick: () -> Unit,
+    onVideoCallClick: () -> Unit,
     onMessageTextChanged: (String) -> Unit,
     onSendMessage: () -> Unit,
     onRetryImageMessage: () -> Unit,
@@ -187,9 +190,11 @@ private fun ChatDetailContent(
     )
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted ->
-            Log.d("ChatDetailScreen", "Permission result: $granted")
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { permissions ->
+            val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
+            val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
+            Log.d("ChatDetailScreen", "Permissions result: audio=$audioGranted, camera=$cameraGranted")
         }
     )
 
@@ -203,7 +208,7 @@ private fun ChatDetailContent(
             cameraLauncher.launch(uri)
         } else {
             Log.d("ChatDetailScreen", "Requesting camera permission")
-            permissionLauncher.launch(Manifest.permission.CAMERA)
+            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
         }
     }
 
@@ -213,7 +218,7 @@ private fun ChatDetailContent(
             onStartRecording(cacheDir)
         } else {
             Log.d("ChatDetailScreen", "Requesting audio permission")
-            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
         }
     }
 
@@ -229,7 +234,23 @@ private fun ChatDetailContent(
             }
         } else {
             Log.d("ChatDetailScreen", "Requesting audio permission for call")
-            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+        }
+    }
+
+    fun startVideoCall() {
+        Log.d("ChatDetailScreen", "startVideoCall called for peer: ${uiState.peerUserId}")
+        val hasAudio = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val hasCamera = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        
+        if (hasAudio && hasCamera) {
+            if (uiState.peerUserId != null) {
+                isStartingCall = true
+                onVideoCallClick()
+            }
+        } else {
+            Log.d("ChatDetailScreen", "Requesting permissions for video call")
+            permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
         }
     }
 
@@ -289,7 +310,7 @@ private fun ChatDetailContent(
                 },
                 actions = {
                     if (conversationId != null && conversationType == ConversationType.Direct) {
-                        IconButton(enabled = false, onClick = { /* Video Call Coming Soon */ }) {
+                        IconButton(onClick = { startVideoCall() }) {
                             Icon(imageVector = Icons.Outlined.Videocam, contentDescription = "Video Call")
                         }
                         IconButton(onClick = { startVoiceCall() }) {
@@ -819,4 +840,4 @@ private fun String.profileInitials(): String = trim().split(" ").filter { it.isN
 
 @Composable private fun HeaderBackButton(onClick: () -> Unit) { IconButton(onClick = onClick) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } }
 
-@Preview(showBackground = true) @Composable private fun ChatDetailScreenPreview() { ContactMeTheme { ChatDetailScreen(chatName = "ContactMe User", conversationId = null, onBack = {}, onVoiceCallClick = {}) } }
+@Preview(showBackground = true) @Composable private fun ChatDetailScreenPreview() { ContactMeTheme { ChatDetailScreen(chatName = "ContactMe User", conversationId = null, onBack = {}, onVoiceCallClick = {}, onVideoCallClick = {}) } }

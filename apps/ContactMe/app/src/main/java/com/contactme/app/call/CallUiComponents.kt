@@ -17,8 +17,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import org.webrtc.PeerConnection
-import com.contactme.app.ui.theme.ContactMeGreen
 import java.util.Locale
+import com.contactme.app.ui.theme.ContactMeGreen
+import androidx.compose.ui.viewinterop.AndroidView
+import org.webrtc.SurfaceViewRenderer
+import org.webrtc.RendererCommon
+
+@Composable
+fun VideoRenderer(
+    modifier: Modifier = Modifier,
+    onSurfaceReady: (SurfaceViewRenderer) -> Unit
+) {
+    AndroidView(
+        factory = { context ->
+            SurfaceViewRenderer(context).apply {
+                init(WebRtcEngineFactory.staticEglContext, null)
+                setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+                setMirror(true)
+                onSurfaceReady(this)
+            }
+        },
+        modifier = modifier
+    )
+}
 
 @Composable
 fun CallPeerInfo(

@@ -16,6 +16,10 @@ class WebRtcEngineFactory @Inject constructor(
 ) {
     private val eglBase: EglBase by lazy { EglBase.create() }
 
+    init {
+        staticEglContext = eglBase.eglBaseContext
+    }
+
     private val factory: PeerConnectionFactory by lazy {
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(context).createInitializationOptions()
@@ -34,4 +38,8 @@ class WebRtcEngineFactory @Inject constructor(
     fun peerConnectionFactory(): PeerConnectionFactory = factory
 
     fun eglContext(): EglBase.Context = eglBase.eglBaseContext
+
+    companion object {
+        lateinit var staticEglContext: EglBase.Context
+    }
 }

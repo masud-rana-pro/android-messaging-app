@@ -16,6 +16,9 @@ import kotlinx.coroutines.launch
 import org.webrtc.PeerConnection
 import javax.inject.Inject
 
+import org.webrtc.VideoTrack
+import org.webrtc.SurfaceViewRenderer
+
 @HiltViewModel
 class IncomingCallViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -62,7 +65,7 @@ class IncomingCallViewModel @Inject constructor(
 
         CallForegroundService.start(context, call.callId)
 
-        webRtcEngine.initialize(currentUserId, object : WebRtcCallEngine.Listener {
+        webRtcEngine.initialize(currentUserId, call.type, object : WebRtcCallEngine.Listener {
             override fun onLocalDescription(sdp: String) {
                 Log.d(TAG, "Local description created (answer)")
                 viewModelScope.launch {
@@ -97,6 +100,11 @@ class IncomingCallViewModel @Inject constructor(
 
             override fun onAudioTrackAdded() {
                 Log.d(TAG, "Remote audio track added")
+            }
+
+            override fun onVideoTrackAdded(track: VideoTrack) {
+                Log.d(TAG, "Remote video track added")
+                _uiState.update { it.copy(remoteVideoTrack = track) }
             }
         })
 
@@ -136,6 +144,19 @@ class IncomingCallViewModel @Inject constructor(
         val newState = !uiState.value.isSpeakerEnabled
         webRtcEngine.setSpeakerEnabled(newState)
         _uiState.update { it.copy(isSpeakerEnabled = newState) }
+    }
+
+    fun setupLocalVideo(renderer: SurfaceViewRenderer) {
+        webRtcEngine.setupLocalVideo(renderer)
+    }
+
+    fun setupRemoteVideo(renderer: SurfaceViewRenderer) {
+        val track = uiState.value.remoteVideoTrack ?: return
+        webRtcEngine.setupRemoteVideo(track, renderer)
+    }
+
+    fun switchCamera() {
+        webRtcEngine.switchCamera()
     }
 
     private fun observeCall(callId: String) {
@@ -221,5 +242,6 @@ data class IncomingCallUiState(
     val isMuted: Boolean = false,
     val isSpeakerEnabled: Boolean = false,
     val connectionState: PeerConnection.PeerConnectionState = PeerConnection.PeerConnectionState.NEW,
-    val durationSeconds: Long = 0L
+    val durationSeconds: Long = 0L,
+    val remoteVideoTrack: VideoTrack? = null
 )
