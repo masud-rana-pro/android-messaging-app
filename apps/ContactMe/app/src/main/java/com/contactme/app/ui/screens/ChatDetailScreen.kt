@@ -160,7 +160,13 @@ private fun ChatDetailContent(
     val listState = rememberLazyListState()
     var selectedMessageForActions by remember { mutableStateOf<ChatMessage?>(null) }
     var isEmojiPanelVisible by remember { mutableStateOf(false) }
+    var isStartingCall by remember { mutableStateOf(false) }
     
+    LaunchedEffect(uiState.messages) {
+        // Reset starting call state once we receive updates (indicating we are active in chat)
+        isStartingCall = false
+    }
+
     val context = LocalContext.current
     val cacheDir = context.cacheDir
     
@@ -212,9 +218,11 @@ private fun ChatDetailContent(
     }
 
     fun startVoiceCall() {
+        if (isStartingCall) return
         Log.d("ChatDetailScreen", "startVoiceCall called for peer: ${uiState.peerUserId}")
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             if (uiState.peerUserId != null) {
+                isStartingCall = true
                 onVoiceCallClick()
             } else {
                 Log.e("ChatDetailScreen", "startVoiceCall failed: peerUserId is null")

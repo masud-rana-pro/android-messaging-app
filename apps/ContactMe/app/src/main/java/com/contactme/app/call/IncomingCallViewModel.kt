@@ -44,9 +44,10 @@ class IncomingCallViewModel @Inject constructor(
         incomingCallsJob?.cancel()
         incomingCallsJob = viewModelScope.launch {
             callRepository.listenForIncomingCalls(userId).collectLatest { calls ->
+                Log.d(TAG, "Incoming calls update: count=${calls.size}")
                 val ringingCall = calls.firstOrNull { it.status == CallStatus.Ringing && it.type == CallType.Audio }
                 if (ringingCall != null && ringingCall.callId != _uiState.value.activeCall?.callId) {
-                    Log.d(TAG, "New incoming call detected: ${ringingCall.callId}")
+                    Log.d(TAG, "New active incoming call detected: ${ringingCall.callId}")
                     val callerProfile = profileRepository.getProfile(ringingCall.callerId)
                     _uiState.update { it.copy(activeCall = ringingCall, status = CallStatus.Ringing, callerProfile = callerProfile) }
                 }
