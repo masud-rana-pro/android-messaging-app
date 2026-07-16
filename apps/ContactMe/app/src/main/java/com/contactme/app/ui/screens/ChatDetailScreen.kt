@@ -195,6 +195,13 @@ private fun ChatDetailContent(
             val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
             val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
             Log.d("ChatDetailScreen", "Permissions result: audio=$audioGranted, camera=$cameraGranted")
+            
+            if (audioGranted && !isStartingCall) {
+                // If this was a voice call attempt
+                if (cameraGranted) {
+                   // Possible video call or just both granted
+                }
+            }
         }
     )
 
@@ -225,12 +232,12 @@ private fun ChatDetailContent(
     fun startVoiceCall() {
         if (isStartingCall) return
         Log.d("ChatDetailScreen", "startVoiceCall called for peer: ${uiState.peerUserId}")
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+        val hasAudio = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        
+        if (hasAudio) {
             if (uiState.peerUserId != null) {
                 isStartingCall = true
                 onVoiceCallClick()
-            } else {
-                Log.e("ChatDetailScreen", "startVoiceCall failed: peerUserId is null")
             }
         } else {
             Log.d("ChatDetailScreen", "Requesting audio permission for call")
@@ -239,6 +246,7 @@ private fun ChatDetailContent(
     }
 
     fun startVideoCall() {
+        if (isStartingCall) return
         Log.d("ChatDetailScreen", "startVideoCall called for peer: ${uiState.peerUserId}")
         val hasAudio = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val hasCamera = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
