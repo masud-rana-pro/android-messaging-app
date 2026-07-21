@@ -6,7 +6,10 @@ import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.SetOptions
 import com.contactme.app.profile.PrivacyVisibility
 import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
@@ -25,7 +28,23 @@ class FirebasePresenceRepository @Inject constructor(
     ): Flow<PresenceStatus> = callbackFlow {
         var presenceReference: DatabaseReference? = null
         var presenceListener: ValueEventListener? = null
+        var profileRegistration: ListenerRegistration? = null
         var canShowLastSeen = true
+        var realtimePresence = PresenceStatus()
+        var profilePresence = PresenceStatus()
+
+        fun emitPresence() {
+            trySend(
+                PresenceStatus(
+                    isOnline = realtimePresence.isOnline || profilePresence.isOnline,
+                    lastSeenAtMillis = maxOf(
+                        realtimePresence.lastSeenAtMillis,
+                        profilePresence.lastSeenAtMillis
+                    ),
+                    canShowLastSeen = canShowLastSeen
+                )
+            )
+        }
 
         fun clearPresenceListener() {
             val reference = presenceReference
@@ -37,6 +56,10 @@ class FirebasePresenceRepository @Inject constructor(
 
             presenceReference = null
             presenceListener = null
+            profileRegistration?.remove()
+            profileRegistration = null
+            realtimePresence = PresenceStatus()
+            profilePresence = PresenceStatus()
         }
 
         val conversationRegistration = firestore.collection(CONVERSATIONS_COLLECTION)
@@ -72,22 +95,35 @@ class FirebasePresenceRepository @Inject constructor(
                         .child(peerUserId)
                     val nextListener = object : ValueEventListener {
                         override fun onDataChange(snapshot: DataSnapshot) {
-                            trySend(
-                                PresenceStatus(
-                                    isOnline = snapshot.child("isOnline").getValue(Boolean::class.java) ?: false,
-                                    lastSeenAtMillis = snapshot.child("lastSeenAt").getValue(Long::class.java) ?: 0L,
-                                    canShowLastSeen = canShowLastSeen
-                                )
+                            realtimePresence = PresenceStatus(
+                                isOnline = snapshot.child("isOnline").getValue(Boolean::class.java) ?: false,
+                                lastSeenAtMillis = snapshot.child("lastSeenAt").getValue(Long::class.java) ?: 0L,
+                                canShowLastSeen = canShowLastSeen
                             )
+                            emitPresence()
                         }
 
                         override fun onCancelled(error: DatabaseError) {
-                            trySend(PresenceStatus())
+                            emitPresence()
                         }
                     }
+                    val nextProfileRegistration = firestore.collection(USERS_COLLECTION)
+                        .document(peerUserId)
+                        .addSnapshotListener { profile, _ ->
+                            profilePresence = PresenceStatus(
+                                isOnline = profile?.getBoolean("isOnline") ?: false,
+                                lastSeenAtMillis = profile?.getTimestamp("lastSeenAt")?.toDate()?.time
+                                    ?: profile?.getTimestamp("updatedAt")?.toDate()?.time
+                                    ?: profile?.getTimestamp("createdAt")?.toDate()?.time
+                                    ?: 0L,
+                                canShowLastSeen = canShowLastSeen
+                            )
+                            emitPresence()
+                        }
 
                     presenceReference = nextReference
                     presenceListener = nextListener
+                    profileRegistration = nextProfileRegistration
                     nextReference.addValueEventListener(nextListener)
                 }
             }
@@ -148,6 +184,18 @@ class FirebasePresenceRepository @Inject constructor(
             presenceReference.onDisconnect().setValue(offlineState).await()
             presenceReference.setValue(onlineState).await()
         }
+        runCatching {
+            firestore.collection(USERS_COLLECTION)
+                .document(userId)
+                .set(
+                    mapOf(
+                        "isOnline" to true,
+                        "lastSeenAt" to FieldValue.serverTimestamp()
+                    ),
+                    SetOptions.merge()
+                )
+                .await()
+        }
     }
 
     override suspend fun markOffline(userId: String) {
@@ -161,6 +209,18 @@ class FirebasePresenceRepository @Inject constructor(
                 .child(PRESENCE_PATH)
                 .child(userId)
                 .setValue(offlineState)
+                .await()
+        }
+        runCatching {
+            firestore.collection(USERS_COLLECTION)
+                .document(userId)
+                .set(
+                    mapOf(
+                        "isOnline" to false,
+                        "lastSeenAt" to FieldValue.serverTimestamp()
+                    ),
+                    SetOptions.merge()
+                )
                 .await()
         }
     }

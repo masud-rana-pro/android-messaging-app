@@ -53,7 +53,7 @@ fun IncomingCallScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    CallScreenSurface {
         val call = uiState.activeCall
         if (call != null) {
             if (uiState.status == CallStatus.Ringing) {
@@ -119,7 +119,7 @@ private fun IncomingRingingLayout(
         ) {
             FloatingActionButton(
                 onClick = onReject,
-                containerColor = Color.Red,
+                containerColor = MaterialTheme.colorScheme.error,
                 contentColor = Color.White,
                 shape = CircleShape,
                 modifier = Modifier.size(72.dp)
@@ -129,8 +129,8 @@ private fun IncomingRingingLayout(
 
             FloatingActionButton(
                 onClick = onAccept,
-                containerColor = Color.Green,
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = CircleShape,
                 modifier = Modifier.size(72.dp)
             ) {
@@ -184,17 +184,14 @@ private fun IncomingVideoCallLayout(
                 viewModel.setupRemoteVideo(renderer)
             }
         } else {
-            Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color.White)
-            }
+            CallVideoPlaceholder(modifier = Modifier.fillMaxSize())
         }
 
-        Box(
+        LocalVideoPreviewContainer(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(16.dp)
                 .size(width = 120.dp, height = 180.dp)
-                .background(Color.Black, shape = MaterialTheme.shapes.medium)
         ) {
             VideoRenderer(modifier = Modifier.fillMaxSize()) { renderer ->
                 viewModel.setupLocalVideo(renderer)
@@ -208,12 +205,12 @@ private fun IncomingVideoCallLayout(
             Text(
                 text = uiState.callerProfile?.displayName ?: "ContactMe User",
                 style = MaterialTheme.typography.titleLarge,
-                color = Color.White
+                color = CallTextPrimary
             )
             Text(
                 text = getCallStatusLabel(uiState.status, uiState.connectionState),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f)
+                color = CallTextSecondary
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -224,7 +221,7 @@ private fun IncomingVideoCallLayout(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = viewModel::switchCamera) {
-                    Icon(Icons.Default.FlipCameraAndroid, contentDescription = "Switch Camera", tint = Color.White)
+                    Icon(Icons.Default.FlipCameraAndroid, contentDescription = "Switch Camera", tint = CallTextPrimary)
                 }
                 
                 CallControlBar(

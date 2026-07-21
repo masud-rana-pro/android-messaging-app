@@ -8,6 +8,7 @@ import androidx.work.WorkInfo
 import com.contactme.app.auth.AuthRepository
 import com.contactme.app.conversation.ConversationRepository
 import com.contactme.app.conversation.ConversationType
+import com.contactme.app.call.CallType
 import com.contactme.app.message.MessageRepository
 import com.contactme.app.message.MessageResult
 import com.contactme.app.message.ChatMessage
@@ -387,7 +388,11 @@ class ChatDetailViewModel @Inject constructor(
                         MessageType.Text -> message.text.take(120)
                         MessageType.Image -> "Photo"
                         MessageType.Document -> message.fileName.ifBlank { "Document" }
-                        MessageType.Call -> "Voice call"
+                        MessageType.Call -> if (message.text.startsWith("Video call", ignoreCase = true)) {
+                            "Video call"
+                        } else {
+                            "Voice call"
+                        }
                         MessageType.Voice -> "Voice message"
                     },
                     type = message.type
@@ -697,6 +702,29 @@ class ChatDetailViewModel @Inject constructor(
                             errorMessage = result.message
                         )
                     }
+                }
+            }
+        }
+    }
+
+    fun startGroupCall(callType: CallType, roomUrl: String, onStarted: () -> Unit) {
+        val conversationId = activeConversationId
+        val senderId = authRepository.currentUserId()
+        if (activeConversationType != ConversationType.Group || conversationId == null || senderId == null) {
+            _uiState.update { it.copy(errorMessage = "Open a group chat first.") }
+            return
+        }
+        if (_uiState.value.isSending) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSending = true, errorMessage = null, statusMessage = null) }
+            val label = if (callType == CallType.Video) "Group video call" else "Group audio call"
+            when (messageRepository.sendGroupCallInvitation(conversationId, senderId, "$label · Join now", roomUrl)) {
+                MessageResult.Success -> {
+                    _uiState.update { it.copy(isSending = false, statusMessage = "$label started.") }
+                    onStarted()
+                }
+                is MessageResult.Error -> {
+                    _uiState.update { it.copy(isSending = false, errorMessage = "Group call could not be started.") }
                 }
             }
         }

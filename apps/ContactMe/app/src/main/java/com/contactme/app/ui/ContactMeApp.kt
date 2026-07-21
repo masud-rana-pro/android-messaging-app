@@ -40,6 +40,8 @@ import android.provider.Settings
 import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
 import com.contactme.app.call.CallType
+import com.contactme.app.call.ActiveCallStore
+import com.contactme.app.conversation.ConversationType
 import com.contactme.app.navigation.AppScreen
 import com.contactme.app.navigation.ChatTarget
 import com.contactme.app.ui.notification.DeviceTokenSyncViewModel
@@ -93,6 +95,9 @@ fun ContactMeApp(
     var selectedChatTarget by remember {
         mutableStateOf(ChatTarget(title = "ContactMe User", conversationId = null))
     }
+    var currentCallPeerId by remember { mutableStateOf("") }
+    var currentCallType by remember { mutableStateOf(CallType.Audio) }
+    var shouldStartOutgoingCall by remember { mutableStateOf(true) }
 
     fun openChat(target: ChatTarget) {
         Log.d("ContactMeApp", "openChat: target=$target")
@@ -103,17 +108,40 @@ fun ContactMeApp(
 
     fun openOutgoingCall(receiverId: String, type: CallType = CallType.Audio) {
         Log.d("ContactMeApp", "openOutgoingCall: receiverId=$receiverId, type=$type")
-        selectedChatTarget = ChatTarget(
-            title = if (type == CallType.Video) "Video Calling..." else "Calling...",
-            conversationId = receiverId,
-            photoUrl = selectedChatTarget.photoUrl,
-            type = selectedChatTarget.type
-        )
+        currentCallPeerId = receiverId
+        currentCallType = type
+        shouldStartOutgoingCall = true
         previousScreen = currentScreen
         currentScreen = AppScreen.OutgoingCall
     }
 
+    fun openStoredCallIfPossible(): Boolean {
+        val activeCall = ActiveCallStore.read(context) ?: return false
+        return when (activeCall.role) {
+            ActiveCallStore.ROLE_OUTGOING -> {
+                currentCallPeerId = activeCall.peerId
+                currentCallType = activeCall.type
+                shouldStartOutgoingCall = false
+                currentScreen = AppScreen.OutgoingCall
+                true
+            }
+            ActiveCallStore.ROLE_INCOMING -> {
+                incomingCallViewModel.openCallFromNotification(activeCall.callId) {
+                    currentScreen = AppScreen.IncomingCall
+                }
+                true
+            }
+            else -> false
+        }
+    }
+
+    fun isCallScreenActive(): Boolean =
+        currentScreen == AppScreen.OutgoingCall || currentScreen == AppScreen.IncomingCall
+
+    fun hasStoredActiveCall(): Boolean = ActiveCallStore.read(context) != null
+
     fun openNotificationChatIfPossible(target: ChatTarget) {
+        if (isCallScreenActive() || hasStoredActiveCall()) return
         selectedChatTarget = target
         currentScreen = AppScreen.ChatDetail
     }
@@ -141,7 +169,7 @@ fun ContactMeApp(
 
     LaunchedEffect(incomingCallState.activeCall) {
         val call = incomingCallState.activeCall
-        if (call != null && currentScreen != AppScreen.IncomingCall) {
+        if (call != null && currentScreen != AppScreen.IncomingCall && currentScreen != AppScreen.OutgoingCall) {
             currentScreen = AppScreen.IncomingCall
         }
     }
@@ -149,9 +177,11 @@ fun ContactMeApp(
     LaunchedEffect(notificationChatTarget, currentScreen) {
         val target = notificationChatTarget ?: return@LaunchedEffect
         if (
-            currentScreen == AppScreen.Home ||
+            !isCallScreenActive() &&
+            !hasStoredActiveCall() &&
+            (currentScreen == AppScreen.Home ||
             currentScreen == AppScreen.ChatDetail ||
-            currentScreen == AppScreen.Settings
+            currentScreen == AppScreen.Settings)
         ) {
             openNotificationChatIfPossible(target)
             onNotificationChatTargetConsumed()
@@ -160,9 +190,20 @@ fun ContactMeApp(
 
     LaunchedEffect(notificationCallId) {
         val callId = notificationCallId ?: return@LaunchedEffect
-        // The IncomingCallViewModel will likely detect this via Firestore, 
-        // but we consume the intent signal here.
-        onNotificationCallConsumed()
+        val stored = ActiveCallStore.read(context)
+        if (stored?.callId == callId && stored.role == ActiveCallStore.ROLE_OUTGOING) {
+            currentCallPeerId = stored.peerId
+            currentCallType = stored.type
+            shouldStartOutgoingCall = false
+            currentScreen = AppScreen.OutgoingCall
+            onNotificationCallConsumed()
+        } else {
+            incomingCallViewModel.openCallFromNotification(callId) {
+                previousScreen = currentScreen
+                currentScreen = AppScreen.IncomingCall
+                onNotificationCallConsumed()
+            }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -173,8 +214,10 @@ fun ContactMeApp(
             when (currentScreen) {
                 AppScreen.Splash -> SplashScreen(
                     onSplashFinished = {
-                        sessionViewModel.resolveStartScreen { startScreen ->
-                            currentScreen = startScreen
+                        if (!openStoredCallIfPossible()) {
+                            sessionViewModel.resolveStartScreen { startScreen ->
+                                currentScreen = startScreen
+                            }
                         }
                     }
                 )
@@ -193,44 +236,59 @@ fun ContactMeApp(
 
                 AppScreen.Home -> HomeScreen(
                     onConversationSelected = { conversationId, chatName, photoUrl, type ->
-                        openChat(
-                            ChatTarget(
-                                title = chatName,
-                                conversationId = conversationId,
-                                photoUrl = photoUrl,
-                                type = type
-                            )
-                        )
-                    },
-                    onDiscoveredUserSelected = { userProfile ->
-                        conversationViewModel.openDirectConversation(userProfile) { conversationId, chatName, photoUrl ->
+                        if (!openStoredCallIfPossible()) {
                             openChat(
                                 ChatTarget(
                                     title = chatName,
                                     conversationId = conversationId,
-                                    photoUrl = photoUrl
+                                    photoUrl = photoUrl,
+                                    type = type
                                 )
                             )
                         }
                     },
+                    onDiscoveredUserSelected = { userProfile ->
+                        if (!openStoredCallIfPossible()) {
+                            conversationViewModel.openDirectConversation(userProfile) { conversationId, chatName, photoUrl ->
+                                openChat(
+                                    ChatTarget(
+                                        title = chatName,
+                                        conversationId = conversationId,
+                                        photoUrl = photoUrl
+                                    )
+                                )
+                            }
+                        }
+                    },
                     onStartChatSelected = {
-                        currentScreen = AppScreen.StartChat
+                        if (!openStoredCallIfPossible()) currentScreen = AppScreen.StartChat
                     },
                     onSettingsSelected = {
-                        currentScreen = AppScreen.Settings
+                        if (!openStoredCallIfPossible()) currentScreen = AppScreen.Settings
                     },
                     onCreateGroupSelected = {
-                        currentScreen = AppScreen.CreateGroup
-                    }
+                        if (!openStoredCallIfPossible()) currentScreen = AppScreen.CreateGroup
+                    },
+                    onCallSelected = { receiverId, type -> openOutgoingCall(receiverId, type) }
                 )
 
                 AppScreen.CreateGroup -> GroupCreationScreen(
-                    onBack = { currentScreen = AppScreen.Home },
-                    onGroupCreated = { currentScreen = AppScreen.Home }
+                    onBack = { if (!openStoredCallIfPossible()) currentScreen = AppScreen.Home },
+                    onGroupCreated = { conversationId, title ->
+                        openChat(
+                            ChatTarget(
+                                title = title,
+                                conversationId = conversationId,
+                                type = ConversationType.Group
+                            )
+                        )
+                    }
                 )
 
                 AppScreen.StartChat -> StartChatScreen(
-                    onBack = { currentScreen = AppScreen.Home },
+                    onBack = { if (!openStoredCallIfPossible()) currentScreen = AppScreen.Home },
+                    onAudioCall = { userProfile -> openOutgoingCall(userProfile.userId, CallType.Audio) },
+                    onVideoCall = { userProfile -> openOutgoingCall(userProfile.userId, CallType.Video) },
                     onUserSelected = { userProfile ->
                         Log.d("ContactMeApp", "StartChat: onUserSelected=${userProfile.userId}")
                         conversationViewModel.openDirectConversation(userProfile) { conversationId, chatName, photoUrl ->
@@ -256,15 +314,23 @@ fun ContactMeApp(
                     conversationId = selectedChatTarget.conversationId,
                     chatPhotoUrl = selectedChatTarget.photoUrl,
                     conversationType = selectedChatTarget.type,
-                    onBack = { currentScreen = AppScreen.Home },
+                    onBack = { if (!openStoredCallIfPossible()) currentScreen = AppScreen.Home },
                     onVoiceCallClick = { receiverId -> openOutgoingCall(receiverId, CallType.Audio) },
                     onVideoCallClick = { receiverId -> openOutgoingCall(receiverId, CallType.Video) }
                 )
 
                 AppScreen.OutgoingCall -> OutgoingCallScreen(
-                    receiverId = selectedChatTarget.conversationId.orEmpty(),
-                    callType = if (selectedChatTarget.title == "Video Calling...") CallType.Video else CallType.Audio,
-                    onCallEnded = { currentScreen = previousScreen }
+                    receiverId = currentCallPeerId,
+                    callType = currentCallType,
+                    startNewCall = shouldStartOutgoingCall,
+                    onCallEnded = {
+                        shouldStartOutgoingCall = true
+                        currentScreen = if (previousScreen == AppScreen.OutgoingCall || previousScreen == AppScreen.IncomingCall) {
+                            AppScreen.Home
+                        } else {
+                            previousScreen
+                        }
+                    }
                 )
 
                 AppScreen.IncomingCall -> IncomingCallScreen(
@@ -276,8 +342,8 @@ fun ContactMeApp(
                 )
 
                 AppScreen.Settings -> SettingsScreen(
-                    onBack = { currentScreen = AppScreen.Home },
-                    onEditProfile = { currentScreen = AppScreen.ProfileSetup },
+                    onBack = { if (!openStoredCallIfPossible()) currentScreen = AppScreen.Home },
+                    onEditProfile = { if (!openStoredCallIfPossible()) currentScreen = AppScreen.ProfileSetup },
                     onSignOut = {
                         sessionViewModel.signOut {
                             deviceTokenSyncViewModel.resetSyncState()

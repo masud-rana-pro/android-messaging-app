@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.media.RingtoneManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -15,11 +18,14 @@ import com.contactme.app.navigation.NotificationNavigation
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 class ContactMeNotificationRenderer @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val okHttpClient: OkHttpClient
 ) {
-    fun show(message: RemoteMessage) {
+    suspend fun show(message: RemoteMessage) {
         if (!canShowNotifications()) return
 
         val payload = ContactMeNotificationPayload.from(message) ?: return
@@ -42,6 +48,7 @@ class ContactMeNotificationRenderer @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val largeIcon = loadLargeIcon(payload.photoUrl)
         val notification = NotificationCompat.Builder(context, payload.channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(payload.title)
@@ -53,6 +60,22 @@ class ContactMeNotificationRenderer @Inject constructor(
             .setCategory(payload.category)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setGroup(payload.groupKey)
+            .apply { largeIcon?.let(::setLargeIcon) }
+            .setSound(
+                when (payload.type) {
+                    "incoming_call" -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                    "message" -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    else -> null
+                }
+            )
+            .setVibrate(
+                when (payload.type) {
+                    "incoming_call" -> longArrayOf(0, 500, 350, 500, 350, 700)
+                    "message" -> longArrayOf(0, 180, 120, 220)
+                    else -> null
+                }
+            )
+            .setOngoing(payload.type == "incoming_call")
             .build()
 
         NotificationManagerCompat.from(context).notify(
@@ -68,5 +91,43 @@ class ContactMeNotificationRenderer @Inject constructor(
             context,
             Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun loadLargeIcon(photoUrl: String): Bitmap? {
+        if (!photoUrl.startsWith("https://")) return null
+        return runCatching {
+            okHttpClient.newCall(Request.Builder().url(photoUrl).get().build()).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val body = response.body ?: return@use null
+                val contentLength = body.contentLength()
+                if (contentLength > MAX_NOTIFICATION_IMAGE_BYTES) return@use null
+                val bytes = body.bytes()
+                if (bytes.size > MAX_NOTIFICATION_IMAGE_BYTES) return@use null
+                decodeNotificationIcon(bytes)
+            }
+        }.getOrNull()
+    }
+
+    private fun decodeNotificationIcon(bytes: ByteArray): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sampleSize = 1
+        while (bounds.outWidth / sampleSize > MAX_NOTIFICATION_ICON_PX * 2 ||
+            bounds.outHeight / sampleSize > MAX_NOTIFICATION_ICON_PX * 2
+        ) {
+            sampleSize *= 2
+        }
+        return BitmapFactory.decodeByteArray(
+            bytes,
+            0,
+            bytes.size,
+            BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        )
+    }
+
+    private companion object {
+        const val MAX_NOTIFICATION_IMAGE_BYTES = 5 * 1024 * 1024
+        const val MAX_NOTIFICATION_ICON_PX = 256
     }
 }

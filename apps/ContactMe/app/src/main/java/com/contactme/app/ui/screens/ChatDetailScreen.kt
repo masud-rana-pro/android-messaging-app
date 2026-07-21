@@ -2,7 +2,11 @@ package com.contactme.app.ui.screens
 
 import android.util.Log
 import android.content.Intent
+import android.app.DownloadManager
+import android.content.Context
 import android.net.Uri
+import android.os.Environment
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.CallMade
+import androidx.compose.material.icons.automirrored.outlined.CallReceived
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
@@ -41,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.contactme.app.R
@@ -52,6 +60,7 @@ import com.contactme.app.message.MessageStatus
 import com.contactme.app.message.MessageType
 import androidx.core.content.FileProvider
 import com.contactme.app.BuildConfig
+import com.contactme.app.call.CallType
 import java.io.File
 import android.Manifest
 import android.content.pm.PackageManager
@@ -67,6 +76,7 @@ import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,6 +133,7 @@ fun ChatDetailScreen(
         onStopRecording = viewModel::stopRecording,
         onCancelRecording = viewModel::cancelRecording,
         onVoiceMessageToggle = viewModel::toggleVoiceMessagePlayback
+        ,onGroupCallStart = viewModel::startGroupCall
     )
 }
 
@@ -158,12 +169,14 @@ private fun ChatDetailContent(
     onStopRecording: () -> Unit,
     onCancelRecording: () -> Unit,
     onVoiceMessageToggle: (ChatMessage) -> Unit
+    ,onGroupCallStart: (CallType, String, () -> Unit) -> Unit
 ) {
     val messages = uiState.messages
     val listState = rememberLazyListState()
     var selectedMessageForActions by remember { mutableStateOf<ChatMessage?>(null) }
     var isEmojiPanelVisible by remember { mutableStateOf(false) }
     var isStartingCall by remember { mutableStateOf(false) }
+    var pendingCallType by remember { mutableStateOf<CallType?>(null) }
     
     LaunchedEffect(uiState.messages) {
         // Reset starting call state once we receive updates (indicating we are active in chat)
@@ -195,13 +208,19 @@ private fun ChatDetailContent(
             val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
             val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
             Log.d("ChatDetailScreen", "Permissions result: audio=$audioGranted, camera=$cameraGranted")
-            
-            if (audioGranted && !isStartingCall) {
-                // If this was a voice call attempt
-                if (cameraGranted) {
-                   // Possible video call or just both granted
+
+            when (pendingCallType) {
+                CallType.Audio -> if (audioGranted && uiState.peerUserId != null) {
+                    isStartingCall = true
+                    onVoiceCallClick()
                 }
+                CallType.Video -> if (audioGranted && cameraGranted && uiState.peerUserId != null) {
+                    isStartingCall = true
+                    onVideoCallClick()
+                }
+                null -> Unit
             }
+            pendingCallType = null
         }
     )
 
@@ -241,6 +260,7 @@ private fun ChatDetailContent(
             }
         } else {
             Log.d("ChatDetailScreen", "Requesting audio permission for call")
+            pendingCallType = CallType.Audio
             permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
         }
     }
@@ -258,7 +278,20 @@ private fun ChatDetailContent(
             }
         } else {
             Log.d("ChatDetailScreen", "Requesting permissions for video call")
+            pendingCallType = CallType.Video
             permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
+        }
+    }
+
+    fun startGroupCall(type: CallType) {
+        if (isStartingCall || conversationId.isNullOrBlank()) return
+        isStartingCall = true
+        val roomId = UUID.randomUUID().toString().replace("-", "")
+        val roomUrl = "https://meet.jit.si/contactme-$roomId"
+        onGroupCallStart(type, roomUrl) {
+            isStartingCall = false
+            val launchUrl = groupCallLaunchUrl(roomUrl, type == CallType.Video)
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(launchUrl))) }
         }
     }
 
@@ -317,11 +350,19 @@ private fun ChatDetailContent(
                     }
                 },
                 actions = {
+                    if (conversationId != null && conversationType == ConversationType.Group) {
+                        IconButton(onClick = { startGroupCall(CallType.Video) }, enabled = !uiState.isSending) {
+                            Icon(imageVector = Icons.Outlined.Videocam, contentDescription = "Start group video call")
+                        }
+                        IconButton(onClick = { startGroupCall(CallType.Audio) }, enabled = !uiState.isSending) {
+                            Icon(imageVector = Icons.Outlined.Call, contentDescription = "Start group audio call")
+                        }
+                    }
                     if (conversationId != null && conversationType == ConversationType.Direct) {
-                        IconButton(onClick = { startVideoCall() }) {
+                        IconButton(onClick = { startVideoCall() }, enabled = !uiState.isChatBlocked && !uiState.isSafetyActionInProgress) {
                             Icon(imageVector = Icons.Outlined.Videocam, contentDescription = "Video Call")
                         }
-                        IconButton(onClick = { startVoiceCall() }) {
+                        IconButton(onClick = { startVoiceCall() }, enabled = !uiState.isChatBlocked && !uiState.isSafetyActionInProgress) {
                             Icon(imageVector = Icons.Outlined.Call, contentDescription = "Voice Call")
                         }
                         ChatActionMenu(
@@ -508,27 +549,34 @@ private fun ChatHeaderTitle(chatName: String, chatPhotoUrl: String, subtitle: St
     }
 }
 
+@Composable
 private fun chatSubtitle(conversationType: ConversationType, isOtherUserTyping: Boolean, peerPresence: PresenceStatus): String {
+    var clockTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(peerPresence.lastSeenAtMillis) {
+        while (true) {
+            clockTick = System.currentTimeMillis()
+            delay(60_000)
+        }
+    }
     if (isOtherUserTyping) return "typing..."
     if (peerPresence.isOnline) return "online"
     if (conversationType == ConversationType.Group) return "Group"
-    if (peerPresence.canShowLastSeen && peerPresence.lastSeenAtMillis > 0L) {
-        return "last seen ${peerPresence.lastSeenAtMillis.formatPresenceTime()}"
+    if (peerPresence.lastSeenAtMillis > 0L) {
+        return "last seen ${peerPresence.lastSeenAtMillis.formatPresenceTime(clockTick)}"
     }
-    return "last seen recently"
+    return "last seen unavailable"
 }
 
-private fun Long.formatPresenceTime(): String {
-    val now = Calendar.getInstance()
-    val time = Calendar.getInstance().apply { timeInMillis = this@formatPresenceTime }
-    val isToday = now.get(Calendar.YEAR) == time.get(Calendar.YEAR) && now.get(Calendar.DAY_OF_YEAR) == time.get(Calendar.DAY_OF_YEAR)
-    val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
-    val isYesterday = yesterday.get(Calendar.YEAR) == time.get(Calendar.YEAR) && yesterday.get(Calendar.DAY_OF_YEAR) == time.get(Calendar.DAY_OF_YEAR)
-    val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this@formatPresenceTime))
-    return when {
-        isToday -> "today at $timeStr"
-        isYesterday -> "yesterday at $timeStr"
-        else -> SimpleDateFormat("d MMM 'at' h:mm a", Locale.getDefault()).format(Date(this@formatPresenceTime))
+private fun Long.formatPresenceTime(nowMillis: Long = System.currentTimeMillis()): String {
+    val elapsedMillis = (nowMillis - this).coerceAtLeast(0L)
+    val elapsedDays = elapsedMillis / (24L * 60L * 60L * 1000L)
+    val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault())
+        .format(Date(this@formatPresenceTime))
+        .lowercase(Locale.getDefault())
+    return if (elapsedDays < 1L) {
+        timeStr
+    } else {
+        "$elapsedDays ${if (elapsedDays == 1L) "day" else "days"} ago"
     }
 }
 
@@ -618,7 +666,10 @@ private fun MessageInputBar(
         }
         FloatingActionButton(
             onClick = { if (text.isNotBlank()) onSendMessage() else onMicClick() },
-            containerColor = ContactMeGreen, contentColor = Color.White, shape = CircleShape, modifier = Modifier.size(48.dp),
+            containerColor = ContactMeGreen,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            shape = CircleShape,
+            modifier = Modifier.size(48.dp),
             elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
         ) {
             if (isSending) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
@@ -629,15 +680,57 @@ private fun MessageInputBar(
 
 @Composable
 private fun CallLogContent(message: ChatMessage, isMine: Boolean) {
-    Surface(color = Color.Black.copy(alpha = 0.05f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    val context = LocalContext.current
+    val isGroupCall = message.text.startsWith("Group", ignoreCase = true) && message.mediaUrl.isNotBlank()
+    val isGroupCallJoinable = isGroupCall && System.currentTimeMillis() - message.sentAtMillis <= 2 * 60 * 60 * 1000L
+    val isVideoCall = message.text.contains("video call", ignoreCase = true)
+    val callTypeLabel = when {
+        isGroupCall && isVideoCall -> "Group video call"
+        isGroupCall -> "Group audio call"
+        isVideoCall -> "Video call"
+        else -> "Voice call"
+    }
+    val callDetails = message.text
+        .removePrefix(callTypeLabel)
+        .trimStart(' ', '\u00b7')
+        .ifBlank { "Call ended" }
+    val directionLabel = if (isGroupCall) {
+        if (isMine) "You started" else "Group"
+    } else if (isMine) "Outgoing" else "Incoming"
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(Icons.Outlined.Call, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-            Column {
-                Text("Voice call", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                Text(message.text.ifBlank { "No answer" }, style = MaterialTheme.typography.bodySmall)
+            Icon(
+                imageVector = if (isVideoCall) Icons.Outlined.Videocam else if (isMine) Icons.AutoMirrored.Outlined.CallMade else Icons.AutoMirrored.Outlined.CallReceived,
+                contentDescription = callTypeLabel,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text("$directionLabel $callTypeLabel", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Text(callDetails.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
+            }
+            if (isGroupCallJoinable) {
+                TextButton(onClick = {
+                    val launchUrl = groupCallLaunchUrl(message.mediaUrl, isVideoCall)
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(launchUrl))) }
+                }) {
+                    Text("Join")
+                }
+            } else if (isGroupCall) {
+                Text("Expired", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
+}
+
+private fun groupCallLaunchUrl(roomUrl: String, isVideoCall: Boolean): String {
+    val config = listOf(
+        "config.prejoinConfig.enabled=false",
+        "config.startWithAudioMuted=false",
+        "config.startWithVideoMuted=${(!isVideoCall).toString()}",
+        "config.startAudioOnly=${(!isVideoCall).toString()}"
+    ).joinToString("&")
+    return "$roomUrl#$config"
 }
 
 @Composable
@@ -691,7 +784,12 @@ private fun RecordingBar(durationMillis: Long, onStop: () -> Unit, onCancel: () 
             TextButton(onClick = onCancel) { Text("Cancel", color = MaterialTheme.colorScheme.error) }
             IconButton(onClick = onStop) {
                 Surface(shape = CircleShape, color = ContactMeGreen) {
-                    Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.padding(8.dp))
+                    Icon(
+                        Icons.AutoMirrored.Outlined.Send,
+                        contentDescription = "Send",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.padding(8.dp)
+                    )
                 }
             }
         }
@@ -748,27 +846,131 @@ private fun ChatDateSeparator(sentAtMillis: Long) {
 @Composable
 private fun ChatActionMenu(uiState: ChatDetailUiState, onReportChat: (ReportReason) -> Unit, onBlockChat: () -> Unit, onUnblockChat: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
+    var showBlockDialog by remember { mutableStateOf(false) }
+    var selectedReason by remember { mutableStateOf(ReportReason.Spam) }
     Box {
-        IconButton(onClick = { expanded = true }) { Icon(Icons.Outlined.MoreVert, null) }
+        IconButton(onClick = { expanded = true }, enabled = !uiState.isSafetyActionInProgress) { Icon(Icons.Outlined.MoreVert, "Chat actions") }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text("Report") }, onClick = { expanded = false; /* TODO */ })
-            DropdownMenuItem(text = { Text(if (uiState.canUnblockChat) "Unblock" else "Block") }, onClick = { expanded = false; if (uiState.canUnblockChat) onUnblockChat() else onBlockChat() })
+            DropdownMenuItem(
+                text = { Text("Report user") },
+                leadingIcon = { Icon(Icons.Outlined.Report, null) },
+                onClick = { expanded = false; showReportDialog = true }
+            )
+            DropdownMenuItem(
+                text = { Text(if (uiState.canUnblockChat) "Unblock user" else "Block user") },
+                leadingIcon = { Icon(if (uiState.canUnblockChat) Icons.Outlined.LockOpen else Icons.Outlined.Block, null) },
+                onClick = {
+                    expanded = false
+                    if (uiState.canUnblockChat) onUnblockChat() else showBlockDialog = true
+                }
+            )
         }
+    }
+    if (showReportDialog) {
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            icon = { Icon(Icons.Outlined.Report, null) },
+            title = { Text("Report this user?") },
+            text = {
+                Column {
+                    Text("Choose the reason. Reports are private and cannot be edited after sending.")
+                    ReportReason.entries.forEach { reason ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { selectedReason = reason }.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = selectedReason == reason, onClick = { selectedReason = reason })
+                            Text(reason.displayLabel())
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showReportDialog = false; onReportChat(selectedReason) }) { Text("Send report") }
+            },
+            dismissButton = { TextButton(onClick = { showReportDialog = false }) { Text("Cancel") } }
+        )
+    }
+    if (showBlockDialog) {
+        AlertDialog(
+            onDismissRequest = { showBlockDialog = false },
+            icon = { Icon(Icons.Outlined.Block, null) },
+            title = { Text("Block this user?") },
+            text = { Text("You will no longer be able to message or call each other until you unblock them.") },
+            confirmButton = {
+                TextButton(onClick = { showBlockDialog = false; onBlockChat() }) { Text("Block", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { showBlockDialog = false }) { Text("Cancel") } }
+        )
     }
 }
 
+private fun ReportReason.displayLabel(): String = when (this) {
+    ReportReason.Spam -> "Spam"
+    ReportReason.Harassment -> "Harassment or bullying"
+    ReportReason.Scam -> "Scam or fraud"
+    ReportReason.Other -> "Other"
+}
+
 @Composable private fun ImageMessageContent(message: ChatMessage) {
-    AsyncImage(model = message.mediaUrl, contentDescription = null, modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+    val context = LocalContext.current
+    var showFullImage by remember { mutableStateOf(false) }
+    AsyncImage(
+        model = message.mediaUrl,
+        contentDescription = "Open image",
+        modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).clip(RoundedCornerShape(8.dp)).clickable { showFullImage = true },
+        contentScale = ContentScale.Crop
+    )
+    if (showFullImage) {
+        Dialog(
+            onDismissRequest = { showFullImage = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                AsyncImage(model = message.mediaUrl, contentDescription = "Full image", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                Row(modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
+                    IconButton(onClick = { downloadMedia(context, message.mediaUrl, message.fileName.ifBlank { "ContactMe-${message.id}.jpg" }, message.mimeType.ifBlank { "image/jpeg" }) }) {
+                        Icon(Icons.Outlined.Download, contentDescription = "Save image", tint = Color.White)
+                    }
+                    IconButton(onClick = { showFullImage = false }) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Close", tint = Color.White)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable private fun DocumentMessageContent(message: ChatMessage) {
     val context = LocalContext.current
     Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.05f)).clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(message.mediaUrl))) } }.padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(Icons.Outlined.Description, null)
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(message.fileName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(message.fileSizeBytes.formatFileSize(), style = MaterialTheme.typography.labelSmall)
         }
+        IconButton(onClick = { downloadMedia(context, message.mediaUrl, message.fileName.ifBlank { "ContactMe-document" }, message.mimeType.ifBlank { "application/octet-stream" }) }) {
+            Icon(Icons.Outlined.Download, contentDescription = "Download document")
+        }
+    }
+}
+
+private fun downloadMedia(context: Context, url: String, fileName: String, mimeType: String) {
+    if (url.isBlank()) return
+    runCatching {
+        val request = DownloadManager.Request(Uri.parse(url))
+            .setTitle(fileName)
+            .setDescription("Downloading from ContactMe")
+            .setMimeType(mimeType)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(true)
+        context.getSystemService(DownloadManager::class.java).enqueue(request)
+        Toast.makeText(context, "Downloading to Downloads", Toast.LENGTH_SHORT).show()
+    }.onFailure {
+        Toast.makeText(context, "Download could not be started", Toast.LENGTH_SHORT).show()
     }
 }
 

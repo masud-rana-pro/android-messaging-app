@@ -14,12 +14,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 class FirebaseMessageRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val cloudinaryUploadClient: CloudinaryUploadClient,
-    private val safetyRepository: SafetyRepository
+    private val safetyRepository: SafetyRepository,
+    private val okHttpClient: OkHttpClient
 ) : MessageRepository {
     private val senderNameCache = ConcurrentHashMap<String, String>()
 
@@ -134,6 +142,7 @@ class FirebaseMessageRepository @Inject constructor(
                     )
                 )
             }.await()
+            triggerMessageNotification(conversationId, messageDocument.id, senderId)
         }.fold(
             onSuccess = { MessageResult.Success },
             onFailure = {
@@ -192,6 +201,7 @@ class FirebaseMessageRepository @Inject constructor(
                     )
                 )
             }.await()
+            triggerMessageNotification(conversationId, messageDocument.id, senderId)
             Log.d(TAG, "Firestore message created successfully")
         }.fold(
             onSuccess = { MessageResult.Success },
@@ -251,6 +261,7 @@ class FirebaseMessageRepository @Inject constructor(
                     )
                 )
             }.await()
+            triggerMessageNotification(conversationId, messageDocument.id, senderId)
             Log.d(TAG, "Firestore document message created")
         }.fold(
             onSuccess = { MessageResult.Success },
@@ -312,6 +323,7 @@ class FirebaseMessageRepository @Inject constructor(
                     )
                 )
             }.await()
+            triggerMessageNotification(conversationId, messageDocument.id, senderId)
             Log.d(TAG, "Firestore voice message created")
         }.fold(
             onSuccess = { MessageResult.Success },
@@ -402,6 +414,92 @@ class FirebaseMessageRepository @Inject constructor(
         )
     }
 
+    override suspend fun sendCallMessage(
+        conversationId: String,
+        senderId: String,
+        text: String
+    ): MessageResult {
+        val conversation = firestore.collection(CONVERSATIONS_COLLECTION).document(conversationId)
+        return runCatching {
+            val message = conversation.collection(MESSAGES_COLLECTION).document()
+            firestore.runBatch { batch ->
+                batch.set(message, mapOf(
+                    "senderId" to senderId,
+                    "text" to text,
+                    "type" to MessageType.Call.firestoreValue,
+                    "status" to MessageStatus.Sent.firestoreValue,
+                    "createdAt" to FieldValue.serverTimestamp()
+                ))
+                batch.update(conversation, mapOf(
+                    "lastMessageText" to text,
+                    "lastMessageId" to message.id,
+                    "lastMessageSenderId" to senderId,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ))
+            }.await()
+        }.fold(
+            onSuccess = { MessageResult.Success },
+            onFailure = { MessageResult.Error("Call history could not be added to chat.") }
+        )
+    }
+
+    override suspend fun sendGroupCallInvitation(
+        conversationId: String,
+        senderId: String,
+        text: String,
+        roomUrl: String
+    ): MessageResult {
+        val conversation = firestore.collection(CONVERSATIONS_COLLECTION).document(conversationId)
+        return runCatching {
+            val message = conversation.collection(MESSAGES_COLLECTION).document()
+            firestore.runBatch { batch ->
+                batch.set(message, mapOf(
+                    "senderId" to senderId,
+                    "text" to text,
+                    "type" to MessageType.Call.firestoreValue,
+                    "mediaUrl" to roomUrl,
+                    "status" to MessageStatus.Sent.firestoreValue,
+                    "createdAt" to FieldValue.serverTimestamp()
+                ))
+                batch.update(conversation, mapOf(
+                    "lastMessageText" to text,
+                    "lastMessageId" to message.id,
+                    "lastMessageSenderId" to senderId,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ))
+            }.await()
+            triggerMessageNotification(conversationId, message.id, senderId)
+        }.fold(
+            onSuccess = { MessageResult.Success },
+            onFailure = { MessageResult.Error("Group call could not be started. Please try again.") }
+        )
+    }
+
+    private suspend fun triggerMessageNotification(
+        conversationId: String,
+        messageId: String,
+        senderId: String
+    ) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val body = JSONObject()
+                    .put("type", "message")
+                    .put("conversationId", conversationId)
+                    .put("messageId", messageId)
+                    .put("senderId", senderId)
+                    .toString()
+                    .toRequestBody("application/json".toMediaType())
+                okHttpClient.newCall(
+                    Request.Builder().url(NOTIFICATION_WORKER_URL).post(body).build()
+                ).execute().use { response ->
+                    if (!response.isSuccessful) Log.w(TAG, "Message notification trigger failed: ${response.code}")
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "Message notification trigger error", error)
+            }
+        }
+    }
+
     private companion object {
         const val TAG = "FirebaseMessageRepo"
         const val CONVERSATIONS_COLLECTION = "conversations"
@@ -411,6 +509,7 @@ class FirebaseMessageRepository @Inject constructor(
         const val IMAGE_LAST_MESSAGE = "Photo"
         const val CLOUDINARY_PROVIDER = "cloudinary"
         const val DELETED_LAST_MESSAGE = "Message deleted"
+        const val NOTIFICATION_WORKER_URL = "https://contactme-call-notification.masud-jee68.workers.dev"
     }
 
     private suspend fun isBlockedConversation(

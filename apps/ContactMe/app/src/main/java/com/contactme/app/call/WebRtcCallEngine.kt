@@ -1,7 +1,10 @@
 package com.contactme.app.call
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.Build
 import android.util.Log
 import org.webrtc.*
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -18,6 +21,9 @@ class WebRtcCallEngine @Inject constructor(
     private var localVideoTrack: VideoTrack? = null
     private var localVideoSource: VideoSource? = null
     private var videoCapturer: VideoCapturer? = null
+    private val pendingRemoteIceCandidates = mutableListOf<IceCandidate>()
+    private var remoteDescriptionSet = false
+    private var audioFocusRequest: AudioFocusRequest? = null
 
     interface Listener {
         fun onLocalDescription(sdp: String)
@@ -31,9 +37,13 @@ class WebRtcCallEngine @Inject constructor(
     private var localUserId: String = ""
 
     fun initialize(localUserId: String, callType: CallType, listener: Listener) {
-        Log.d(TAG, "Initializing WebRtcCallEngine for $localUserId, type: $callType")
+        Log.d(
+            TAG,
+            "Initializing WebRtcCallEngine for $localUserId, type: $callType, turnRelay=${WebRtcConfig.hasTurnRelay()}"
+        )
         this.localUserId = localUserId
         this.listener = listener
+        prepareCallAudioRoute(callType)
         
         val rtcConfig = WebRtcConfig.rtcConfiguration()
         val observer = object : PeerConnection.Observer {
@@ -50,7 +60,7 @@ class WebRtcCallEngine @Inject constructor(
             
             override fun onIceCandidate(candidate: IceCandidate?) {
                 candidate?.let {
-                    Log.d(TAG, "New local ICE candidate: ${it.sdpMid}")
+                    Log.d(TAG, "New local ICE candidate: mid=${it.sdpMid}, type=${it.sdp.candidateTypeLabel()}")
                     listener.onIceCandidate(
                         CallIceCandidate(
                             senderId = localUserId,
@@ -115,11 +125,58 @@ class WebRtcCallEngine @Inject constructor(
 
     private fun setupAudioTrack() {
         Log.d(TAG, "Setting up local audio track")
-        val audioConstraints = MediaConstraints()
+        val audioConstraints = MediaConstraints().apply {
+            optional.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+            optional.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+            optional.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+            optional.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+        }
         localAudioSource = factory.peerConnectionFactory().createAudioSource(audioConstraints)
         localAudioTrack = factory.peerConnectionFactory().createAudioTrack("ARDAMSa0", localAudioSource)
         localAudioTrack?.setEnabled(true)
         peerConnection?.addTrack(localAudioTrack, listOf("ARDAMS"))
+    }
+
+    private fun prepareCallAudioRoute(callType: CallType) {
+        runCatching {
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager.isMicrophoneMute = false
+            audioManager.isSpeakerphoneOn = callType == CallType.Video
+            requestAudioFocus()
+        }.onFailure { Log.e(TAG, "Could not prepare call audio route", it) }
+    }
+
+    private fun requestAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setOnAudioFocusChangeListener { }
+                .build()
+            audioFocusRequest = request
+            audioManager.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                null,
+                AudioManager.STREAM_VOICE_CALL,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+            )
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let(audioManager::abandonAudioFocusRequest)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(null)
+        }
+        audioFocusRequest = null
     }
 
     private fun setupVideoTrack() {
@@ -162,14 +219,20 @@ class WebRtcCallEngine @Inject constructor(
         return null
     }
 
-    fun setRemoteOffer(sdp: String) {
+    fun setRemoteOffer(sdp: String, onSuccess: () -> Unit = {}) {
         Log.d(TAG, "Setting remote offer")
         val remoteSdp = SessionDescription(SessionDescription.Type.OFFER, sdp)
         peerConnection?.setRemoteDescription(object : SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {}
-            override fun onSetSuccess() { Log.d(TAG, "Remote offer set successfully") }
+            override fun onSetSuccess() {
+                Log.d(TAG, "Remote offer set successfully")
+                onRemoteDescriptionSet()
+                onSuccess()
+            }
             override fun onCreateFailure(p0: String?) {}
-            override fun onSetFailure(error: String?) { Log.e(TAG, "Failed to set remote offer: $error") }
+            override fun onSetFailure(error: String?) {
+                Log.e(TAG, "Failed to set remote offer: $error")
+            }
         }, remoteSdp)
     }
 
@@ -232,17 +295,29 @@ class WebRtcCallEngine @Inject constructor(
         val remoteSdp = SessionDescription(SessionDescription.Type.ANSWER, sdp)
         peerConnection?.setRemoteDescription(object : SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {}
-            override fun onSetSuccess() { Log.d(TAG, "Remote description set successfully") }
+            override fun onSetSuccess() {
+                Log.d(TAG, "Remote description set successfully")
+                onRemoteDescriptionSet()
+            }
             override fun onCreateFailure(p0: String?) {}
             override fun onSetFailure(error: String?) { Log.e(TAG, "Failed to set remote description: $error") }
         }, remoteSdp)
     }
 
     fun addIceCandidate(candidate: CallIceCandidate) {
-        Log.d(TAG, "Adding remote ICE candidate: ${candidate.sdpMid}")
-        peerConnection?.addIceCandidate(
-            IceCandidate(candidate.sdpMid, candidate.sdpMLineIndex, candidate.candidate)
-        )
+        Log.d(TAG, "Adding remote ICE candidate: mid=${candidate.sdpMid}, type=${candidate.candidate.candidateTypeLabel()}")
+        val iceCandidate = IceCandidate(candidate.sdpMid, candidate.sdpMLineIndex, candidate.candidate)
+        if (remoteDescriptionSet) {
+            peerConnection?.addIceCandidate(iceCandidate)
+        } else {
+            pendingRemoteIceCandidates += iceCandidate
+        }
+    }
+
+    private fun onRemoteDescriptionSet() {
+        remoteDescriptionSet = true
+        pendingRemoteIceCandidates.forEach { peerConnection?.addIceCandidate(it) }
+        pendingRemoteIceCandidates.clear()
     }
 
     fun setMuted(isMuted: Boolean) {
@@ -265,6 +340,8 @@ class WebRtcCallEngine @Inject constructor(
         runCatching {
             videoCapturer?.stopCapture()
             videoCapturer?.dispose()
+            abandonAudioFocus()
+            audioManager.isMicrophoneMute = false
             audioManager.mode = AudioManager.MODE_NORMAL
             audioManager.isSpeakerphoneOn = false
             peerConnection?.close()
@@ -279,6 +356,8 @@ class WebRtcCallEngine @Inject constructor(
         localVideoSource?.dispose()
         localVideoSource = null
         videoCapturer = null
+        pendingRemoteIceCandidates.clear()
+        remoteDescriptionSet = false
         listener = null
     }
 
@@ -286,3 +365,7 @@ class WebRtcCallEngine @Inject constructor(
         const val TAG = "WebRtcCallEngine"
     }
 }
+
+private fun String.candidateTypeLabel(): String =
+    substringAfter(" typ ", missingDelimiterValue = "unknown")
+        .substringBefore(' ')

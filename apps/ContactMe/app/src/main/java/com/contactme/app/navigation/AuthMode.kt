@@ -13,7 +13,7 @@ enum class AuthMode(
         actionLabel = "Log in"
     ),
     EmailRegister(
-        title = "Create email account",
-        actionLabel = "Register"
+        title = "Create your account",
+        actionLabel = "Create account"
     )
 }

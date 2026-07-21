@@ -22,6 +22,16 @@ class FakeProfileRepository @Inject constructor() : ProfileRepository {
         return privacySettings[userId] ?: PrivacySettings()
     }
 
+    override suspend fun getAvailableGroupMembers(currentUserId: String): List<UserProfile> {
+        delay(150)
+        return profiles.values
+            .filter { profile -> profile.userId != currentUserId }
+            .sortedWith(
+                compareBy<UserProfile> { profile -> profile.displayName.ifBlank { profile.username }.lowercase() }
+                    .thenBy { profile -> profile.username.lowercase() }
+            )
+    }
+
     override suspend fun searchProfiles(
         query: String,
         currentUserId: String
@@ -53,6 +63,7 @@ class FakeProfileRepository @Inject constructor() : ProfileRepository {
         userId: String,
         displayName: String,
         username: String,
+        phoneNumber: String,
         photoUrl: String
     ): ProfileResult {
         delay(350)
@@ -69,7 +80,7 @@ class FakeProfileRepository @Inject constructor() : ProfileRepository {
             userId = userId,
             displayName = displayName.trim(),
             username = normalizedUsername,
-            phoneNumber = "",
+            phoneNumber = phoneNumber,
             photoUrl = photoUrl
         )
         return ProfileResult.Success

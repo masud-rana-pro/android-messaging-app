@@ -3,9 +3,9 @@ package com.contactme.app.ui.group
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
-import com.contactme.app.contact.ContactRepository
 import com.contactme.app.conversation.ConversationRepository
 import com.contactme.app.conversation.ConversationResult
+import com.contactme.app.profile.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,14 +17,14 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class GroupCreationViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val contactRepository: ContactRepository,
+    private val profileRepository: ProfileRepository,
     private val conversationRepository: ConversationRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(GroupCreationUiState())
     val uiState: StateFlow<GroupCreationUiState> = _uiState.asStateFlow()
 
     init {
-        observeContacts()
+        loadAppUsers()
     }
 
     fun onTitleChanged(title: String) {
@@ -41,7 +41,7 @@ class GroupCreationViewModel @Inject constructor(
         }
     }
 
-    fun createGroup(onCreated: () -> Unit) {
+    fun createGroup(onCreated: (conversationId: String, title: String) -> Unit) {
         val currentUserId = authRepository.currentUserId()
         if (currentUserId == null || _uiState.value.isCreating) return
 
@@ -56,7 +56,7 @@ class GroupCreationViewModel @Inject constructor(
             ) {
                 is ConversationResult.Success -> {
                     _uiState.update { it.copy(isCreating = false) }
-                    onCreated()
+                    onCreated(result.conversationId, _uiState.value.title.trim())
                 }
                 is ConversationResult.Error -> {
                     _uiState.update {
@@ -67,7 +67,7 @@ class GroupCreationViewModel @Inject constructor(
         }
     }
 
-    private fun observeContacts() {
+    private fun loadAppUsers() {
         val userId = authRepository.currentUserId()
         if (userId == null) {
             _uiState.update {
@@ -77,9 +77,8 @@ class GroupCreationViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            contactRepository.observeContacts(userId).collect { contacts ->
-                _uiState.update { it.copy(contacts = contacts, isLoadingContacts = false) }
-            }
+            val users = profileRepository.getAvailableGroupMembers(userId)
+            _uiState.update { it.copy(contacts = users, isLoadingContacts = false) }
         }
     }
 

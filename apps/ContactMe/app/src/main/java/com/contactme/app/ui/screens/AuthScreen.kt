@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,6 +32,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.contactme.app.R
 import com.contactme.app.navigation.AuthMode
 import com.contactme.app.ui.auth.AuthUiState
 import com.contactme.app.ui.auth.AuthViewModel
@@ -50,6 +56,7 @@ fun AuthScreen(
         onEmailChanged = viewModel::onEmailChanged,
         onPasswordChanged = viewModel::onPasswordChanged,
         onAuthModeChanged = viewModel::onAuthModeChanged,
+        onResetPassword = viewModel::resetPassword,
         onSubmit = {
             viewModel.submit(
                 activity = activity,
@@ -67,6 +74,7 @@ private fun AuthContent(
     onEmailChanged: (String) -> Unit,
     onPasswordChanged: (String) -> Unit,
     onAuthModeChanged: (AuthMode) -> Unit,
+    onResetPassword: () -> Unit,
     onSubmit: () -> Unit
 ) {
     Column(
@@ -79,8 +87,15 @@ private fun AuthContent(
                 horizontal = ContactMeSpacing.screenHorizontal,
                 vertical = ContactMeSpacing.screenVertical
             ),
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Image(
+            painter = painterResource(R.drawable.contactme_logo_v2),
+            contentDescription = "ContactMe logo",
+            modifier = Modifier.size(92.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = uiState.authMode.title,
             style = MaterialTheme.typography.headlineLarge,
@@ -89,11 +104,9 @@ private fun AuthContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = if (uiState.authMode == AuthMode.Phone) {
-                "Enter your phone number."
-            } else {
-                "Use your email and password."
-            },
+            text = if (uiState.authMode == AuthMode.EmailRegister) {
+                "Register with your email, mobile number and password."
+            } else "Welcome back. Sign in with your email and password.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
         )
@@ -133,6 +146,19 @@ private fun AuthContent(
                 shape = RoundedCornerShape(18.dp),
                 label = { Text(text = "Email") }
             )
+            if (uiState.authMode == AuthMode.EmailRegister) {
+                Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = uiState.phoneNumber,
+                    onValueChange = onPhoneNumberChanged,
+                    enabled = !uiState.isLoading,
+                    singleLine = true,
+                    shape = RoundedCornerShape(18.dp),
+                    label = { Text(text = "Mobile number") },
+                    placeholder = { Text(text = "01XXXXXXXXX") }
+                )
+            }
             Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
@@ -144,6 +170,13 @@ private fun AuthContent(
                 label = { Text(text = "Password") },
                 visualTransformation = PasswordVisualTransformation()
             )
+            if (uiState.authMode == AuthMode.EmailLogin) {
+                TextButton(
+                    modifier = Modifier.align(Alignment.End),
+                    enabled = !uiState.isLoading,
+                    onClick = onResetPassword
+                ) { Text("Forgot password?") }
+            }
         }
 
         uiState.statusMessage?.let { message ->
@@ -180,26 +213,6 @@ private fun AuthContent(
             )
         }
         Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                enabled = !uiState.isLoading,
-                onClick = { onAuthModeChanged(AuthMode.Phone) }
-            ) {
-                Text(text = "Phone")
-            }
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                enabled = !uiState.isLoading,
-                onClick = { onAuthModeChanged(AuthMode.EmailLogin) }
-            ) {
-                Text(text = "Email")
-            }
-        }
-        Spacer(modifier = Modifier.height(ContactMeSpacing.fieldGap))
         if (uiState.authMode != AuthMode.Phone) {
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
@@ -216,9 +229,9 @@ private fun AuthContent(
             ) {
                 Text(
                     text = if (uiState.authMode == AuthMode.EmailLogin) {
-                        "Create account"
+                        "New here? Create account"
                     } else {
-                        "Log in"
+                        "Already registered? Log in"
                     }
                 )
             }

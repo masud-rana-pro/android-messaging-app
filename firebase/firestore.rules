@@ -58,6 +58,8 @@ service cloud.firestore {
         && (!("email" in request.resource.data) || request.resource.data.email is string)
         && (!("photoUrl" in request.resource.data) || request.resource.data.photoUrl is string)
         && (!("lastSeenVisibility" in request.resource.data) || request.resource.data.lastSeenVisibility is string)
+        && (!("isOnline" in request.resource.data) || request.resource.data.isOnline is bool)
+        && (!("lastSeenAt" in request.resource.data) || request.resource.data.lastSeenAt is timestamp)
         && (!("profilePhotoVisibility" in request.resource.data) || request.resource.data.profilePhotoVisibility is string)
         && (!("readReceiptsEnabled" in request.resource.data) || request.resource.data.readReceiptsEnabled is bool)
         && request.resource.data.profileComplete == true;
@@ -161,6 +163,11 @@ service cloud.firestore {
               && request.resource.data.text is string
               && request.resource.data.text.size() > 0
               && request.resource.data.text.size() <= 4000
+            ) || (
+              request.resource.data.type == "call"
+              && request.resource.data.text is string
+              && request.resource.data.text.size() > 0
+              && request.resource.data.text.size() <= 120
             ) ||
             (
               request.resource.data.type == "image"
@@ -236,12 +243,19 @@ service cloud.firestore {
     match /calls/{callId} {
       function isCallParticipant() {
         return isSignedIn()
-          && request.auth.uid in [resource.data.callerId, resource.data.receiverId];
+          && (
+            resource.data.callerId == request.auth.uid ||
+            resource.data.receiverId == request.auth.uid
+          );
       }
 
       function callIdentityIsUnchanged() {
         return request.resource.data.callerId == resource.data.callerId
           && request.resource.data.receiverId == resource.data.receiverId
+          && (
+            !("participantIds" in resource.data) ||
+            request.resource.data.participantIds == resource.data.participantIds
+          )
           && request.resource.data.type == resource.data.type
           && request.resource.data.createdAt == resource.data.createdAt;
       }
@@ -300,16 +314,22 @@ service cloud.firestore {
       allow read: if isCallParticipant();
       allow create: if isSignedIn()
         && request.resource.data.keys().hasAll([
-          "callerId", "receiverId", "type", "status", "offer", "answer",
+          "callerId", "receiverId", "participantIds", "type", "status", "offer", "answer",
           "createdAt", "acceptedAt", "endedAt"
         ])
         && request.resource.data.keys().hasOnly([
-          "callerId", "receiverId", "type", "status", "offer", "answer",
+          "callerId", "receiverId", "participantIds", "type", "status", "offer", "answer",
           "createdAt", "acceptedAt", "endedAt"
         ])
         && request.resource.data.callerId == request.auth.uid
         && request.resource.data.receiverId is string
         && request.resource.data.receiverId != request.auth.uid
+        && request.resource.data.participantIds is list
+        && request.resource.data.participantIds.size() == 2
+        && request.resource.data.participantIds.hasAll([
+          request.resource.data.callerId,
+          request.resource.data.receiverId
+        ])
         && exists(/databases/$(database)/documents/users/$(request.resource.data.receiverId))
         && !exists(/databases/$(database)/documents/blocked_users/$(request.auth.uid)/items/$(request.resource.data.receiverId))
         && !exists(/databases/$(database)/documents/blocked_users/$(request.resource.data.receiverId)/items/$(request.auth.uid))

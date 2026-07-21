@@ -12,15 +12,15 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
 
     <application
         android:allowBackup="true"
         android:name=".ContactMeApplication"
-        android:icon="@drawable/ic_launcher_foreground"
+        android:icon="@drawable/contactme_logo_v2"
         android:label="@string/app_name"
-        android:roundIcon="@drawable/ic_launcher_foreground"
+        android:roundIcon="@drawable/contactme_logo_v2"
         android:supportsRtl="true"
         android:theme="@style/Theme.ContactMe">
         <provider
@@ -43,7 +43,7 @@
 
         <service
             android:name=".call.CallForegroundService"
-            android:foregroundServiceType="phoneCall"
+            android:foregroundServiceType="microphone|camera"
             android:exported="false" />
 
         <provider

@@ -6,6 +6,7 @@ import javax.inject.Inject
 
 class FakeAuthRepository @Inject constructor() : AuthRepository {
     private var signedIn = false
+    private var phone = ""
 
     override fun hasActiveSession(): Boolean {
         return signedIn
@@ -29,11 +30,21 @@ class FakeAuthRepository @Inject constructor() : AuthRepository {
 
     override suspend fun register(
         email: String,
+        phoneNumber: String,
         password: String
-    ): AuthResult = validateFakeAuth(
+    ): AuthResult {
+        phone = PhoneNumberFormatter.normalizeBangladeshNumber(phoneNumber).orEmpty()
+        if (phone.isBlank()) return AuthResult.Error("Enter a valid Bangladesh mobile number.")
+        return validateFakeAuth(
         email = email,
         password = password
     )
+    }
+
+    override suspend fun sendPasswordReset(email: String): AuthResult =
+        if (email.contains("@")) AuthResult.Success else AuthResult.Error("Enter your email address first.")
+
+    override fun registrationPhoneNumber(): String = phone
 
     private suspend fun validateFakeAuth(
         email: String,

@@ -10,6 +10,8 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = ContactMeLightSurface,
     primaryContainer = ContactMeGreenLight,
     onPrimaryContainer = ContactMeGreenDark,
+    secondary = ContactMeCyan,
+    onSecondary = ContactMeLightSurface,
     secondaryContainer = ContactMeGreenLight,
     onSecondaryContainer = ContactMeGreenDark,
     background = ContactMeLightBackground,
@@ -38,9 +40,11 @@ fun ContactMeTheme(
 
 private val DarkColorScheme = darkColorScheme(
     primary = ContactMeGreen,
-    onPrimary = ContactMeDarkBackground,
+    onPrimary = ContactMeDarkText,
     primaryContainer = ContactMeGreenDark,
     onPrimaryContainer = ContactMeDarkText,
+    secondary = ContactMeCyan,
+    onSecondary = ContactMeDarkText,
     secondaryContainer = ContactMeDarkSurfaceVariant,
     onSecondaryContainer = ContactMeDarkText,
     background = ContactMeDarkBackground,

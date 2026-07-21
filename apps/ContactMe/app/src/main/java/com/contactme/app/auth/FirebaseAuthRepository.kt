@@ -15,6 +15,7 @@ import kotlin.coroutines.resume
 class FirebaseAuthRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth
 ) : AuthRepository {
+    private var pendingRegistrationPhoneNumber: String = ""
     override fun hasActiveSession(): Boolean {
         return firebaseAuth.currentUser != null
     }
@@ -39,8 +40,12 @@ class FirebaseAuthRepository @Inject constructor(
 
     override suspend fun register(
         email: String,
+        phoneNumber: String,
         password: String
-    ): AuthResult = submitFirebaseAuth(
+    ): AuthResult {
+        val normalizedPhone = PhoneNumberFormatter.normalizeBangladeshNumber(phoneNumber)
+            ?: return AuthResult.Error("Enter a valid Bangladesh mobile number.")
+        val result = submitFirebaseAuth(
         email = email,
         password = password,
         operation = {
@@ -50,6 +55,19 @@ class FirebaseAuthRepository @Inject constructor(
             ).await()
         }
     )
+        if (result == AuthResult.Success) pendingRegistrationPhoneNumber = normalizedPhone
+        return result
+    }
+
+    override suspend fun sendPasswordReset(email: String): AuthResult {
+        if (email.isBlank() || !email.contains("@")) return AuthResult.Error("Enter your email address first.")
+        return runCatching { firebaseAuth.sendPasswordResetEmail(email.trim()).await() }.fold(
+            onSuccess = { AuthResult.Success },
+            onFailure = { AuthResult.Error(it.message ?: "Password reset email could not be sent.") }
+        )
+    }
+
+    override fun registrationPhoneNumber(): String = pendingRegistrationPhoneNumber
 
     private suspend fun submitFirebaseAuth(
         email: String,

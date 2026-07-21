@@ -27,10 +27,12 @@ class FirebaseCallSignalingRepository @Inject constructor(
         }
         return runCatching {
             val call = calls().document()
+            val participantIds = listOf(callerId, receiverId).sorted()
             call.set(
                 mapOf(
                     CALLER_ID to callerId,
                     RECEIVER_ID to receiverId,
+                    PARTICIPANT_IDS to participantIds,
                     TYPE to type.firestoreValue,
                     STATUS to CallStatus.Ringing.firestoreValue,
                     OFFER to offer,
@@ -266,6 +268,7 @@ class FirebaseCallSignalingRepository @Inject constructor(
         const val RECEIVER_CANDIDATES = "receiverCandidates"
         const val CALLER_ID = "callerId"
         const val RECEIVER_ID = "receiverId"
+        const val PARTICIPANT_IDS = "participantIds"
         const val TYPE = "type"
         const val STATUS = "status"
         const val OFFER = "offer"

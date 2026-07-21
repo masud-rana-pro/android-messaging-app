@@ -19,8 +19,11 @@ val webRtcProperties = Properties().apply {
     }
 }
 
-fun webRtcConfigValue(name: String): String = webRtcProperties
-    .getProperty(name, "")
+fun webRtcConfigValue(name: String): String = (
+    webRtcProperties.getProperty(name)
+        ?: providers.gradleProperty("WEBRTC_$name").orNull
+        ?: ""
+    )
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
 
