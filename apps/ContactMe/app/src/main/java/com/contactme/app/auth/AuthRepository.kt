@@ -14,8 +14,13 @@ interface AuthRepository {
 
     suspend fun register(
         email: String,
+        phoneNumber: String,
         password: String
     ): AuthResult
+
+    suspend fun sendPasswordReset(email: String): AuthResult
+
+    fun registrationPhoneNumber(): String
 
     suspend fun requestPhoneOtp(
         phoneNumber: String,

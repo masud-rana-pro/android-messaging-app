@@ -72,7 +72,8 @@ class ProfileSetupViewModel @Inject constructor(
         val validationMessage = validateProfile(
             displayName = state.displayName,
             username = state.username,
-            userId = userId
+            userId = userId,
+            hasPhoto = state.selectedPhotoUri.isNotBlank() || state.photoUrl.isNotBlank()
         )
 
         if (validationMessage != null) {
@@ -98,6 +99,7 @@ class ProfileSetupViewModel @Inject constructor(
                     userId = userId.orEmpty(),
                     displayName = state.displayName,
                     username = state.username,
+                    phoneNumber = authRepository.registrationPhoneNumber(),
                     photoUrl = photoUrl
                 )
             ) {
@@ -140,7 +142,8 @@ class ProfileSetupViewModel @Inject constructor(
     private fun validateProfile(
         displayName: String,
         username: String,
-        userId: String?
+        userId: String?,
+        hasPhoto: Boolean
     ): String? {
         return when {
             userId == null -> "Session expired. Please log in again."
@@ -150,6 +153,7 @@ class ProfileSetupViewModel @Inject constructor(
             username.trim().length < MIN_USERNAME_LENGTH -> {
                 "Username must be at least 3 characters."
             }
+            !hasPhoto -> "Choose a profile photo to continue."
             else -> null
         }
     }

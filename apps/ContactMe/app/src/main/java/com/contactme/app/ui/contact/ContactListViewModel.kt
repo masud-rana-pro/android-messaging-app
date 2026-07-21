@@ -13,6 +13,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +38,9 @@ class ContactListViewModel @Inject constructor(
 
     private val _matchedContactMeUsers = MutableStateFlow<List<UserProfile>>(emptyList())
     val matchedContactMeUsers: StateFlow<List<UserProfile>> = _matchedContactMeUsers.asStateFlow()
+
+    private val _deviceContacts = MutableStateFlow<List<DeviceContactUi>>(emptyList())
+    val deviceContacts: StateFlow<List<DeviceContactUi>> = _deviceContacts.asStateFlow()
 
     init {
         observeContacts()
@@ -74,22 +80,26 @@ class ContactListViewModel @Inject constructor(
             _uiState.update { it.copy(message = "Matching your contacts...") }
 
             val localContacts = readLocalContacts()
-            val matchedUsers = mutableListOf<UserProfile>()
-
-            localContacts.chunked(10).forEach { batch ->
-                batch.forEach { contact ->
-                    contact.phoneNumber?.let { phone ->
-                        val users = profileRepository.searchProfiles(phone, currentUserId)
-                        matchedUsers.addAll(users)
-                    }
-                    contact.email?.let { email ->
-                        val users = profileRepository.searchProfiles(email, currentUserId)
-                        matchedUsers.addAll(users)
-                    }
+            _deviceContacts.value = localContacts.map {
+                DeviceContactUi(it.name, it.phoneNumber, it.email)
+            }.distinctBy { it.phoneNumber ?: it.email ?: it.name }
+            val contactRows = localContacts.chunked(20).flatMap { batch ->
+                coroutineScope {
+                    batch.map { contact ->
+                        async {
+                            val matches = buildList {
+                                contact.phoneNumber?.let { addAll(profileRepository.searchProfiles(it, currentUserId)) }
+                                if (isEmpty()) contact.email?.let { addAll(profileRepository.searchProfiles(it, currentUserId)) }
+                            }
+                            DeviceContactUi(contact.name, contact.phoneNumber, contact.email, matches.firstOrNull())
+                        }
+                    }.awaitAll()
                 }
             }
+            val matchedUsers = contactRows.mapNotNull(DeviceContactUi::contactMeProfile)
 
             _matchedContactMeUsers.value = matchedUsers.distinctBy { it.userId }
+            _deviceContacts.value = contactRows.distinctBy { it.phoneNumber ?: it.email ?: it.name }
             _isMatchingContacts.value = false
             _uiState.update {
                 it.copy(
@@ -145,8 +155,9 @@ class ContactListViewModel @Inject constructor(
             val addressIndex = it.getColumnIndex(ContactsContract.CommonDataKinds.Email.ADDRESS)
 
             while (it.moveToNext()) {
-                val name = it.getString(nameIndex)
-                val address = it.getString(addressIndex)
+                if (nameIndex < 0 || addressIndex < 0) continue
+                val name = it.getString(nameIndex)?.trim().orEmpty().ifBlank { "Unknown contact" }
+                val address = it.getString(addressIndex)?.trim()?.takeIf(String::isNotBlank) ?: continue
                 contacts.add(LocalContact(name, null, address))
             }
         }
@@ -160,3 +171,10 @@ class ContactListViewModel @Inject constructor(
         val email: String?
     )
 }
+
+data class DeviceContactUi(
+    val name: String,
+    val phoneNumber: String? = null,
+    val email: String? = null,
+    val contactMeProfile: UserProfile? = null
+)

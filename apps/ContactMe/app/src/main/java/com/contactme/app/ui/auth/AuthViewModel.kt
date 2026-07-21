@@ -109,6 +109,7 @@ class AuthViewModel @Inject constructor(
 
                 AuthMode.EmailRegister -> authRepository.register(
                     email = state.email,
+                    phoneNumber = state.phoneNumber,
                     password = state.password
                 )
             }
@@ -127,6 +128,17 @@ class AuthViewModel @Inject constructor(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    fun resetPassword() {
+        val email = _uiState.value.email
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null, statusMessage = null) }
+            when (val result = authRepository.sendPasswordReset(email)) {
+                AuthResult.Success -> _uiState.update { it.copy(isLoading = false, statusMessage = "Password reset link sent. Check your email.") }
+                is AuthResult.Error -> _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
             }
         }
     }

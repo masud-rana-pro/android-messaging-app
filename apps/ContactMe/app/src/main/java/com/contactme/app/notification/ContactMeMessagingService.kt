@@ -28,6 +28,8 @@ class ContactMeMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-        notificationRenderer.show(message)
+        serviceScope.launch {
+            notificationRenderer.show(message)
+        }
     }
 }

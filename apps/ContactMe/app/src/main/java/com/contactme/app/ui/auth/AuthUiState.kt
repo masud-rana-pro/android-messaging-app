@@ -3,7 +3,7 @@ package com.contactme.app.ui.auth
 import com.contactme.app.navigation.AuthMode
 
 data class AuthUiState(
-    val authMode: AuthMode = AuthMode.Phone,
+    val authMode: AuthMode = AuthMode.EmailRegister,
     val phoneNumber: String = "",
     val otpCode: String = "",
     val phoneVerificationId: String? = null,

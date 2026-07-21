@@ -62,6 +62,30 @@ class FirebaseProfileRepository @Inject constructor(
         }.getOrDefault(PrivacySettings())
     }
 
+    override suspend fun getAvailableGroupMembers(currentUserId: String): List<UserProfile> {
+        return runCatching {
+            firestore.collection(USERS_COLLECTION)
+                .whereEqualTo(PROFILE_COMPLETE_FIELD, true)
+                .get()
+                .await()
+                .documents
+                .filter { document -> document.id != currentUserId }
+                .map { document ->
+                    UserProfile(
+                        userId = document.id,
+                        displayName = document.getString("displayName").orEmpty(),
+                        username = document.getString("username").orEmpty(),
+                        phoneNumber = document.getString("phoneNumber").orEmpty(),
+                        photoUrl = document.visibleProfilePhotoUrlFor(currentUserId)
+                    )
+                }
+                .sortedWith(
+                    compareBy<UserProfile> { profile -> profile.displayName.ifBlank { profile.username }.lowercase() }
+                        .thenBy { profile -> profile.username.lowercase() }
+                )
+        }.getOrDefault(emptyList())
+    }
+
     override suspend fun searchProfiles(
         query: String,
         currentUserId: String
@@ -106,6 +130,7 @@ class FirebaseProfileRepository @Inject constructor(
         userId: String,
         displayName: String,
         username: String,
+        phoneNumber: String,
         photoUrl: String
     ): ProfileResult {
         return runCatching {
@@ -133,7 +158,11 @@ class FirebaseProfileRepository @Inject constructor(
                 val profileData = mutableMapOf<String, Any>(
                     "displayName" to displayName.trim(),
                     "username" to normalizedUsername,
-                    "phoneNumber" to currentUser?.phoneNumber.orEmpty(),
+                    "phoneNumber" to (
+                        currentUser?.phoneNumber?.takeIf(String::isNotBlank)
+                            ?: phoneNumber.takeIf(String::isNotBlank)
+                            ?: profileSnapshot.getString("phoneNumber").orEmpty()
+                        ),
                     "email" to currentUser?.email.orEmpty(),
                     "photoUrl" to photoUrl,
                     "lastSeenVisibility" to (

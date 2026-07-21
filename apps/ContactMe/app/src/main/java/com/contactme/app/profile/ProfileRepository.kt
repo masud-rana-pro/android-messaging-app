@@ -7,6 +7,8 @@ interface ProfileRepository {
 
     suspend fun getPrivacySettings(userId: String): PrivacySettings
 
+    suspend fun getAvailableGroupMembers(currentUserId: String): List<UserProfile>
+
     suspend fun searchProfiles(
         query: String,
         currentUserId: String
@@ -16,6 +18,7 @@ interface ProfileRepository {
         userId: String,
         displayName: String,
         username: String,
+        phoneNumber: String,
         photoUrl: String
     ): ProfileResult
 

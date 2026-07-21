@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.contactme.app.auth.AuthRepository
 import com.contactme.app.profile.ProfileRepository
 import com.contactme.app.profile.UserProfile
+import com.contactme.app.message.MessageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ class OutgoingCallViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val callRepository: CallSignalingRepository,
     private val webRtcEngine: WebRtcCallEngine,
+    private val messageRepository: MessageRepository,
     private val okHttpClient: OkHttpClient
 ) : ViewModel() {
 
@@ -43,6 +45,8 @@ class OutgoingCallViewModel @Inject constructor(
     private var iceCandidateJob: Job? = null
     private var timerJob: Job? = null
     private val processedIceCandidateIds = mutableSetOf<String>()
+    private val pendingLocalIceCandidates = mutableListOf<CallIceCandidate>()
+    private var callLogged = false
 
     fun startCall(receiverId: String, type: CallType) {
         if (receiverId.isBlank()) {
@@ -55,11 +59,12 @@ class OutgoingCallViewModel @Inject constructor(
         }
         val callerId = authRepository.currentUserId() ?: return
         Log.d(TAG, "Starting $type call to $receiverId from $callerId")
+        resetForNewCall(receiverId, type)
         
         viewModelScope.launch {
             val receiverProfile = profileRepository.getProfile(receiverId)
             Log.d(TAG, "Resolved receiver profile: ${receiverProfile?.displayName}, FCM: ${receiverProfile?.userId}")
-            _uiState.update { it.copy(status = CallStatus.Ringing, receiverId = receiverId, receiverProfile = receiverProfile, callType = type) }
+            _uiState.update { it.copy(receiverProfile = receiverProfile) }
         }
 
         webRtcEngine.initialize(callerId, type, object : WebRtcCallEngine.Listener {
@@ -70,7 +75,20 @@ class OutgoingCallViewModel @Inject constructor(
                     if (result is CallResult.Created) {
                         Log.d(TAG, "Call offer created in Firestore: ${result.callId}")
                         currentCallId = result.callId
-                        CallForegroundService.start(context, result.callId)
+                        pendingLocalIceCandidates.toList().forEach { candidate ->
+                            val candidateResult = callRepository.addCallerIceCandidate(result.callId, callerId, candidate)
+                            if (candidateResult is CallResult.Error) {
+                                Log.e(TAG, "Failed to publish queued caller ICE candidate: ${candidateResult.message}")
+                            }
+                        }
+                        pendingLocalIceCandidates.clear()
+                        CallForegroundService.start(
+                            context = context,
+                            callId = result.callId,
+                            callType = type,
+                            role = ActiveCallStore.ROLE_OUTGOING,
+                            peerId = receiverId
+                        )
                         triggerCallNotification(result.callId, receiverId)
                         observeCall(result.callId)
                         observeIceCandidates(result.callId)
@@ -82,9 +100,15 @@ class OutgoingCallViewModel @Inject constructor(
             }
 
             override fun onIceCandidate(candidate: CallIceCandidate) {
-                currentCallId?.let { callId ->
+                val callId = currentCallId
+                if (callId == null) {
+                    pendingLocalIceCandidates += candidate
+                } else {
                     viewModelScope.launch {
-                        callRepository.addCallerIceCandidate(callId, callerId, candidate)
+                        val result = callRepository.addCallerIceCandidate(callId, callerId, candidate)
+                        if (result is CallResult.Error) {
+                            Log.e(TAG, "Failed to publish caller ICE candidate: ${result.message}")
+                        }
                     }
                 }
             }
@@ -146,6 +170,7 @@ class OutgoingCallViewModel @Inject constructor(
                     session.status == CallStatus.Cancelled ||
                     session.status == CallStatus.Busy ||
                     session.status == CallStatus.Timeout) {
+                    logCallInChat(session)
                     Log.d(TAG, "Call reached terminal status: ${session.status}, cleaning up")
                     cleanup()
                 }
@@ -209,6 +234,16 @@ class OutgoingCallViewModel @Inject constructor(
         Log.d(TAG, "Ending call: $callId")
         viewModelScope.launch {
             callRepository.endCall(callId, userId)
+            _uiState.update { it.copy(status = CallStatus.Ended) }
+            logCallInChat(
+                CallSession(
+                    callId = callId,
+                    callerId = userId,
+                    receiverId = uiState.value.receiverId,
+                    type = uiState.value.callType,
+                    status = CallStatus.Ended
+                )
+            )
             cleanup()
         }
     }
@@ -241,10 +276,57 @@ class OutgoingCallViewModel @Inject constructor(
     private fun cleanup() {
         Log.d(TAG, "Cleaning up outgoing call")
         CallForegroundService.stop(context)
+        currentCallId?.let { ActiveCallStore.clear(context, it) }
         webRtcEngine.release()
         signalingJob?.cancel()
         iceCandidateJob?.cancel()
         timerJob?.cancel()
+        currentCallId = null
+        pendingLocalIceCandidates.clear()
+        processedIceCandidateIds.clear()
+        _uiState.update {
+            it.copy(
+                status = CallStatus.Ended,
+                isMuted = false,
+                isSpeakerEnabled = false,
+                connectionState = PeerConnection.PeerConnectionState.CLOSED,
+                durationSeconds = 0L,
+                remoteVideoTrack = null
+            )
+        }
+    }
+
+    private fun resetForNewCall(receiverId: String, type: CallType) {
+        signalingJob?.cancel()
+        iceCandidateJob?.cancel()
+        timerJob?.cancel()
+        webRtcEngine.release()
+        currentCallId = null
+        pendingLocalIceCandidates.clear()
+        processedIceCandidateIds.clear()
+        callLogged = false
+        _uiState.value = OutgoingCallUiState(
+            status = CallStatus.Ringing,
+            callType = type,
+            receiverId = receiverId,
+            connectionState = PeerConnection.PeerConnectionState.NEW
+        )
+    }
+
+    private suspend fun logCallInChat(session: CallSession) {
+        if (callLogged) return
+        callLogged = true
+        val conversationId = listOf(session.callerId, session.receiverId).sorted().joinToString("__")
+        val label = if (session.type == CallType.Video) "Video call" else "Voice call"
+        val status = session.status.name.lowercase().replaceFirstChar { it.uppercase() }
+        val durationSeconds = uiState.value.durationSeconds
+        val duration = when {
+            durationSeconds >= 60 -> "${durationSeconds / 60} min ${durationSeconds % 60} sec"
+            durationSeconds > 0 -> "$durationSeconds sec"
+            else -> ""
+        }
+        val details = listOf(status, duration).filter(String::isNotBlank).joinToString(" · ")
+        messageRepository.sendCallMessage(conversationId, session.callerId, "$label · $details")
     }
 
     override fun onCleared() {

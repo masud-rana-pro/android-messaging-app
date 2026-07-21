@@ -1,6 +1,7 @@
 package com.contactme.app.ui.screens
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,8 +16,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,10 +30,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.contactme.app.profile.UserProfile
 import com.contactme.app.ui.contact.ContactListViewModel
+import com.contactme.app.ui.contact.DeviceContactUi
 import com.contactme.app.ui.conversation.ConversationViewModel
 import com.contactme.app.ui.discovery.ContactDiscoveryUiState
 import com.contactme.app.ui.discovery.ContactDiscoveryViewModel
@@ -39,15 +47,19 @@ import com.contactme.app.ui.theme.ContactMeSpacing
 fun StartChatScreen(
     onBack: () -> Unit,
     onUserSelected: (UserProfile) -> Unit,
+    onAudioCall: (UserProfile) -> Unit,
+    onVideoCall: (UserProfile) -> Unit,
     discoveryViewModel: ContactDiscoveryViewModel = hiltViewModel(),
     contactListViewModel: ContactListViewModel = hiltViewModel(),
     conversationViewModel: ConversationViewModel = hiltViewModel()
 ) {
-    val discoveryState by discoveryViewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    var query by rememberSaveable { mutableStateOf("") }
     val isOpeningChat by conversationViewModel.isOpeningChat.collectAsState()
     val openingError by conversationViewModel.errorMessage.collectAsState()
     val isMatchingContacts by contactListViewModel.isMatchingContacts.collectAsState()
     val matchedUsers by contactListViewModel.matchedContactMeUsers.collectAsState()
+    val deviceContacts by contactListViewModel.deviceContacts.collectAsState()
 
     val contactsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -58,10 +70,21 @@ fun StartChatScreen(
         }
     )
 
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            contactListViewModel.findFromPhoneContacts()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Start a chat", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text("Select contact", fontWeight = FontWeight.Bold)
+                        Text("${deviceContacts.size} contacts", style = MaterialTheme.typography.labelMedium)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
@@ -82,15 +105,15 @@ fun StartChatScreen(
             ) {
                 OutlinedTextField(
                     modifier = Modifier.fillMaxWidth(),
-                    value = discoveryState.query,
-                    onValueChange = discoveryViewModel::onQueryChanged,
-                    placeholder = { Text("Search username or phone") },
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("Search name or phone") },
                     leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                     shape = RoundedCornerShape(24.dp),
                     singleLine = true
                 )
 
-                Button(
+                if (deviceContacts.isEmpty()) Button(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS) },
                     enabled = !isMatchingContacts,
@@ -125,7 +148,7 @@ fun StartChatScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (discoveryState.isSearching) {
+                    if (isMatchingContacts) {
                         item {
                             Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator()
@@ -133,14 +156,15 @@ fun StartChatScreen(
                         }
                     }
 
-                    val results = if (discoveryState.query.isBlank()) matchedUsers else discoveryState.results
+                    val results = deviceContacts.filter { contact ->
+                        query.isBlank() || contact.name.contains(query, ignoreCase = true) ||
+                            contact.phoneNumber.orEmpty().contains(query) || contact.email.orEmpty().contains(query, ignoreCase = true)
+                    }
 
-                    if (results.isEmpty() && !discoveryState.isSearching) {
+                    if (results.isEmpty() && !isMatchingContacts) {
                         item {
                             Text(
-                                text = if (discoveryState.query.isBlank()) 
-                                    "Search a ContactMe user to start chatting." 
-                                else "No ContactMe user found.",
+                                text = if (deviceContacts.isEmpty()) "Allow contacts access to show your phone contacts." else "No matching contact found.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                                 modifier = Modifier.padding(16.dp)
@@ -148,19 +172,61 @@ fun StartChatScreen(
                         }
                     }
 
-                    items(results) { user ->
-                        StartChatUserRow(
-                            user = user,
-                            onClick = { 
-                                if (!isOpeningChat) {
-                                    Log.d("StartChatScreen", "User selected: ${user.userId}")
-                                    onUserSelected(user) 
-                                }
-                            }
+                    items(results, key = { it.phoneNumber ?: it.email ?: it.name }) { contact ->
+                        DeviceContactRow(
+                            contact = contact,
+                            actionsEnabled = !isOpeningChat,
+                            onChat = { contact.contactMeProfile?.let(onUserSelected) },
+                            onAudioCall = { contact.contactMeProfile?.let(onAudioCall) },
+                            onVideoCall = { contact.contactMeProfile?.let(onVideoCall) }
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DeviceContactRow(
+    contact: DeviceContactUi,
+    actionsEnabled: Boolean,
+    onChat: () -> Unit,
+    onAudioCall: () -> Unit,
+    onVideoCall: () -> Unit
+) {
+    val profile = contact.contactMeProfile
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!profile?.photoUrl.isNullOrBlank()) {
+                AsyncImage(model = profile?.photoUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                Text(contact.name.take(1).uppercase(), color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(contact.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = profile?.let { it.phoneNumber.ifBlank { "@${it.username}" } }
+                    ?: contact.phoneNumber ?: contact.email ?: "Not on ContactMe",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (profile == null) Text("Not on ContactMe", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (profile != null) {
+            IconButton(onClick = onChat, enabled = actionsEnabled) { Icon(Icons.Outlined.Chat, contentDescription = "Chat") }
+            IconButton(onClick = onAudioCall, enabled = actionsEnabled) { Icon(Icons.Outlined.Call, contentDescription = "Audio call") }
+            IconButton(onClick = onVideoCall, enabled = actionsEnabled) { Icon(Icons.Outlined.Videocam, contentDescription = "Video call") }
         }
     }
 }

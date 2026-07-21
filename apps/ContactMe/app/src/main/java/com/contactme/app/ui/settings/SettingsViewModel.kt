@@ -70,18 +70,18 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun cycleLastSeenVisibility() {
+    fun setLastSeenVisibility(visibility: com.contactme.app.profile.PrivacyVisibility) {
         savePrivacySettings(
             _uiState.value.privacySettings.copy(
-                lastSeenVisibility = _uiState.value.privacySettings.lastSeenVisibility.next()
+                lastSeenVisibility = visibility
             )
         )
     }
 
-    fun cycleProfilePhotoVisibility() {
+    fun setProfilePhotoVisibility(visibility: com.contactme.app.profile.PrivacyVisibility) {
         savePrivacySettings(
             _uiState.value.privacySettings.copy(
-                profilePhotoVisibility = _uiState.value.privacySettings.profilePhotoVisibility.next()
+                profilePhotoVisibility = visibility
             )
         )
     }

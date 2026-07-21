@@ -8,7 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -16,13 +15,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 fun OutgoingCallScreen(
     receiverId: String,
     callType: CallType = CallType.Audio,
+    startNewCall: Boolean = true,
     onCallEnded: () -> Unit,
     viewModel: OutgoingCallViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.startCall(receiverId, callType)
+    LaunchedEffect(receiverId, callType, startNewCall) {
+        if (startNewCall) {
+            viewModel.startCall(receiverId, callType)
+        }
     }
 
     LaunchedEffect(uiState.status) {
@@ -35,7 +37,7 @@ fun OutgoingCallScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    CallScreenSurface {
         if (callType == CallType.Video && (uiState.status == CallStatus.Connected || uiState.status == CallStatus.Accepted || uiState.status == CallStatus.Connecting)) {
             VideoCallLayout(
                 uiState = uiState,
@@ -94,17 +96,14 @@ private fun VideoCallLayout(
                 viewModel.setupRemoteVideo(renderer)
             }
         } else {
-            Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color.White)
-            }
+            CallVideoPlaceholder(modifier = Modifier.fillMaxSize())
         }
 
-        Box(
+        LocalVideoPreviewContainer(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(16.dp)
                 .size(width = 120.dp, height = 180.dp)
-                .background(Color.Black, shape = MaterialTheme.shapes.medium)
         ) {
             VideoRenderer(modifier = Modifier.fillMaxSize()) { renderer ->
                 viewModel.setupLocalVideo(renderer)
@@ -118,12 +117,12 @@ private fun VideoCallLayout(
             Text(
                 text = uiState.receiverProfile?.displayName ?: "ContactMe User",
                 style = MaterialTheme.typography.titleLarge,
-                color = Color.White
+                color = CallTextPrimary
             )
             Text(
                 text = getCallStatusLabel(uiState.status, uiState.connectionState),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f)
+                color = CallTextSecondary
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -134,7 +133,7 @@ private fun VideoCallLayout(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = viewModel::switchCamera) {
-                    Icon(Icons.Default.FlipCameraAndroid, contentDescription = "Switch Camera", tint = Color.White)
+                    Icon(Icons.Default.FlipCameraAndroid, contentDescription = "Switch Camera", tint = CallTextPrimary)
                 }
                 
                 CallControlBar(

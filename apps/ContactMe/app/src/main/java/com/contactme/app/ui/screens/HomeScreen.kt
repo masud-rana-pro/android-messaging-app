@@ -56,6 +56,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.contactme.app.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -82,6 +85,7 @@ import com.contactme.app.ui.call.CallsViewModel
 import com.contactme.app.ui.call.CallListUiState
 import com.contactme.app.call.CallSession
 import com.contactme.app.call.CallStatus
+import com.contactme.app.call.CallType
 import com.contactme.app.ui.theme.ContactMeSpacing
 import com.contactme.app.ui.theme.ContactMeTheme
 import java.text.SimpleDateFormat
@@ -96,7 +100,8 @@ fun HomeScreen(
     onDiscoveredUserSelected: (UserProfile) -> Unit,
     onStartChatSelected: () -> Unit,
     onCreateGroupSelected: () -> Unit,
-    onSettingsSelected: () -> Unit
+    onSettingsSelected: () -> Unit,
+    onCallSelected: (String, CallType) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(HomeTab.Chats) }
     var newChatRequestCount by remember { mutableStateOf(0) }
@@ -105,10 +110,15 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "ContactMe",
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(R.drawable.contactme_logo_v2),
+                            contentDescription = null,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(text = "ContactMe", fontWeight = FontWeight.Bold)
+                    }
                 },
                 actions = {
                     if (selectedTab == HomeTab.Chats) {
@@ -187,7 +197,17 @@ fun HomeScreen(
                     title = "Status"
                 )
 
-                HomeTab.Calls -> CallsTab()
+                HomeTab.Calls -> CallsTab(
+                    onOpenChat = { conversationId, name, photoUrl ->
+                        onConversationSelected(
+                            conversationId,
+                            name,
+                            photoUrl,
+                            ConversationType.Direct
+                        )
+                    },
+                    onStartCall = onCallSelected
+                )
 
                 HomeTab.Communities -> PlaceholderTab(
                     title = "Communities"
@@ -249,7 +269,7 @@ private fun ChatsContent(
 
     Column(
         modifier = Modifier.verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        verticalArrangement = Arrangement.spacedBy(ContactMeSpacing.md)
     ) {
         ChatSearch(
             newChatRequestCount = newChatRequestCount,
@@ -669,6 +689,8 @@ private fun Calendar.isYesterday(today: Calendar): Boolean {
 
 @Composable
 private fun CallsTab(
+    onOpenChat: (String, String, String) -> Unit,
+    onStartCall: (String, CallType) -> Unit,
     viewModel: com.contactme.app.ui.call.CallsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -698,6 +720,14 @@ private fun CallsTab(
                         session = session,
                         currentUserId = uiState.currentUserId,
                         peerProfile = uiState.profiles[if (session.callerId == uiState.currentUserId) session.receiverId else session.callerId]
+                        ,onOpenChat = { peerId, name, photoUrl ->
+                            onOpenChat(
+                                listOf(uiState.currentUserId, peerId).sorted().joinToString("__"),
+                                name,
+                                photoUrl
+                            )
+                        },
+                        onStartCall = onStartCall
                     )
                 }
             }
@@ -750,10 +780,13 @@ private fun EmptyCallsState(message: String) {
 private fun CallRow(
     session: com.contactme.app.call.CallSession,
     currentUserId: String,
-    peerProfile: com.contactme.app.profile.UserProfile?
+    peerProfile: com.contactme.app.profile.UserProfile?,
+    onOpenChat: (String, String, String) -> Unit,
+    onStartCall: (String, CallType) -> Unit
 ) {
     val isOutgoing = session.callerId == currentUserId
     val peerName = peerProfile?.displayName ?: "ContactMe User"
+    val peerId = if (isOutgoing) session.receiverId else session.callerId
     val icon = when {
         session.status == com.contactme.app.call.CallStatus.Missed -> Icons.Default.CallMissed
         isOutgoing -> Icons.Default.CallMade
@@ -766,7 +799,9 @@ private fun CallRow(
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().clickable { /* TODO: Call Details */ }.padding(16.dp, 12.dp),
+        modifier = Modifier.fillMaxWidth().clickable {
+            onOpenChat(peerId, peerName, peerProfile?.photoUrl.orEmpty())
+        }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ContactAvatar(photoUrl = peerProfile?.photoUrl ?: "", label = peerName, size = 48)
@@ -791,11 +826,19 @@ private fun CallRow(
             }
         }
 
-        IconButton(onClick = { /* TODO: Re-call */ }) {
-            Icon(imageVector = Icons.Outlined.Call, contentDescription = "Call Back", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        IconButton(onClick = { onOpenChat(peerId, peerName, peerProfile?.photoUrl.orEmpty()) }) {
+            Icon(imageVector = Icons.Outlined.Chat, contentDescription = "Message", tint = MaterialTheme.colorScheme.primary)
+        }
+        IconButton(onClick = { onStartCall(peerId, session.type) }) {
+            Icon(
+                imageVector = if (session.type == CallType.Video) Icons.Outlined.Videocam else Icons.Outlined.Call,
+                contentDescription = if (session.type == CallType.Video) "Video call" else "Audio call",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
+
 
 private fun CallStatus.displayLabel(): String {
     return when (this) {
@@ -839,7 +882,8 @@ private fun HomeScreenPreview() {
             onDiscoveredUserSelected = {},
             onStartChatSelected = {},
             onCreateGroupSelected = {},
-            onSettingsSelected = {}
+            onSettingsSelected = {},
+            onCallSelected = { _, _ -> }
         )
     }
 }

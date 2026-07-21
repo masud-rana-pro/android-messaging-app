@@ -9,10 +9,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.BatterySaver
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Logout
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,8 +55,8 @@ fun SettingsScreen(
         onBack = onBack,
         onEditProfile = onEditProfile,
         onSignOut = onSignOut,
-        onLastSeenClick = viewModel::cycleLastSeenVisibility,
-        onProfilePhotoClick = viewModel::cycleProfilePhotoVisibility,
+        onLastSeenChanged = viewModel::setLastSeenVisibility,
+        onProfilePhotoChanged = viewModel::setProfilePhotoVisibility,
         onReadReceiptsClick = viewModel::toggleReadReceipts
     )
 }
@@ -58,8 +68,8 @@ private fun SettingsContent(
     onBack: () -> Unit,
     onEditProfile: () -> Unit,
     onSignOut: () -> Unit,
-    onLastSeenClick: () -> Unit,
-    onProfilePhotoClick: () -> Unit,
+    onLastSeenChanged: (PrivacyVisibility) -> Unit,
+    onProfilePhotoChanged: (PrivacyVisibility) -> Unit,
     onReadReceiptsClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -75,8 +85,8 @@ private fun SettingsContent(
                     )
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(text = "Back")
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -95,7 +105,7 @@ private fun SettingsContent(
                     horizontal = ContactMeSpacing.screenHorizontal,
                     vertical = ContactMeSpacing.contentGap
                 ),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            verticalArrangement = Arrangement.spacedBy(ContactMeSpacing.md)
         ) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -105,7 +115,7 @@ private fun SettingsContent(
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(ContactMeSpacing.sm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -153,10 +163,12 @@ private fun SettingsContent(
                 )
             }
             
-            OutlinedButton(
+            FilledTonalButton(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onEditProfile
             ) {
+                Icon(Icons.Outlined.Edit, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
                 Text(text = "Edit profile")
             }
             
@@ -170,13 +182,13 @@ private fun SettingsContent(
                 title = "Last seen",
                 value = uiState.privacySettings.lastSeenVisibility.toDisplayText(),
                 enabled = !uiState.isSavingPrivacy,
-                onClick = onLastSeenClick
+                onValueChanged = onLastSeenChanged
             )
             PrivacyChoiceItem(
                 title = "Profile photo",
                 value = uiState.privacySettings.profilePhotoVisibility.toDisplayText(),
                 enabled = !uiState.isSavingPrivacy,
-                onClick = onProfilePhotoClick
+                onValueChanged = onProfilePhotoChanged
             )
             PrivacyToggleItem(
                 title = "Read receipts",
@@ -202,6 +214,8 @@ private fun SettingsContent(
                     context.startActivity(intent)
                 }
             ) {
+                Icon(Icons.Outlined.Notifications, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
                 Text("Open Notification Settings")
             }
 
@@ -212,6 +226,8 @@ private fun SettingsContent(
                     runCatching { context.startActivity(intent) }
                 }
             ) {
+                Icon(Icons.Outlined.BatterySaver, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
                 Text("Optimize Battery for Calls")
             }
 
@@ -219,39 +235,44 @@ private fun SettingsContent(
 
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = onSignOut
+                onClick = onSignOut,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
             ) {
-                Text(
-                    text = "Log out",
-                    color = MaterialTheme.colorScheme.error
-                )
+                Icon(Icons.Outlined.Logout, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(text = "Log out")
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PrivacyChoiceItem(
     title: String,
     value: String,
     enabled: Boolean,
-    onClick: () -> Unit
+    onValueChanged: (PrivacyVisibility) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold
-        )
-        TextButton(
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { if (enabled) expanded = !expanded }) {
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+            value = value,
+            onValueChange = {},
+            readOnly = true,
             enabled = enabled,
-            onClick = onClick
-        ) {
-            Text(text = value)
+            label = { Text(title) },
+            trailingIcon = { Icon(Icons.Outlined.ExpandMore, contentDescription = "Choose $title") },
+            colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surface)
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            PrivacyVisibility.entries.forEach { visibility ->
+                DropdownMenuItem(
+                    text = { Text(visibility.toDisplayText()) },
+                    onClick = { expanded = false; onValueChanged(visibility) }
+                )
+            }
         }
     }
 }
@@ -295,8 +316,8 @@ private fun SettingsScreenPreview() {
             onBack = {},
             onEditProfile = {},
             onSignOut = {},
-            onLastSeenClick = {},
-            onProfilePhotoClick = {},
+            onLastSeenChanged = {},
+            onProfilePhotoChanged = {},
             onReadReceiptsClick = {}
         )
     }

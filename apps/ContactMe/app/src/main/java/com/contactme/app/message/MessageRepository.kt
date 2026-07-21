@@ -36,6 +36,19 @@ interface MessageRepository {
         fileSizeBytes: Long
     ): MessageResult
 
+    suspend fun sendCallMessage(
+        conversationId: String,
+        senderId: String,
+        text: String
+    ): MessageResult
+
+    suspend fun sendGroupCallInvitation(
+        conversationId: String,
+        senderId: String,
+        text: String,
+        roomUrl: String
+    ): MessageResult
+
     suspend fun deleteMessage(
         conversationId: String,
         messageId: String,

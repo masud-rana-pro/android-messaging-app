@@ -19,9 +19,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -36,17 +43,23 @@ import com.contactme.app.ui.theme.ContactMeSpacing
 @Composable
 fun GroupCreationScreen(
     onBack: () -> Unit,
-    onGroupCreated: () -> Unit,
+    onGroupCreated: (conversationId: String, title: String) -> Unit,
     viewModel: GroupCreationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
+    val visibleContacts = remember(uiState.contacts, searchQuery) {
+        uiState.contacts.filter { contact -> contact.matchesGroupSearch(searchQuery) }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(text = "New group", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text(text = "Back") }
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                    }
                 }
             )
         }
@@ -70,17 +83,25 @@ fun GroupCreationScreen(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Search app users") },
+                singleLine = true
+            )
             uiState.errorMessage?.let { message ->
                 Text(text = message, color = MaterialTheme.colorScheme.error)
             }
             when {
                 uiState.isLoadingContacts -> CircularProgressIndicator()
-                uiState.contacts.isEmpty() -> Text(text = "Save at least two contacts to create a group.")
+                uiState.contacts.isEmpty() -> Text(text = "No ContactMe users found yet.")
+                visibleContacts.isEmpty() -> Text(text = "No matching user found.")
                 else -> LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(uiState.contacts, key = UserProfile::userId) { contact ->
+                    items(visibleContacts, key = UserProfile::userId) { contact ->
                         GroupContactRow(
                             contact = contact,
                             selected = contact.userId in uiState.selectedUserIds,
@@ -93,13 +114,25 @@ fun GroupCreationScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                enabled = !uiState.isCreating && uiState.contacts.isNotEmpty(),
+                enabled = !uiState.isCreating && uiState.title.isNotBlank() && uiState.selectedUserIds.size >= 2,
                 onClick = { viewModel.createGroup(onGroupCreated) }
             ) {
                 Text(text = if (uiState.isCreating) "Creating..." else "Create group")
             }
         }
     }
+}
+
+private fun UserProfile.matchesGroupSearch(query: String): Boolean {
+    val normalizedQuery = query.trim()
+    if (normalizedQuery.isBlank()) return true
+
+    val textQuery = normalizedQuery.lowercase().removePrefix("@")
+    val phoneQuery = normalizedQuery.filter(Char::isDigit)
+    return displayName.contains(normalizedQuery, ignoreCase = true) ||
+        username.contains(textQuery, ignoreCase = true) ||
+        "@$username".contains(normalizedQuery, ignoreCase = true) ||
+        (phoneQuery.isNotBlank() && phoneNumber.filter(Char::isDigit).contains(phoneQuery))
 }
 
 @Composable
