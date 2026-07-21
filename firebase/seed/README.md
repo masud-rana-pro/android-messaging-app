@@ -1,3 +1,5 @@
 # Firebase Seed Data
 
-Seed data and local development fixtures will live here.
+This folder is reserved for optional development fixtures and seed data.
+
+Do not place real user data, production exports, Firebase service-account files, or private tokens here.
