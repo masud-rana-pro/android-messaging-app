@@ -35,9 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -510,14 +508,22 @@ private fun ChatDetailContent(
 private fun ChatWallpaper() {
     val isDark = isSystemInDarkTheme()
     val wallpaperRes = if (isDark) R.drawable.chat_bg_dark else R.drawable.chat_bg_light
-    Image(
-        painter = painterResource(id = wallpaperRes),
-        contentDescription = null,
-        modifier = Modifier.fillMaxSize(),
-        contentScale = ContentScale.Crop,
-        alpha = if (isDark) 0.35f else 0.45f,
-        colorFilter = if (isDark) ColorFilter.tint(Color.Black, BlendMode.Darken) else null
-    )
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Image(
+            painter = painterResource(id = wallpaperRes),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            alpha = if (isDark) 0.22f else 0.45f
+        )
+        if (isDark) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.28f))
+            )
+        }
+    }
 }
 
 @Composable
