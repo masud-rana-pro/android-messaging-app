@@ -57,6 +57,7 @@ fun StartChatScreen(
     var query by rememberSaveable { mutableStateOf("") }
     val isOpeningChat by conversationViewModel.isOpeningChat.collectAsState()
     val openingError by conversationViewModel.errorMessage.collectAsState()
+    val discoveryState by discoveryViewModel.uiState.collectAsState()
     val isMatchingContacts by contactListViewModel.isMatchingContacts.collectAsState()
     val matchedUsers by contactListViewModel.matchedContactMeUsers.collectAsState()
     val deviceContacts by contactListViewModel.deviceContacts.collectAsState()
@@ -106,7 +107,10 @@ fun StartChatScreen(
                 OutlinedTextField(
                     modifier = Modifier.fillMaxWidth(),
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = {
+                        query = it
+                        discoveryViewModel.onQueryChanged(it)
+                    },
                     placeholder = { Text("Search name or phone") },
                     leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                     shape = RoundedCornerShape(24.dp),
@@ -160,14 +164,64 @@ fun StartChatScreen(
                         query.isBlank() || contact.name.contains(query, ignoreCase = true) ||
                             contact.phoneNumber.orEmpty().contains(query) || contact.email.orEmpty().contains(query, ignoreCase = true)
                     }
+                    val contactProfileIds = results.mapNotNull { it.contactMeProfile?.userId }.toSet()
+                    val appUsers = discoveryState.results.filterNot { it.userId in contactProfileIds }
 
-                    if (results.isEmpty() && !isMatchingContacts) {
+                    if (
+                        results.isEmpty() &&
+                        appUsers.isEmpty() &&
+                        !isMatchingContacts &&
+                        !discoveryState.isSearching
+                    ) {
                         item {
                             Text(
-                                text = if (deviceContacts.isEmpty()) "Allow contacts access to show your phone contacts." else "No matching contact found.",
+                                text = if (query.length < 3) {
+                                    "Type at least 3 letters or digits to search ContactMe users."
+                                } else {
+                                    discoveryState.message ?: "No matching contact found."
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                                 modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
+
+                    if (discoveryState.isSearching) {
+                        item {
+                            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
+
+                    if (appUsers.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "ContactMe users",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+
+                    items(appUsers, key = { it.userId }) { user ->
+                        StartChatUserRow(
+                            user = user,
+                            onClick = { onUserSelected(user) }
+                        )
+                    }
+
+                    if (results.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "Phone contacts",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 4.dp)
                             )
                         }
                     }
