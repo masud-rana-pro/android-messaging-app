@@ -1,105 +1,60 @@
 # ContactMe
 
-ContactMe is an Android messaging app focused on realtime chat, media sharing, presence, notifications, and audio/video calling. The app is built with Kotlin, Jetpack Compose, Firebase, WebRTC, and a Cloudflare Worker for server-side FCM fanout.
+ContactMe is a native Android messaging application built around realtime conversations, media sharing, presence, push notifications, and calling. It is designed as a modern, privacy-aware communication experience for Android devices.
 
-## What Works Now
+## Highlights
 
-- Email registration, login, logout, and password reset
-- Profile setup with display name, username, phone number, and profile photo
-- Direct conversations with realtime text messages
-- Image, document, and voice message support
-- Reply, edit, delete, report, block, and unblock chat actions
-- Conversation list with unread state and call history cards in chat
-- Online/last-seen presence backed by Firebase Realtime Database and Firestore
-- One-to-one audio and video calling with WebRTC + TURN
-- Incoming call foreground notifications and active call restoration
-- Group creation from registered app users
-- Group chat and group audio/video call invitations through Jitsi links
-- Message push notifications through Cloudflare Worker + FCM
-- Polished Compose UI theme, logo, chat wallpaper, settings, and call screens
+- Email authentication, password reset, profile setup, and session restoration
+- Realtime direct and group conversations
+- Text, image, document, and voice messages
+- Message replies, editing, deletion, read receipts, typing indicators, blocking, and reporting
+- App-user discovery and device-contact matching
+- Online status, last seen, and privacy controls
+- One-to-one audio and video calls with WebRTC and TURN
+- Incoming-call and message notifications through Firebase Cloud Messaging
+- Group call invitations using Jitsi Meet rooms
+- Light and dark Compose UI with accessible call, chat, settings, and profile flows
+
+## Technology
+
+| Area | Stack |
+| --- | --- |
+| Android client | Kotlin, Jetpack Compose, Hilt, WorkManager |
+| Authentication and data | Firebase Authentication, Cloud Firestore, Realtime Database, Storage |
+| Notifications | Firebase Cloud Messaging, Cloudflare Worker |
+| Media | Cloudinary |
+| One-to-one calling | WebRTC with TURN |
+| Group calling | Jitsi Meet |
 
 ## Repository Layout
 
 ```text
-apps/ContactMe/              Android app
-backend/cloudflare-worker/   FCM notification Worker
-firebase/                    Firestore, Realtime Database, and Storage rules
-docs/                        Roadmap, architecture, feature notes, checklists
-learning/                    Step-by-step implementation notes
-design/                      Design references and exported assets
+apps/ContactMe/              Android application
+backend/cloudflare-worker/   Secure FCM notification worker
+firebase/                    Firebase security rules and indexes
 ```
 
-## Android App
+## Run Locally
 
-Open this folder in Android Studio:
-
-```text
-apps/ContactMe
-```
-
-Build and test from PowerShell:
+1. Open `apps/ContactMe` in Android Studio.
+2. Add your Firebase `google-services.json` to `apps/ContactMe/app/`.
+3. Configure Firebase Auth, Firestore, Realtime Database, Storage, and FCM for the Android package.
+4. Create a local `webrtc.properties` from `webrtc.properties.example` and supply valid TURN details for real-device calling.
+5. Build and install the app.
 
 ```powershell
 cd apps\ContactMe
 .\gradlew.bat assembleDebug testDebugUnitTest
 ```
 
-If Gradle wrapper download is blocked on the local machine, use the installed Gradle distribution under `%USERPROFILE%\.gradle\wrapper\dists\...`.
+## Backend Services
 
-## Firebase Setup
+Firebase manages authentication, data, online presence, and client notifications. The Cloudflare Worker sends verified FCM notifications without exposing Firebase service-account credentials to the Android client. Its deployment instructions are in [backend/cloudflare-worker/README.md](backend/cloudflare-worker/README.md).
 
-The app expects Firebase Auth, Firestore, Realtime Database, Storage, and FCM to be configured for the Android package.
+## Security
 
-Deploy rules from the repo root:
+This repository intentionally excludes Firebase configuration files, service-account credentials, TURN credentials, Cloudinary credentials, signing keys, build outputs, and local IDE files. Use local configuration and platform secret stores for all production values.
 
-```powershell
-firebase deploy --only firestore:rules,database,storage --project <firebase-project-id>
-```
+## License
 
-Keep `google-services.json` local unless you intentionally decide to commit environment-specific Firebase config.
-
-## Cloudflare Worker
-
-The Worker verifies message/call requests, reads Firestore with a service account, and sends FCM HTTP v1 data messages. Source lives in:
-
-```text
-backend/cloudflare-worker
-```
-
-Before deploying, set Worker secrets:
-
-```powershell
-cd backend\cloudflare-worker
-npx wrangler secret put FIREBASE_PROJECT_ID
-npx wrangler secret put FIREBASE_CLIENT_EMAIL
-npx wrangler secret put FIREBASE_PRIVATE_KEY
-npx wrangler deploy
-```
-
-The Android app currently calls the deployed Worker URL from `FirebaseMessageRepository`.
-
-## Calling Notes
-
-One-to-one calls use native WebRTC signaling documents in Firestore. Real phones usually need a working TURN server, especially across mobile data and different Wi-Fi networks.
-
-Do not commit real TURN, Firebase service-account, Cloudinary, signing, or API secrets. Prefer local files, Gradle properties injected outside Git, Firebase secrets, or Cloudflare Worker secrets.
-
-## Useful Docs
-
-- [Architecture](docs/03-architecture.md)
-- [Database schema](docs/04-database-schema.md)
-- [Security rules](docs/05-security-rules.md)
-- [Notification flow](docs/06-notification-flow.md)
-- [Calling flow](docs/07-calling-flow.md)
-- [Release checklist](docs/08-release-checklist.md)
-- [Current state roadmap](docs/28-current-state-and-next-roadmap.md)
-
-## Current Local Notes
-
-The latest verified command was:
-
-```powershell
-.\gradlew.bat assembleDebug testDebugUnitTest
-```
-
-It completed successfully after the Start Chat app-user search fix.
+See [LICENSE](LICENSE).

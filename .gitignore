@@ -1,66 +1,69 @@
-# -----------------------------
-# ContactMe Git Ignore Rules
-# -----------------------------
-# Keep source code, docs, learning notes, Firebase rules, scripts, and Gradle wrapper files in Git.
-# Ignore only generated files, local machine settings, build outputs, and secrets.
-
-# Android / Gradle generated files
+# Android and Gradle output
 .gradle/
 .kotlin/
 build/
 **/build/
+*.apk
+*.aab
+*.ap_
+*.dex
 
-# Node / Firebase Functions generated files
+# JavaScript tooling
 node_modules/
 **/node_modules/
-backend/firebase-functions/lib/
+.wrangler/
 
-# Local Android Studio / SDK machine settings
-local.properties
-**/local.properties
-
-# IDE user-specific files
+# Android Studio and local machine settings
 .idea/
 **/.idea/
 *.iml
+local.properties
+**/local.properties
 
-# Build artifacts
-*.apk
-*.ap_
-*.aab
-*.dex
-
-# Kotlin / Java / Gradle logs
-*.log
-hs_err_pid*
-replay_pid*
-
-# OS generated files
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Secrets and signing files
+# Secrets and environment-specific configuration
 .env
 .env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
 cloudinary.properties
 cloudinary.local.properties
 apps/ContactMe/webrtc.properties
-scripts/cloudinary_onboarding.gradle.kts
 *.keystore
 *.jks
 *.p12
 *.pem
+service-account*.json
 
-# Firebase / Google service config
-# Keep these out until you intentionally decide how to manage environment-specific config.
-google-services.json
-GoogleService-Info.plist
-
-# Temporary files
+# Logs, temporary files, and OS metadata
+*.log
+emulator_log*.txt
+hs_err_pid*
+replay_pid*
 *.tmp
 *.temp
 *.swp
 *.swo
 ~$*
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local investigation, generated resources, and backups
+assets/
+firebase/*-backup-*.txt
+backend/firebase-functions/
+
+# Local planning material and retired placeholders
+.github/
+CHANGELOG.md
+apps/admin-web/
+backend/api-server/
+backend/realtime-server/
+backend/workers/
+design/
+docs/
+firebase/seed/
+learning/
+scripts/
+tests/
